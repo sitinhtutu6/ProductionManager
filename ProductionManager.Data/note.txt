@@ -1,0 +1,85 @@
+Viết code mẫu cho phần WinForms khởi chạy ASP.NET Core.
+
+Cách viết Discord Service để gửi tin nhắn tự động.
+
+Tôi muốn dùng ASP Net + Winform C# (UI quản lý start/stop/config đường dẫn lưu db cho web) với các yêu cầu sau:
+- Website quản lý đơn hàng sản xuất 
+- Có giao diện quản lý đơn hàng chi tiết, logic và khoa học
+- Có tình trạng đơn hàng (Duyệt, đang sản xuất, thành phẩm, đóng gói, đã giao hàng, đã nhận tiền, tạm dừng hoặc Huỷ)
+- Xử lý đơn hàng có nhận cọc trước từ khách
+- Theo đơn hàng theo: ngày/ tháng/ quý/ năm / khách hàng và giữa 2 khoảng thời gian
+- Mỗi đơn hàng sẽ một hoặc nhiều mặt hàng -> phải có bảng chi tiết đơn hàng
+- Đơn hàng giao có thể chia làm nhiều lần (giao chi tiết/ thành phẩm)
+- Phải có ngày nhận đơn hàng và lịch sử giao hàng (thông tin chi tiết như: ngày giao, số xe giao, số lượng, tên sản phẩm/ chi tiết sản phẩm, ghi chú, chứng từ - file pdf/ ảnh) 
+- Phải có giao diện và quản lý khách hàng (mã khách hàng, tên công ty, tên người lh, số điện thoại, địa chỉ email, địa chỉ, ghi chú,...) 
+- Gửi thông báo về bot discord khi đơn hàng thay đổi trạng thái
+- Phải có UI phân quyền (admin và người dùng)
+- Có chức năng lock đơn hàng khi giao thành công hoặc edit từ admin  
+
+
+chạy lại migrate: 
+Add-Migration InitialCreate -Context AppDbContext -Project ProductionManager.Data -StartupProject ProductionManager.Data
+
+
+// nếu lỗi thử chạy query này cho db
+ALTER TABLE Orders ADD COLUMN RowVersion DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) NULL;
+
+ALTER TABLE PurchaseOrders ADD COLUMN RowVersion DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) NULL;
+
+ALTER TABLE Invoices ADD COLUMN RowVersion DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) NULL;
+
+ALTER TABLE CashEntries ADD COLUMN PurchaseOrderId INT NULL;
+
+ALTER TABLE CashEntries ADD COLUMN ExportShipmentId INT NULL;
+//---------------------------
+
+//- them bang
+CREATE TABLE OrderHistory (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    OrderId INT NULL,
+    Action VARCHAR(255) NOT NULL,
+    OldValue TEXT,
+    NewValue TEXT,
+    ChangedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ChangedBy VARCHAR(255)
+);
+
+
+//-----------------------
+
+CREATE TABLE WorkOrder (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    OrderId INT NOT NULL,
+    WOCode VARCHAR(50) NOT NULL,
+    ProductName VARCHAR(255),
+    TargetQuantity INT DEFAULT 0,
+    FinishedQuantity INT DEFAULT 0,
+    StartDate DATETIME,
+    EndDate DATETIME,
+    Status INT DEFAULT 0,
+    MachineId VARCHAR(50),
+    CONSTRAINT FK_WorkOrder_Order FOREIGN KEY (OrderId) REFERENCES Orders(Id) ON DELETE CASCADE
+);
+
+/-///-------------
+16/07/2026: 
+ALTER TABLE productiondb.orderdetails
+ADD COLUMN ExcludedMaterials TEXT NULL;
+
+//----------
+22/07/2026:
+ALTER TABLE ExportShipments
+ADD Departure NVARCHAR(200) NULL,
+    Destination NVARCHAR(200) NULL;
+
+    //---------------------
+    24/07
+    ALTER TABLE WarehouseItems
+ADD ImportUnit NVARCHAR(50) NULL,
+ADD ConversionRate FLOAT NOT NULL DEFAULT 1;
+
+28/08/2026
+USE productiondb;
+ALTER TABLE PurchaseOrderDetails
+ADD COLUMN LinkedOrderId INT NULL,
+ADD COLUMN LinkedOrderCode VARCHAR(255) NULL;
