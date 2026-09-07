@@ -1,0 +1,127 @@
+﻿@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đăng Nhập - Hệ Thống Quản Lý</title>
+
+    <meta name="turbo-visit-control" content="reload">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body { 
+            background-color: #f4f6f9; 
+            font-family: 'Inter', sans-serif; 
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+        }
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            overflow: hidden;
+            background: white;
+        }
+        .login-header {
+            background: #0d6efd;
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        /* CSS cho Logo */
+        .login-logo {
+            max-width: 100px; /* Điều chỉnh độ to nhỏ của logo ở đây */
+            height: auto;
+            border-radius: 50%; /* Bo tròn ảnh. Đổi thành 8px nếu logo là hình vuông/chữ nhật */
+            border: 3px solid rgba(255,255,255,0.3); /* Viền trắng mờ bao quanh ảnh */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            background-color: white; /* Nền trắng phòng khi logo trong suốt */
+        }
+        .login-body {
+            padding: 40px 30px;
+        }
+        .form-control {
+            padding: 12px 15px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            border: 1px solid #e2e8f0;
+        }
+        .form-control:focus {
+            background-color: white;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+        }
+        .btn-login {
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <div class="login-header">
+            <img src="~/images/logo.jpg" alt="Logo Hệ Thống" class="login-logo mb-3" onerror="this.style.display='none';" />
+            
+            <h4 class="fw-bold mb-0">Đăng Nhập</h4>
+            <p class="mb-0 text-white-50 small mt-1">Hệ thống quản lý sản xuất</p>
+        </div>
+        
+        <div class="login-body">
+            <form asp-controller="Account" asp-action="Login" method="post">
+                
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="alert alert-danger small fw-bold py-2 mb-3 text-center">
+                        @Html.ValidationSummary(false, "")
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <label for="email" class="form-label small fw-bold text-muted">Địa chỉ Email</label>
+                    <input type="email" name="email" id="email" class="form-control" value="@ViewBag.SavedEmail" placeholder="nhapemail@domain.com" required autofocus />
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label small fw-bold text-muted">Mật khẩu</label>
+                    <input type="password" name="password" id="password" class="form-control" placeholder="••••••••" required />
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="form-check">
+                        <input type="checkbox" name="rememberMe" value="true" class="form-check-input" id="rememberMe" @(string.IsNullOrEmpty(ViewBag.SavedEmail) ? "" : "checked")>
+                        <label class="form-check-label small fw-bold text-dark" for="rememberMe">
+                            Ghi nhớ tôi
+                        </label>
+                    </div>
+                    <a asp-action="ForgotPassword" class="small text-decoration-none fw-bold text-primary">Quên mật khẩu?</a>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-login w-100 shadow-sm">
+                    Đăng Nhập
+                </button>
+
+                <div class="text-center mt-4 pt-3 border-top">
+                    <span class="small text-muted">Chưa có tài khoản?</span>
+                    <a asp-action="Register" class="small fw-bold text-decoration-none ms-1">Đăng ký ngay</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</body>
+</html>

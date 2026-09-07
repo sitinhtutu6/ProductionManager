@@ -1,0 +1,73 @@
+﻿@model ProductionManager.Data.Shipment
+@{
+    var order = ViewBag.Order as ProductionManager.Data.Order;
+}
+
+<div class="container mt-4">
+    <h3>🚚 Tạo Phiếu Giao Hàng (Xuất kho)</h3>
+    <p>Đơn hàng: <strong>@order.OrderCode</strong></p>
+
+    <form asp-action="CreateShipment" method="post">
+        <input type="hidden" asp-for="OrderId" />
+
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label>Ngày giao</label>
+                <input asp-for="ShipmentDate" class="form-control" type="date" />
+            </div>
+            <div class="col-md-3">
+                <label>Số xe / Tài xế</label>
+                <input asp-for="VehicleNumber" class="form-control" placeholder="VD: 59C-123.45" />
+            </div>
+            <div class="col-md-6">
+                <label>Ghi chú</label>
+                <input asp-for="Notes" class="form-control" />
+            </div>
+        </div>
+
+        <h5>Danh sách hàng cần giao:</h5>
+        <table class="table table-bordered">
+            <thead class="bg-light">
+                <tr>
+                    <th>Sản phẩm</th>
+                    <th>SL Đặt</th>
+                    <th>Đã giao</th>
+                    <th>Còn lại</th>
+                    <th width="150" class="text-primary">SL Giao lần này</th>
+                </tr>
+            </thead>
+            <tbody>
+                @* Duyệt qua từng món hàng trong đơn gốc *@
+                @for (int i = 0; i < order.OrderDetails.Count; i++)
+                {
+                    var item = order.OrderDetails.ElementAt(i);
+                    // Tính đã giao
+                    var shipped = order.Shipments
+                    .SelectMany(s => s.ShipmentDetails)
+                    .Where(sd => sd.OrderDetailId == item.Id)
+                    .Sum(sd => sd.QuantityShipped);
+
+                    var remain = item.Quantity - shipped;
+
+                    <tr>
+                        <td>
+                            @item.ProductName
+                            @* Hidden input để binding về Controller *@
+                            <input type="hidden" name="details[@i].OrderDetailId" value="@item.Id" />
+                        </td>
+                        <td>@item.Quantity</td>
+                        <td>@shipped</td>
+                        <td><b class="text-danger">@remain</b></td>
+                        <td>
+                            <input type="number" name="details[@i].QuantityShipped"
+                                   class="form-control font-weight-bold"
+                                   min="0" max="@remain" value="0" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <button type="submit" class="btn btn-primary">Xác nhận Giao hàng</button>
+    </form>
+</div>

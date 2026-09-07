@@ -1,0 +1,84 @@
+﻿@using Microsoft.EntityFrameworkCore
+@using ProductionManager.Data
+@using ProductionApp.Web.Constants
+@inject AppDbContext _context
+
+@model IEnumerable<ProductionApp.Web.Models.UserViewModel>
+@{ ViewData["Title"] = "Quản lý Tài khoản"; 
+    bool canViewFinance = User.IsInRole("Admin") || User.IsInRole("Accountant") || User.IsInRole("Manager");
+}
+@if (canViewFinance){
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="text-primary"><i class="fa-solid fa-users-gear"></i> Quản lý Tài khoản</h2>
+            <a asp-action="Create" class="btn btn-success fw-bold shadow-sm">
+                <i class="fa-solid fa-plus"></i> Thêm mới
+            </a>
+        </div>
+
+        @if (TempData["Success"] != null) {
+            <div class="alert alert-success alert-dismissible fade show">
+                <i class="fa-solid fa-check-circle me-2"></i>@TempData["Success"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+    
+
+            <div class="card shadow border-0">
+            <div class="card-body p-0">
+                <table class="table table-hover table-striped mb-0 align-middle">
+                    <thead class="bg-dark text-white">
+                        <tr>
+                            <th class="ps-4">Email / Tài khoản</th>
+                            <th>Họ tên</th>
+                            <th>Vai trò</th>
+                            <th class="text-center">Trạng thái</th>
+                            <th class="text-end pe-4">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold text-primary">@item.Email</div>
+                                    <div class="text-muted small">ID: @item.Id.Substring(0, 8)...</div>
+                                </td>
+                                <td>
+                                    <span class="fw-bold">@item.FullName</span>
+                                    <div class="text-muted small">@item.Address</div>
+                                </td>
+                                <td>
+                                    @if (item.Roles.Any())
+                                    {
+                                        foreach (var role in item.Roles)
+                                        {
+                                            var badgeClass = role == "Admin" ? "bg-danger" : (role == "Manager" ? "bg-warning text-dark" : "bg-info text-dark");
+                                            <span class="badge @badgeClass rounded-pill me-1">@role</span>
+                                        }
+                                    }
+                                    else { <span class="badge bg-secondary">User</span> }
+                                </td>
+                                <td class="text-center">
+                                    @if (item.IsActive) { <span class="badge bg-success">Hoạt động</span> }
+                                    else { <span class="badge bg-secondary">Đã khóa</span> }
+                                </td>
+                                <td class="text-end pe-4">
+                                    <a asp-action="ManageRoles" asp-route-userId="@item.Id" class="btn btn-sm btn-outline-warning shadow-sm me-1" title="Phân quyền">
+                                        <i class="fa-solid fa-user-shield"></i>
+                                    </a>
+                                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-primary shadow-sm" title="Sửa">
+                                        <i class="fa-solid fa-pen"></i>
+                                    </a>
+                                    <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-outline-danger shadow-sm" onclick="return confirm('Bạn có chắc chắn muốn xóa user này?');" title="Xóa">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

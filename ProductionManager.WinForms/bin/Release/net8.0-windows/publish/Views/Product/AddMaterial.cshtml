@@ -1,0 +1,61 @@
+﻿@model ProductionManager.Data.Material
+
+@{
+    ViewData["Title"] = (Model.Id == 0) ? "Thêm Vật tư vào Định mức" : "Cập nhật Định mức";
+}
+
+<div class="container mt-4" style="max-width: 600px;">
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <div class="card shadow border-warning">
+        <div class="card-header bg-warning">
+            <h5 class="mb-0 text-dark fw-bold">
+                <i class="fa-solid fa-link"></i> @ViewData["Title"]
+            </h5>
+        </div>
+        <div class="card-body">
+            <form asp-action="SaveMaterial" method="post">
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" asp-for="ProductId" />
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Chọn Vật tư từ Kho (*)</label>
+                    <select asp-for="WarehouseItemId" class="form-select" required>
+                        <option value="">-- Chọn vật tư --</option>
+                        @if (ViewBag.WarehouseList != null)
+                        {
+                            foreach (var item in ViewBag.WarehouseList)
+                            {
+                                <option value="@item.Id">@item.Display</option>
+                            }
+                        }
+                    </select>
+                    <div class="form-text small text-muted">Hệ thống sẽ tự động lấy thông tin từ kho.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Số lượng (Định mức)</label>
+                    <input asp-for="Quantity" class="form-control fw-bold text-primary" type="number" step="any" required />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Ghi chú (nếu có)</label>
+                    <textarea asp-for="Note" class="form-control" rows="2"></textarea>
+                </div>
+
+                <hr />
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a asp-controller="Product" asp-action="Index" class="btn btn-secondary">Hủy bỏ</a>
+                    <button type="submit" class="btn btn-warning fw-bold px-4">
+                        <i class="fa-solid fa-floppy-disk"></i> Lưu Định Mức
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

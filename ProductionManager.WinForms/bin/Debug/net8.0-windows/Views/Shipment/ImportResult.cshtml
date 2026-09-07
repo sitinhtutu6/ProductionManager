@@ -1,0 +1,41 @@
+﻿@model List<ProductionApp.Web.Controllers.ShipmentImportDto>
+@{
+    ViewData["Title"] = "Kết quả Import";
+    int successCount = ViewBag.SuccessCount ?? 0;
+}
+
+<div class="container py-5" style="max-width: 1000px;">
+    <div class="text-center mb-5">
+        <i class="fa-solid fa-circle-check text-success" style="font-size: 5rem;"></i>
+        <h2 class="fw-900 mt-3 text-dark">IMPORT HOÀN TẤT!</h2>
+        <p class="fs-5 text-muted">Hệ thống đã tạo thành công <strong class="text-success fs-3">@successCount</strong> phiếu xuất kho.</p>
+        <a asp-action="Index" class="btn btn-primary btn-lg rounded-pill px-5 fw-bold shadow-sm mt-2"><i class="fa-solid fa-arrow-left me-2"></i> Về trang Quản lý</a>
+    </div>
+
+    @if (Model != null && Model.Any())
+    {
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden border-top border-4 border-danger">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold text-danger mb-0"><i class="fa-solid fa-triangle-exclamation me-2"></i>DANH SÁCH DÒNG BỊ LOẠI BỎ (@Model.Count dòng)</h5>
+                <small class="text-muted">Các dòng dữ liệu sau đã bị bỏ qua vì vi phạm quy tắc hệ thống.</small>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-sm align-middle mb-0">
+                    <thead class="bg-light text-muted small text-uppercase">
+                        <tr><th class="ps-3">Dòng Excel</th><th>Mã Phiếu</th><th>Nội dung lỗi</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var err in Model)
+                        {
+                            <tr>
+                                <td class="ps-3 fw-bold text-muted">Dòng @err.RowIndex</td>
+                                <td class="font-monospace fw-bold text-dark">@err.ShipmentCode</td>
+                                <td class="text-danger fw-600 small">@string.Join(", ", err.Errors)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>

@@ -1,0 +1,380 @@
+﻿@model ProductionApp.Web.Models.ViewModels.DebtDashboardVM
+@using System.Globalization
+@{
+    ViewData["Title"] = "Quản lý Công Nợ";
+    bool isReceivable = Model.Type == 1; // True: Phải thu (Khách), False: Phải trả (NCC & Vận Tải)
+    
+    // 🔥 BIẾN NGỮ CẢNH TỰ ĐỘNG
+    string actionText = isReceivable ? "Thu tiền" : "Thanh toán";
+    string actionTextUpper = isReceivable ? "THU TIỀN" : "CHI TIỀN";
+    string themeColor = isReceivable ? "primary" : "success";
+    string voucherLabel = isReceivable ? "Số Phiếu Thu / Hóa Đơn" : "Số Ủy nhiệm chi / Phiếu Chi";
+    string iconAct = isReceivable ? "fa-hand-holding-dollar" : "fa-money-bill-transfer";
+}
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+
+<style>
+    body { background-color: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .nav-tabs-custom { border-bottom: 2px solid #e2e8f0; margin-bottom: 20px; }
+    .nav-tabs-custom .nav-link { color: #64748b; font-weight: 600; padding: 12px 24px; border: none; position: relative; transition: all 0.3s ease; }
+    .nav-tabs-custom .nav-link:hover, .nav-tabs-custom .nav-link.active { color: #0d6efd; background: transparent; }
+    .nav-tabs-custom .nav-link.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 2px; background-color: #0d6efd; border-radius: 2px 2px 0 0; }
+    .summary-card { border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.03); transition: transform 0.2s; }
+    .summary-card:hover { transform: translateY(-3px); }
+    .table-custom { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+    .table-custom thead th { background-color: #f1f5f9; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 0.75rem; padding: 15px; border-bottom: 2px solid #e2e8f0; }
+    .table-custom tbody td { padding: 15px; vertical-align: middle; border-bottom: 1px solid #f1f5f9; }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="fw-bold text-dark mb-0">
+            <i class="fa-solid @(isReceivable ? "fa-arrow-down-up-across-line text-primary" : "fa-truck-fast text-danger") me-2"></i>SỔ CÔNG NỢ
+        </h3>
+        
+        <div>
+            @if (!isReceivable) 
+            {
+                <a href="/APInvoice/Create" class="btn btn-primary fw-bold shadow-sm">
+                    <i class="fa-solid fa-file-invoice-dollar me-1"></i> Lập HĐ Đầu Vào (Gom VAT)
+                </a>
+            }
+        </div>
+    </div>
+
+    <ul class="nav nav-tabs nav-tabs-custom">
+        <li class="nav-item">
+            <a class="nav-link @(isReceivable ? "active" : "")" href="/Debt/Index?type=1">
+                <i class="fa-solid fa-hand-holding-dollar me-2"></i>Công nợ Phải Thu (Khách hàng)
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(!isReceivable ? "active" : "")" href="/Debt/Index?type=2">
+                <i class="fa-solid fa-file-invoice-dollar me-2"></i>Công nợ Phải Trả (Nhà Cung Cấp)
+            </a>
+        </li>
+    </ul>
+
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-body p-4">
+            <form method="get" action="/Debt/Index" id="filterForm" class="row g-3 align-items-end">
+                <input type="hidden" name="type" value="@Model.Type" id="currentType" />
+                <div class="col-md-2">
+                    <label class="small fw-bold text-muted mb-1">Từ ngày</label>
+                    <input type="text" name="fromDate" id="fromDate" class="form-control datepicker fw-bold bg-light" placeholder="Chọn ngày" value="@Model.FromDate?.ToString("yyyy-MM-dd")">
+                </div>
+                <div class="col-md-2">
+                    <label class="small fw-bold text-muted mb-1">Đến ngày</label>
+                    <input type="text" name="toDate" id="toDate" class="form-control datepicker fw-bold bg-light" placeholder="Chọn ngày" value="@Model.ToDate?.ToString("yyyy-MM-dd")">
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted mb-1">Đối tác (Khách / NCC)</label>
+                    <select name="keyword" id="keywordFilter" class="form-select fw-bold border-primary shadow-sm select2-partner">
+                        <option value="">-- Tất cả Đối tác --</option>
+                        @if (ViewBag.PartnerList != null)
+                        {
+                            foreach (var item in ViewBag.PartnerList)
+                            {
+                                <option value="@item.Value" selected="@(Model.Keyword == item.Value ? "selected" : null)">@item.Text</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary fw-bold px-4 shadow-sm"><i class="fa-solid fa-filter me-1"></i> Lọc</button>
+                    <button type="button" class="btn btn-success fw-bold px-4 shadow-sm" onclick="exportFilteredReport()"><i class="fa-solid fa-file-excel me-1"></i> Xuất Excel</button>
+                    <a href="/Debt/Index?type=@Model.Type" class="btn btn-light border fw-bold px-3"><i class="fa-solid fa-rotate-right"></i></a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @{
+        decimal sumTotal = Model.DebtGroups?.SelectMany(g => g.Details).Sum(i => i.TotalAmount) ?? 0;
+        decimal sumPaid = Model.DebtGroups?.SelectMany(g => g.Details).Sum(i => i.PaidAmount) ?? 0;
+        decimal sumRemain = Model.DebtGroups?.Sum(g => g.TotalDebt) ?? 0;
+    }
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="summary-card card bg-primary bg-opacity-10 h-100">
+                <div class="card-body">
+                    <div class="text-primary small fw-bold text-uppercase mb-2">TỔNG PHÁT SINH</div>
+                    <h3 class="fw-black text-primary mb-0">@sumTotal.ToString("N0") <small class="fs-6 text-muted">đ</small></h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="summary-card card bg-success bg-opacity-10 h-100">
+                <div class="card-body">
+                    <div class="text-success small fw-bold text-uppercase mb-2">@(isReceivable ? "ĐÃ THU" : "ĐÃ CHI")</div>
+                    <h3 class="fw-black text-success mb-0">@sumPaid.ToString("N0") <small class="fs-6 text-muted">đ</small></h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="summary-card card bg-danger bg-opacity-10 h-100 border border-danger border-opacity-25">
+                <div class="card-body">
+                    <div class="text-danger small fw-bold text-uppercase mb-2">CÒN LẠI (NỢ ĐỌNG)</div>
+                    <h3 class="fw-black text-danger mb-0">@sumRemain.ToString("N0") <small class="fs-6 text-muted">đ</small></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.DebtGroups != null && Model.DebtGroups.Any())
+    {
+        foreach (var group in Model.DebtGroups)
+        {
+            <div class="card table-custom mb-4 border-0">
+                <div class="card-header bg-dark text-white p-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0 fw-bold"><i class="fa-regular fa-building me-2 text-warning"></i>@group.PartnerName</h5>
+                        <small class="text-light opacity-75">SĐT: @(group.Phone ?? "N/A") | Mã: @(group.PartnerCode ?? "N/A")</small>
+                    </div>
+                    <div class="text-end d-flex align-items-center gap-3">
+                        <button class="btn btn-sm btn-@themeColor fw-bold shadow-sm" onclick="openBatchPaymentModal(this, '@group.PartnerName')">
+                            <i class="fa-solid fa-check-double me-1"></i> @actionTextUpper lô chọn
+                        </button>
+                        <span class="badge bg-danger fs-6 fw-bold p-2 shadow-sm">Nợ chốt: @group.TotalDebt.ToString("N0") đ</span>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th width="40" class="text-center"><input class="form-check-input" type="checkbox" onchange="toggleAllCheckboxes(this)"></th>
+                                <th width="120">Chứng từ</th>
+                                <th>Ngày</th>
+                                <th>Diễn giải / Ghi chú</th>
+                                <th class="text-end">Phát sinh</th>
+                                <th class="text-end">@(isReceivable ? "Đã Thu" : "Đã Chi")</th>
+                                <th class="text-end">Còn nợ</th>
+                                <th class="text-center">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in group.Details)
+                            {
+                                bool isLocked = item.Note != null && item.Note.Contains("[ĐÃ KHÓA SỔ]");
+                                <tr>
+                                    <td class="text-center">
+                                        @if(item.RemainingAmount > 0) {
+                                            <input class="form-check-input chk-item" type="checkbox" data-id="@item.Id" data-code="@item.Code" data-remain="@item.RemainingAmount.ToString(CultureInfo.InvariantCulture)">
+                                        }
+                                    </td>
+                                    <td><span class="badge bg-light text-dark border font-monospace px-2 py-1 fs-6">@item.Code</span></td>
+                                    <td>
+                                        <div class="fw-bold text-dark">@item.Date.ToString("dd/MM/yyyy")</div>
+                                        <small class="text-muted">@item.Date.ToString("HH:mm")</small>
+                                    </td>
+                                    <td>
+                                        @if (isLocked) { <i class="fa-solid fa-lock text-danger me-1" title="Chứng từ đã khóa"></i> }
+                                        <span class="fw-bold">@item.Note</span>
+                                    </td>
+                                    <td class="text-end fw-bold text-dark">@item.TotalAmount.ToString("N0")</td>
+                                    <td class="text-end fw-bold text-@themeColor">@item.PaidAmount.ToString("N0")</td>
+                                    <td class="text-end fw-bold text-danger">@item.RemainingAmount.ToString("N0")</td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-outline-@themeColor fw-bold" title="@actionText khoản này"
+                                                onclick="openSinglePaymentModal(@item.Id, '@item.Code', @item.RemainingAmount.ToString(CultureInfo.InvariantCulture), '@group.PartnerName')">
+                                            <i class="fa-solid fa-money-bill-wave"></i> @actionTextUpper
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="bg-light">
+                            <tr>
+                                <td colspan="4" class="text-end fw-bold text-muted text-uppercase">Tổng cộng Đối tác:</td>
+                                <td class="text-end fw-black text-dark fs-6">@group.Details.Sum(i => i.TotalAmount).ToString("N0")</td>
+                                <td class="text-end fw-black text-@themeColor fs-6">@group.Details.Sum(i => i.PaidAmount).ToString("N0")</td>
+                                <td class="text-end fw-black text-danger fs-6">@group.TotalDebt.ToString("N0")</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0">
+            <i class="fa-solid fa-folder-open fa-3x text-muted opacity-25 mb-3 d-block"></i>
+            <h5 class="fw-bold text-muted">Không có dữ liệu công nợ</h5>
+            <p class="text-muted small">Hãy thử thay đổi mốc thời gian hoặc từ khóa tìm kiếm</p>
+        </div>
+    }
+</div>
+
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-@themeColor text-white border-0 pb-3">
+                <h5 class="modal-title fw-bold"><i class="fa-solid @iconAct me-2"></i> THỰC HIỆN @actionTextUpper</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <form id="paymentForm">
+                    <input type="hidden" id="payType" name="type" value="@Model.Type" />
+                    <input type="hidden" id="payBatchData" name="batchDataJson" />
+                    <input type="hidden" id="payPartnerName" name="partnerName" />
+
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Chứng từ / Đối tác</label>
+                        <input type="text" id="payDocCode" class="form-control fw-bold bg-white text-dark" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Tổng nợ cần @actionText.ToLower()</label>
+                        <input type="text" id="payRemain" class="form-control fw-bold bg-white text-danger" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-dark">Số tiền THỰC @(isReceivable ? "THU" : "CHI") <span class="text-danger">*</span></label>
+                        <input type="text" id="payAmount" name="amount" class="form-control form-control-lg fw-bold text-@themeColor border-@themeColor shadow-sm" required oninput="formatCurrency(this)">
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-dark">@voucherLabel <span class="text-danger">*</span></label>
+                        <input type="text" id="payVoucher" name="paperVoucherNumber" class="form-control fw-bold border-primary" placeholder="@(isReceivable ? "VD: PT-001" : "VD: UNC-001")" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="small fw-bold text-dark">Phương thức</label>
+                            <select id="payMethod" name="method" class="form-select fw-bold shadow-sm">
+                                <option value="2">Chuyển khoản</option>
+                                <option value="1">Tiền mặt</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="small fw-bold text-dark">Ngày TT</label>
+                            <input type="text" id="payDate" name="date" class="form-control datepicker fw-bold shadow-sm" value="@DateTime.Now.ToString("yyyy-MM-dd")" required>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="small fw-bold text-dark">Nội dung Ghi chú</label>
+                        <textarea id="payNote" name="note" class="form-control shadow-sm" rows="2" placeholder="Ghi chú thêm (Không bắt buộc)..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-white border-top-0 pt-0 pb-4">
+                <button type="button" class="btn btn-light fw-bold rounded-pill px-4" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-@themeColor fw-bold rounded-pill px-5 shadow-sm" onclick="savePayment()"><i class="fa-solid fa-check"></i> Xác nhận @actionTextUpper</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        // TRUYỀN BIẾN NGỮ CẢNH TỪ C# XUỐNG JAVASCRIPT
+        const isReceivable = @isReceivable.ToString().ToLower();
+        const actionText = isReceivable ? "Thu tiền" : "Thanh toán";
+
+        $(document).ready(function() {
+            $('.select2-partner').select2({ theme: 'bootstrap-5', width: '100%', placeholder: 'Tìm kiếm tên đối tác...', allowClear: true });
+            $(".datepicker").flatpickr({ dateFormat: "Y-m-d", locale: "vn" });
+        });
+
+        function formatCurrency(input) {
+            let val = input.value.replace(/\D/g, '');
+            if (val !== "") { input.value = new Intl.NumberFormat('vi-VN').format(val); }
+        }
+
+        function exportFilteredReport() {
+            let from = $('#fromDate').val();
+            let to = $('#toDate').val();
+            let kw = $('#keywordFilter').val();
+            let type = $('#currentType').val();
+
+            let url = `/Debt/ExportExcel?type=${type}&fromDate=${from}&toDate=${to}&keyword=${encodeURIComponent(kw)}`;
+            Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Đang xuất báo cáo...', showConfirmButton: false, timer: 1500 });
+            window.location.href = url;
+        }
+
+        function toggleAllCheckboxes(source) {
+            let table = source.closest('table');
+            let checkboxes = table.querySelectorAll('.chk-item');
+            checkboxes.forEach(chk => chk.checked = source.checked);
+        }
+
+        function openSinglePaymentModal(id, code, remain, partner) {
+            let batchData = [{ Id: id, Code: code, Remain: remain }];
+            
+            document.getElementById('payBatchData').value = JSON.stringify(batchData);
+            document.getElementById('payPartnerName').value = partner;
+            document.getElementById('payDocCode').value = code + " (" + partner + ")";
+            document.getElementById('payRemain').value = new Intl.NumberFormat('vi-VN').format(remain) + " đ";
+            document.getElementById('payAmount').value = new Intl.NumberFormat('vi-VN').format(remain);
+            document.getElementById('payNote').value = actionText + " chứng từ " + code; // ĐỔI TEXT TỰ ĐỘNG
+            
+            new bootstrap.Modal(document.getElementById('paymentModal')).show();
+        }
+
+        function openBatchPaymentModal(btn, partnerName) {
+            let table = btn.closest('.card').querySelector('table');
+            let checkboxes = table.querySelectorAll('.chk-item:checked');
+            
+            if (checkboxes.length === 0) {
+                Swal.fire("Nhắc nhở", "Vui lòng tick chọn ít nhất 1 chứng từ để thao tác!", "info");
+                return;
+            }
+
+            let totalRemain = 0;
+            let batchData = [];
+            let codes = [];
+
+            checkboxes.forEach(chk => {
+                let remain = parseFloat(chk.getAttribute('data-remain'));
+                let id = parseInt(chk.getAttribute('data-id'));
+                let code = chk.getAttribute('data-code');
+                
+                totalRemain += remain;
+                codes.push(code);
+                batchData.push({ Id: id, Code: code, Remain: remain });
+            });
+
+            document.getElementById('payBatchData').value = JSON.stringify(batchData);
+            document.getElementById('payPartnerName').value = partnerName;
+
+            let codeDisplay = codes.length > 3 ? `${codes[0]}, ${codes[1]}, ${codes[2]}... (+${codes.length - 3} CT khác)` : codes.join(', ');
+            document.getElementById('payDocCode').value = actionText + " LÔ: " + codeDisplay; // ĐỔI TEXT TỰ ĐỘNG
+            
+            document.getElementById('payRemain').value = new Intl.NumberFormat('vi-VN').format(totalRemain) + " đ";
+            document.getElementById('payAmount').value = new Intl.NumberFormat('vi-VN').format(totalRemain);
+            document.getElementById('payNote').value = actionText + " bảng kê gồm " + checkboxes.length + " chứng từ."; // ĐỔI TEXT TỰ ĐỘNG
+            
+            new bootstrap.Modal(document.getElementById('paymentModal')).show();
+        }
+
+        function savePayment() {
+            let form = document.getElementById('paymentForm');
+            if (!form.checkValidity()) { form.reportValidity(); return; }
+
+            let amountStr = document.getElementById('payAmount').value.replace(/\D/g, '');
+            let amount = parseFloat(amountStr);
+            if (isNaN(amount) || amount <= 0) { Swal.fire("Lỗi", "Số tiền không hợp lệ", "warning"); return; }
+
+            Swal.fire({ title: 'Đang xử lý...', didOpen: () => Swal.showLoading() });
+            
+            let formData = new FormData(form);
+            formData.set("amount", amount);
+
+            fetch('/Debt/ProcessBatchPayment', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.success) Swal.fire("Thành công!", res.message, "success").then(() => location.reload());
+                    else Swal.fire("Lỗi", res.message, "error");
+                })
+                .catch(err => Swal.fire("Lỗi hệ thống", err.message, "error"));
+        }
+    </script>
+}

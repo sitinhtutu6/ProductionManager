@@ -1,0 +1,56 @@
+﻿@model ProductionApp.Web.Models.ViewModels.UserProfileVM
+@{
+    ViewData["Title"] = "Hồ sơ cá nhân";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg border-0 rounded-3">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fa-solid fa-user-gear me-2"></i> THÔNG TIN TÀI KHOẢN</h5>
+                </div>
+                <div class="card-body p-4">
+                    @if (TempData["Success"] != null)
+                    {
+                        <div class="alert alert-success fw-bold"><i class="fa-solid fa-check-circle me-1"></i> @TempData["Success"]</div>
+                    }
+
+                    <form asp-action="Profile" method="post">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="small text-muted fw-bold">Tên Người Dùng</label>
+                                <input asp-for="Username" class="form-control bg-light" readonly />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="small text-muted fw-bold">Email</label>
+                                <input asp-for="Email" class="form-control bg-light" readonly />
+                            </div>
+                        </div>
+
+                        <hr class="text-muted opacity-25 my-4" />
+
+                        <div class="mb-3">
+                            <label class="small text-muted fw-bold">Họ và tên hiển thị</label>
+                            <input asp-for="FullName" class="form-control fw-bold text-primary" placeholder="Nhập họ tên..." />
+                            <span asp-validation-for="FullName" class="text-danger small"></span>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="small text-muted fw-bold">Số điện thoại</label>
+                            <input asp-for="PhoneNumber" class="form-control" placeholder="Nhập số điện thoại..." />
+                            <span asp-validation-for="PhoneNumber" class="text-danger small"></span>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary fw-bold shadow-sm">
+                                <i class="fa-solid fa-floppy-disk me-1"></i> LƯU THAY ĐỔI
+                            </button>
+                            <a asp-controller="Home" asp-action="Index" class="btn btn-light border fw-bold text-secondary">Quay lại</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

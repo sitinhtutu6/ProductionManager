@@ -1,0 +1,251 @@
+﻿@{
+    ViewData["Title"] = "Lập Hóa Đơn Công Nợ";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)> {
+        ("Đặt Hàng", Url.Action("Index", "PurchaseOrder")), 
+        ("Chốt Nợ Hóa Đơn", "") 
+    };
+    var suppJson = ViewBag.SuppliersJson;
+}
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+
+<style>
+    .sticky-menu { position: sticky; top: 20px; z-index: 10; }
+    .table-erp thead th { background: #f8fafc; color: #475569; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; padding: 15px 12px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+    .table-erp tbody td { padding: 12px; vertical-align: middle; }
+    .row-selectable { cursor: pointer; transition: background-color 0.2s; }
+    .row-selectable:hover { background-color: #f1f5f9; }
+    .summary-box { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; }
+</style>
+
+<div class="container-fluid py-4" style="max-width: 1500px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="text-primary fw-bold mb-1"><i class="fa-solid fa-file-invoice me-2"></i>Lập Hóa Đơn Công Nợ</h3>
+            <p class="text-muted small mb-0">Gom nhiều Đơn đặt hàng thành 1 Hóa đơn để quản lý tập trung ở Sổ Công Nợ Phải Trả.</p>
+        </div>
+        <a href="/Debt/Index?type=2" class="btn btn-warning fw-bold rounded-pill px-4 shadow-sm text-dark">
+            <i class="fa-solid fa-hand-holding-dollar me-2"></i> Chuyển đến Sổ Công Nợ
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8 col-xl-9">
+            <div class="card shadow-sm border-0 rounded-4 h-100">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold text-dark mb-0"><i class="fa-solid fa-list-check me-2 text-primary"></i>DANH SÁCH ĐƠN HÀNG CHỜ CHỐT</h6>
+                </div>
+                <div class="table-responsive" style="min-height: 500px;">
+                    <table class="table table-hover align-middle mb-0 table-erp">
+                        <thead>
+                            <tr>
+                                <th class="text-center" width="50">
+                                    <input type="checkbox" id="checkAll" class="form-check-input" onchange="toggleAll(this)" title="Chọn tất cả">
+                                </th>
+                                <th>Mã Đơn</th>
+                                <th>Ngày Đặt</th>
+                                <th class="text-end">Tiền Hàng</th>
+                                <th class="text-end">Đã Cọc/Trả</th>
+                                <th class="text-end text-success pe-4">Công Nợ Tồn</th>
+                            </tr>
+                        </thead>
+                        <tbody id="poTableBody">
+                            <tr><td colspan="6" class="text-center py-5 text-muted"><i class="fa-solid fa-building-user fa-3x mb-3 text-light"></i><br>Vui lòng chọn Nhà Cung Cấp ở menu bên phải.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 col-xl-3">
+            <div class="card shadow-sm border-0 rounded-4 bg-light sticky-menu">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold text-dark mb-4 border-bottom pb-3"><i class="fa-solid fa-sliders me-2 text-primary"></i>ĐIỀU KHIỂN & LẬP HÓA ĐƠN</h6>
+
+                    <div class="mb-4">
+                        <label class="fw-bold text-primary mb-2 text-uppercase small">1. Chọn Nhà Cung Cấp (*)</label>
+                        <select id="supplierId" class="form-select shadow-sm"></select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="fw-bold text-primary mb-2 text-uppercase small">2. Số Hóa Đơn / Bảng Kê (*)</label>
+                        <input type="text" id="invoiceNo" class="form-control form-control-lg fw-bold shadow-sm border-primary" placeholder="VD: HD-0012345" required>
+                    </div>
+
+                    <div class="summary-box mb-4 shadow-sm">
+                        <h6 class="fw-bold text-muted small text-uppercase mb-3"><i class="fa-solid fa-calculator me-1"></i> Tổng kết đơn đã chọn</h6>
+                        
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted small">Cộng tiền hàng:</span>
+                            <span class="fw-bold text-dark" id="sumTotal">0 ₫</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted small">Trừ Đã cọc/trả:</span>
+                            <span class="fw-bold text-warning" id="sumPaid">0 ₫</span>
+                        </div>
+                        <hr class="my-2 border-secondary opacity-25">
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <span class="fw-bold text-dark text-uppercase small">NỢ PHÁT SINH:</span>
+                            <span class="fs-4 fw-bold text-success" id="sumRemain">0 ₫</span>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info border-0 shadow-sm small mb-4">
+                        <i class="fa-solid fa-circle-info me-1"></i> Sau khi chốt, các đơn này sẽ nằm trong <b>Sổ Công Nợ</b> dưới chung 1 Số Hóa đơn để chờ thanh toán.
+                    </div>
+
+                    <button class="btn btn-primary btn-lg w-100 fw-bold shadow-sm rounded-pill" onclick="submitFinalize()">
+                        <i class="fa-solid fa-share-from-square me-2"></i> LƯU CHỐT SỔ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <script>
+        const suppList = @Html.Raw(suppJson ?? "[]");
+
+        $(document).ready(function () {
+            // Khởi tạo Select2 cho Nhà cung cấp
+            let suppSelect = $('#supplierId');
+            suppSelect.append(new Option("-- Gõ tìm NCC --", ""));
+            suppList.forEach(s => { suppSelect.append(new Option(s.Text, s.Id)); });
+            
+            suppSelect.select2({ theme: 'bootstrap-5' });
+            
+            // Lắng nghe thay đổi NCC để load bảng PO
+            suppSelect.on('change', loadPOs);
+        });
+
+        // Tải danh sách đơn hàng từ Backend API
+        function loadPOs() {
+            let suppId = $('#supplierId').val();
+            let tbody = document.getElementById("poTableBody");
+            
+            if (!suppId) { 
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted"><i class="fa-solid fa-building-user fa-3x mb-3 text-light"></i><br>Vui lòng chọn Nhà Cung Cấp ở menu bên phải.</td></tr>`; 
+                calcSum(); 
+                return; 
+            }
+            
+            // Hiện icon Loading
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Đang tải dữ liệu...</div></td></tr>`;
+
+            // Gọi API
+            fetch(`/PurchaseOrder/GetUnfinalizedPOs?supplierId=${suppId}`)
+                .then(async res => {
+                    if (!res.ok) {
+                        const err = await res.text();
+                        throw new Error("Lỗi Server 500: Hãy kiểm tra lại Backend (Khả năng cao do lỗi .ToString() ngày tháng trong C#).");
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5"><i class="fa-regular fa-face-smile fa-3x mb-3 text-success opacity-50"></i><br><span class="fw-bold text-success">Hoàn hảo! NCC này không có đơn hàng nào chờ chốt nợ.</span></td></tr>`;
+                    } else {
+                        let html = '';
+                        data.forEach(po => {
+                            // Xử lý camelCase hoặc PascalCase từ JSON C#
+                            let id = po.id || po.Id;
+                            let poCode = po.poCode || po.POCode;
+                            let orderDate = po.orderDate || po.OrderDate;
+                            let finalTotal = po.finalTotal || po.FinalTotal || 0;
+                            let depositAmount = po.depositAmount || po.DepositAmount || 0;
+                            let remainingAmount = po.remainingAmount || po.RemainingAmount || 0;
+
+                            // Đổi màu nếu nợ âm (trả dư)
+                            let remainColorClass = remainingAmount < 0 ? "text-danger" : "text-success";
+                            
+                            html += `<tr class="row-selectable" onclick="toggleRowCheckbox(this)">
+                                <td class="text-center">
+                                    <input type="checkbox" class="form-check-input chk-po" value="${id}" 
+                                        data-total="${finalTotal}" data-paid="${depositAmount}" data-remain="${remainingAmount}" 
+                                        onchange="calcSum(); event.stopPropagation();" onclick="event.stopPropagation();">
+                                </td>
+                                <td class="fw-bold text-primary font-monospace">${poCode}</td>
+                                <td class="small text-muted fw-bold">${orderDate}</td>
+                                <td class="text-end fw-bold text-dark">${finalTotal.toLocaleString('vi-VN')}</td>
+                                <td class="text-end fw-bold text-warning">${depositAmount.toLocaleString('vi-VN')}</td>
+                                <td class="text-end fw-bold ${remainColorClass} pe-4 fs-6">${remainingAmount.toLocaleString('vi-VN')}</td>
+                            </tr>`;
+                        });
+                        tbody.innerHTML = html;
+                        document.getElementById('checkAll').checked = false; // Bỏ check-all
+                    }
+                    calcSum(); // Tính lại bảng phụ bên phải
+                })
+                .catch(err => {
+                    // Bắt lỗi hiển thị đẹp mắt, không bị xoay vòng vòng
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-danger"><i class="fa-solid fa-triangle-exclamation fa-3x mb-3"></i><br><span class="fw-bold">${err.message}</span></td></tr>`;
+                    console.error("Fetch Error: ", err);
+                });
+        }
+
+        // Click vào hàng (row) để bật/tắt Checkbox
+        function toggleRowCheckbox(row) { 
+            let chk = $(row).find('.chk-po'); 
+            chk.prop('checked', !chk.prop('checked')); 
+            calcSum(); 
+        }
+        
+        // Check/Uncheck tất cả
+        function toggleAll(source) { 
+            $('.chk-po').prop('checked', source.checked); 
+            calcSum(); 
+        }
+        
+        // Tính toán & Cập nhật Box "Tổng kết" bên phải
+        function calcSum() { 
+            let sumTotal = 0, sumPaid = 0, sumRemain = 0;
+            $('.chk-po:checked').each(function() { 
+                sumTotal += parseFloat($(this).data('total')); 
+                sumPaid += parseFloat($(this).data('paid')); 
+                sumRemain += parseFloat($(this).data('remain')); 
+            }); 
+            
+            document.getElementById("sumTotal").innerText = sumTotal.toLocaleString('vi-VN') + " ₫";
+            document.getElementById("sumPaid").innerText = sumPaid.toLocaleString('vi-VN') + " ₫";
+            document.getElementById("sumRemain").innerText = sumRemain.toLocaleString('vi-VN') + " ₫";
+            
+            // Đổi màu NỢ PHÁT SINH thành Đỏ nếu tổng nợ là số âm (nghĩa là mình cọc lố/ trả dư)
+            let remainEl = document.getElementById("sumRemain");
+            if(sumRemain < 0) {
+                remainEl.classList.remove("text-success"); remainEl.classList.add("text-danger");
+            } else {
+                remainEl.classList.add("text-success"); remainEl.classList.remove("text-danger");
+            }
+        }
+
+        // Gửi lệnh Chốt sổ xuống Backend
+        function submitFinalize() {
+            let invoiceNo = document.getElementById("invoiceNo").value.trim();
+            if (!invoiceNo) { Swal.fire("Lỗi", "Vui lòng nhập Số Hóa Đơn / Bảng Kê ở menu bên phải!", "warning"); return; }
+
+            let selectedIds = [];
+            $('.chk-po:checked').each(function() { selectedIds.push(parseInt($(this).val())); });
+            if (selectedIds.length === 0) { Swal.fire("Cảnh báo", "Vui lòng tick chọn ít nhất 1 đơn hàng ở bảng bên trái!", "warning"); return; }
+
+            Swal.fire({ title: 'Đang lưu hóa đơn và chuyển sổ...', didOpen: () => Swal.showLoading() });
+            
+            fetch('/PurchaseOrder/ProcessDebtFinalization', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ InvoiceNumber: invoiceNo, POIds: selectedIds })
+            }).then(res => res.json()).then(res => {
+                if (res.success) { 
+                    Swal.fire("Thành công", res.message, "success").then(() => window.location.href = res.redirectUrl); 
+                } else { 
+                    Swal.fire("Lỗi", res.message, "error"); 
+                }
+            }).catch(err => {
+                Swal.fire("Lỗi kết nối", "Không thể gửi dữ liệu lên Server.", "error");
+            });
+        }
+    </script>
+}

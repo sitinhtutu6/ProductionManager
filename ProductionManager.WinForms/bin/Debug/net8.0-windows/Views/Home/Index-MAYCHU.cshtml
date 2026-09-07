@@ -1,0 +1,643 @@
+﻿@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@using ProductionManager.Data
+@using ProductionApp.Web.Constants
+
+@inject AppDbContext _context
+@inject SignInManager<AppUser> SignInManager
+@inject UserManager<AppUser> UserManager
+@inject IAuthorizationService AuthorizationService
+
+@inject ProductionManager.Data.AppDbContext DbContext
+
+@{
+    Layout = null;
+    int pendingOrders = ViewBag.PendingOrders ?? 0;
+    int totalOrders = ViewBag.TotalOrders ?? 0;
+    int lowStockItems = ViewBag.LowStockItems ?? 0;
+    int totalProducts = ViewBag.TotalProducts ?? 0;
+
+    // Lấy thông báo hợp lệ
+    var notification = _context.SystemNotifications
+        .FirstOrDefault(n => n.IsEnabled == true && n.StartTime <= DateTime.Now && n.EndTime >= DateTime.Now);
+    bool showNotify = (notification != null);
+    string notifyMsg = notification?.Message ?? "";
+
+    // Tính toán tọa độ TOP cho Sidebar và Iframe
+    string topPosition = showNotify ? "95px" : "60px";
+
+    // Phân quyền
+    bool canViewFinance = User.IsInRole("Admin") || User.IsInRole("Accountant") || User.IsInRole("Manager");
+    bool canViewReport = User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Accountant");
+    bool canViewData = User.IsInRole("Admin");
+
+    var companyName = DbContext.CompanyConfigs.FirstOrDefault()?.CompanyName ?? "CÔNG TY";
+    ViewData["Title"] = "Phần Mềm Quản Trị ERP";
+}
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        /* =========================================================
+                   1. TOP HEADER HIỆN ĐẠI
+                   ========================================================= */
+        .fixed-header-wrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1050;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .news-ticker-container {
+            width: 100%;
+            height: 35px;
+            background: linear-gradient(90deg, #1e293b, #0f172a);
+            border-bottom: 2px solid #f59e0b;
+            color: #fcd34d;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .ticker-move {
+            display: inline-block;
+            white-space: nowrap;
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding-left: 100%;
+            animation: tickerAnim 30s linear infinite;
+        }
+
+            .ticker-move:hover {
+                animation-play-state: paused;
+                cursor: pointer;
+            }
+
+        @@keyframes tickerAnim {
+            0% {
+                transform: translate3d(0, 0, 0);
+            }
+
+            100% {
+                transform: translate3d(-100%, 0, 0);
+            }
+        }
+
+        .top-toolbar {
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+        }
+
+        .brand-icon {
+            font-size: 1.5rem;
+            color: #2563eb;
+            transition: 0.2s;
+            text-decoration: none;
+        }
+
+            .brand-icon:hover {
+                transform: scale(1.1);
+            }
+
+        .dropdown-menu {
+            border: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-radius: 12px;
+        }
+
+        .dropdown-item {
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: 0.2s;
+        }
+
+            .dropdown-item:hover {
+                background-color: #f1f5f9;
+                color: #2563eb;
+                transform: translateX(3px);
+            }
+
+        /* =========================================================
+                   2. SIDEBAR CHUẨN ERP UI/UX
+                   ========================================================= */
+        .sidebar {
+            position: fixed;
+            top: @topPosition;
+            left: 0;
+            bottom: 0;
+            width: 270px;
+            background: #ffffff;
+            border-right: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            transition: left 0.3s ease, top 0.3s ease;
+            z-index: 1000;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.01);
+        }
+
+            .sidebar.collapsed {
+                left: -270px;
+            }
+
+            .sidebar::-webkit-scrollbar {
+                width: 5px;
+            }
+
+            .sidebar::-webkit-scrollbar-thumb {
+                background: #cbd5e1;
+                border-radius: 5px;
+            }
+
+        .nav-group {
+            margin: 15px 12px;
+        }
+
+        .nav-label {
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            padding-left: 12px;
+            letter-spacing: 0.8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            color: #475569;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            margin-bottom: 2px;
+            border-radius: 8px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+            .nav-link i {
+                width: 24px;
+                text-align: center;
+                margin-right: 12px;
+                font-size: 1.1rem;
+                opacity: 0.8;
+                transition: 0.2s;
+            }
+
+            .nav-link:hover {
+                background-color: #f8fafc;
+                color: #2563eb;
+                transform: translateX(4px);
+            }
+
+                .nav-link:hover i {
+                    opacity: 1;
+                    transform: scale(1.1);
+                }
+
+            .nav-link.active {
+                background-color: #eff6ff;
+                color: #2563eb;
+                font-weight: 600;
+                border-left: 3px solid #2563eb;
+                border-radius: 0 8px 8px 0;
+            }
+
+                .nav-link.active i {
+                    opacity: 1;
+                }
+
+        /* Bảng màu tối ưu hóa hiển thị Icon */
+        .ic-sales {
+            color: #3b82f6;
+        }
+        /* Blue */
+        .ic-prod {
+            color: #059669;
+        }
+        /* Green */
+        .ic-wh {
+            color: #ea580c;
+        }
+        /* Orange */
+        .ic-log {
+            color: #8b5cf6;
+        }
+        /* Violet */
+        .ic-fin {
+            color: #e11d48;
+        }
+        /* Rose/Red */
+        .ic-sys {
+            color: #475569;
+        }
+        /* Slate */
+
+        /* =========================================================
+                   3. MAIN CONTENT
+                   ========================================================= */
+        .main-content {
+            position: fixed;
+            top: @topPosition;
+            left: 270px;
+            right: 0;
+            bottom: 0;
+            background: #f8fafc;
+            transition: left 0.3s ease, top 0.3s ease;
+        }
+
+        .sidebar.collapsed ~ .main-content {
+            left: 0;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+            background-color: transparent;
+        }
+
+        .welcome-screen {
+            position: absolute;
+            inset: 0;
+            background: #f8fafc;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .stat-box {
+            padding: 20px 30px;
+            border-radius: 16px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+            min-width: 160px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+            transition: 0.3s;
+        }
+
+            .stat-box:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            }
+    </style>
+</head>
+<body>
+
+    <div class="fixed-header-wrapper">
+        @if (showNotify)
+        {
+            <div class="news-ticker-container" id="ticker-bar" title="Nhấp đúp chuột để đóng" ondblclick="closeTicker()">
+                <div class="ticker-move">
+                    <i class="fa-solid fa-bullhorn me-2 text-warning fa-beat"></i> @notifyMsg
+                </div>
+            </div>
+        }
+
+        <header class="top-toolbar">
+            <div class="d-flex align-items-center">
+                <a href="/" class="brand-icon me-4" title="Trang chủ">
+                    <i class="fa-solid fa-layer-group"></i>
+                </a>
+                <button class="btn btn-light border shadow-sm me-3" onclick="toggleSidebar()"><i class="fa-solid fa-bars-staggered"></i></button>
+                <h5 class="fw-bold text-dark mb-0 border-start border-2 ps-3" id="page-title">Tổng quan hệ thống</h5>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                @if (User.IsInRole("Admin"))
+                {
+                    <button id="btnDebugTele" class="btn btn-danger btn-sm shadow-sm fw-bold rounded-pill px-3"
+                            onclick="sendDebugInfo()" title="Gửi Connection String qua Telegram">
+                        <i class="fa-brands fa-telegram me-2"></i>Gửi Config
+                    </button>
+                }
+
+                <a href="/" class="btn btn-light border btn-sm shadow-sm" title="Tải lại trang chủ"><i class="fa-solid fa-house"></i></a>
+
+                @if (SignInManager.IsSignedIn(User))
+                {
+                    <div class="dropdown">
+                        <a href="#" class="d-flex align-items-center bg-white px-3 py-1 rounded-pill border shadow-sm text-decoration-none text-dark" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <img src="https://ui-avatars.com/api/?name=@UserManager.GetUserName(User)&background=ebf4ff&color=2563eb" alt="Avatar" class="rounded-circle me-2" style="width: 24px; height: 24px;">
+                            <span class="fw-bold small text-truncate" style="max-width: 120px;">@UserManager.GetUserName(User)</span>
+                            <i class="fa-solid fa-chevron-down ms-2 small text-muted"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end mt-2" aria-labelledby="userDropdown">
+                            <li><span class="dropdown-header text-uppercase fw-bold text-muted small">Tài khoản</span></li>
+                            <li>
+                                <a class="dropdown-item" asp-controller="Account" asp-action="Profile" target="main_frame" onclick="setActiveManual(this, 'Hồ sơ cá nhân')">
+                                    <i class="fa-solid fa-id-card me-2 text-primary"></i> Hồ sơ cá nhân
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword" target="main_frame" onclick="setActiveManual(this, 'Đổi mật khẩu')">
+                                    <i class="fa-solid fa-key me-2 text-warning"></i> Đổi mật khẩu
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form class="form-inline m-0 p-0" asp-controller="Account" asp-action="Logout" method="post">
+                                    <button type="submit" class="dropdown-item text-danger fw-bold">
+                                        <i class="fa-solid fa-right-from-bracket me-2"></i> Đăng xuất
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                }
+                else
+                {
+                    <a class="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm" asp-controller="Account" asp-action="Login">
+                        <i class="fa-solid fa-arrow-right-to-bracket me-1"></i> Đăng nhập
+                    </a>
+                }
+            </div>
+        </header>
+    </div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-menu pb-4">
+
+            <div class="nav-group">
+                <div class="nav-label"><i class="fa-solid fa-handshake"></i> Kinh Doanh & Bán Hàng</div>
+                <a href="@Url.Action("Index", "Customer")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-users ic-sales"></i> Khách Hàng / Đối tác
+                </a>
+                <a href="@Url.Action("Index", "Product")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-box-open ic-sales"></i> Danh mục Sản Phẩm
+                </a>
+                <a href="@Url.Action("Index", "Order")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-file-invoice-dollar ic-sales"></i> Quản lý Đơn Hàng
+                    @if (pendingOrders > 0)
+                    {
+                        <span class="badge bg-danger ms-auto rounded-pill shadow-sm">@pendingOrders</span>
+                    }
+                </a>
+                <a href="@Url.Action("Create", "Order")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-cart-plus ic-sales"></i> Tạo Đơn Hàng Mới
+                </a>
+                <a href="@Url.Action("DeliveryProgressReport", "Order")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-chart-gantt ic-sales"></i> Báo Cáo Tiến Độ Đơn
+                </a>
+            </div>
+
+            <div class="nav-group border-top pt-2">
+                <div class="nav-label"><i class="fa-solid fa-industry"></i> Kế Hoạch & Sản Xuất</div>
+                <a href="@Url.Action("Index", "Bom")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-sitemap ic-prod"></i> Định Mức (BOM)
+                </a>
+                <a href="@Url.Action("MasterPlan", "Bom")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-calculator ic-prod"></i> Dự Tính Vật Tư (MRP)
+                </a>
+                <a href="@Url.Action("Index", "ProductionPlan")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-calendar-days ic-prod"></i> Lệnh / Kế Hoạch SX
+                </a>
+            </div>
+
+            <div class="nav-group border-top pt-2">
+                <div class="nav-label"><i class="fa-solid fa-boxes-stacked"></i> Mua Hàng & Tồn Kho</div>
+                <a href="@Url.Action("Index", "PurchaseOrder")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-cart-shopping ic-wh"></i> Đặt Hàng NCC (PO)
+                </a>
+                <a href="@Url.Action("Index", "Warehouse")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-warehouse ic-wh"></i> Quản Lý Kho Vật Tư
+                    @if (lowStockItems > 0)
+                    {
+                        <span class="badge bg-warning text-dark ms-auto rounded-pill shadow-sm">@lowStockItems</span>
+                    }
+                </a>
+                <a href="@Url.Action("History", "Warehouse")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-clock-rotate-left ic-wh"></i> Lịch Sử Kho
+                </a>
+                <a href="@Url.Action("CustomerMaterialReport", "Warehouse")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-people-arrows ic-wh"></i> Vật Tư Khách Giao
+                </a>
+            </div>
+
+            <div class="nav-group border-top pt-2">
+                <div class="nav-label"><i class="fa-solid fa-truck-fast"></i> Vận Tải & Giao Nhận</div>
+                <a href="@Url.Action("Index", "Export")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                    <i class="fa-solid fa-truck-ramp-box ic-log"></i> Điều Phối Chuyến Xe
+                </a>
+            </div>
+
+            @if (canViewFinance || canViewReport)
+            {
+                <div class="nav-group border-top pt-2">
+                    <div class="nav-label"><i class="fa-solid fa-sack-dollar"></i> Tài Chính & Kế Toán</div>
+                    @if (canViewFinance)
+                    {
+                        <a href="@Url.Action("Index", "CashBook")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                            <i class="fa-solid fa-wallet ic-fin"></i> Sổ Quỹ Thu Chi
+                        </a>
+                        <a href="@Url.Action("Index", "Debt")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                            <i class="fa-solid fa-scale-balanced ic-fin"></i> Sổ Công Nợ (A/R & A/P)
+                        </a>
+                    }
+                    @if (canViewReport)
+                    {
+                        <a href="@Url.Action("Index", "CostCategory")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                            <i class="fa-solid fa-tags ic-fin"></i> Danh Mục Phí P&L
+                        </a>
+                        <a href="@Url.Action("Index", "Report")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                            <i class="fa-solid fa-chart-pie ic-fin"></i> Báo Cáo KQKD (Sales)
+                        </a>
+                        <a href="@Url.Action("FinancialStatement", "ReportControllerMonth")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                            <i class="fa-solid fa-chart-line ic-fin"></i> Báo Cáo P&L (Tài chính)
+                        </a>
+                    }
+                </div>
+            }
+
+            <div class="nav-group border-top pt-2">
+                <div class="nav-label"><i class="fa-solid fa-shield-halved"></i> Hệ Thống & Cấu Hình</div>
+                @if (User.Identity.IsAuthenticated)
+                {
+                    <a href="@Url.Action("Index", "Document")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                        <i class="fa-regular fa-folder-open ic-sys"></i> Kho Tài Liệu
+                    </a>
+                }
+                @if (User.IsInRole("Admin"))
+                {
+                    <a href="@Url.Action("Index", "Setting")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                        <i class="fa-solid fa-building ic-sys"></i> Cấu Hình Thông Tin Công Ty
+                    </a>
+                    <a href="@Url.Action("Index", "FinancialPeriod")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                        <i class="fa-solid fa-lock ic-sys"></i> Quản Lý Kỳ Khóa Sổ
+                    </a>
+                    <a href="@Url.Action("Index", "Role")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                        <i class="fa-solid fa-user-shield ic-sys"></i> Nhóm Quyền (Roles)
+                    </a>
+                    <a href="@Url.Action("Index", "User")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                        <i class="fa-solid fa-users-gear ic-sys"></i> Quản Lý Người Dùng
+                    </a>
+                    <a href="@Url.Action("Index", "Data")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                        <i class="fa-solid fa-database ic-sys"></i> Quản Trị Dữ Liệu
+                    </a>
+                    <a href="@Url.Action("Index", "AI")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                        <i class="fa-solid fa-robot ic-sys"></i> Cấu Hình Trí Tuệ AI
+                    </a>
+                    <a href="@Url.Action("Index", "AuditLog")" target="main_frame" class="nav-link" onclick="setActive(this)">
+                        <i class="fa-solid fa-shoe-prints ic-sys"></i> Nhật Ký Hệ Thống (Logs)
+                    </a>
+                }
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content" id="main-content">
+        <div class="welcome-screen" id="welcome">
+            <div class="text-center">
+                <div class="mb-4">
+                    <span class="bg-primary bg-opacity-10 text-primary p-4 rounded-circle d-inline-block">
+                        <i class="fa-solid fa-boxes-packing fa-3x"></i>
+                    </span>
+                </div>
+                <h2 class="fw-bolder text-dark mb-2">CHÀO MỪNG ĐẾN VỚI @companyName</h2>
+                <p class="text-muted fs-5 mb-5">Hệ thống hoạch định nguồn lực đã sẵn sàng. Vui lòng chọn tính năng ở Menu bên trái.</p>
+
+                <div class="d-flex justify-content-center gap-4 flex-wrap">
+                    <div class="stat-box border-primary border-bottom border-3">
+                        <h2 class="fw-black text-primary mb-1">@totalOrders</h2>
+                        <span class="text-muted fw-bold text-uppercase small">Tổng Đơn Hàng</span>
+                    </div>
+                    <div class="stat-box border-warning border-bottom border-3">
+                        <h2 class="fw-black text-warning mb-1">@pendingOrders</h2>
+                        <span class="text-muted fw-bold text-uppercase small">Đơn Chờ Xử Lý</span>
+                    </div>
+                    <div class="stat-box border-success border-bottom border-3">
+                        <h2 class="fw-black text-success mb-1">@totalProducts</h2>
+                        <span class="text-muted fw-bold text-uppercase small">Tổng Sản Phẩm</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <iframe name="main_frame" id="mainFrame" onload="onFrameLoad()"></iframe>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function sendDebugInfo() {
+            if (!confirm('⚠️ CẢNH BÁO BẢO MẬT\n\nBạn có chắc muốn gửi CHUỖI KẾT NỐI (kèm mật khẩu DB) qua Telegram không?')) { return; }
+
+            let btn = document.getElementById('btnDebugTele');
+            let originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...';
+
+            fetch('/System/SendDebugInfo', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+                .then(res => res.json())
+                .then(data => { if (data.success) { alert('✅ ' + data.message); } else { alert('❌ ' + data.message); } })
+                .catch(err => { alert('❌ Lỗi kết nối: ' + err); })
+                .finally(() => { btn.disabled = false; btn.innerHTML = originalHtml; });
+        }
+
+        // --- ĐIỀU KHIỂN GIAO DIỆN ---
+        function closeTicker() {
+            var ticker = document.getElementById('ticker-bar');
+            if (ticker) ticker.style.display = 'none';
+            document.getElementById('sidebar').style.top = '60px';
+            document.getElementById('main-content').style.top = '60px';
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            let savedUrl = sessionStorage.getItem('currentFrameUrl');
+            let savedTitle = sessionStorage.getItem('currentFrameTitle');
+            let savedMenuIndex = sessionStorage.getItem('currentMenuIndex');
+
+            if (savedUrl && savedUrl !== "about:blank") {
+                document.getElementById('mainFrame').src = savedUrl;
+                document.getElementById('welcome').style.display = 'none';
+            }
+            if (savedTitle) { document.getElementById('page-title').innerText = savedTitle; }
+
+            if (savedMenuIndex !== null) {
+                let links = document.querySelectorAll('.nav-link');
+                if (links[savedMenuIndex]) {
+                    links.forEach(el => el.classList.remove('active'));
+                    links[savedMenuIndex].classList.add('active');
+                }
+            }
+        });
+
+        function setActiveManual(element, titleText) {
+            document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+            document.getElementById('welcome').style.display = 'none';
+            document.getElementById('page-title').innerText = titleText;
+            sessionStorage.setItem('currentFrameUrl', element.getAttribute('href'));
+            sessionStorage.setItem('currentFrameTitle', titleText);
+        }
+
+        function setActive(element) {
+            document.querySelectorAll('.nav-link').forEach((el, index) => {
+                el.classList.remove('active');
+                if (el === element) sessionStorage.setItem('currentMenuIndex', index);
+            });
+            element.classList.add('active');
+
+            // Cắt bỏ các con số badge khỏi tiêu đề
+            let textTitle = element.innerText.trim().replace(/[0-9]+$/, '').trim();
+            document.getElementById('page-title').innerText = textTitle;
+            document.getElementById('welcome').style.display = 'none';
+
+            sessionStorage.setItem('currentFrameUrl', element.getAttribute('href'));
+            sessionStorage.setItem('currentFrameTitle', textTitle);
+
+            if (window.innerWidth < 992) { document.getElementById('sidebar').classList.add('collapsed'); }
+        }
+
+        function onFrameLoad() {
+            var iframe = document.getElementById('mainFrame');
+            try {
+                if (iframe.contentWindow.location.href !== "about:blank" && !iframe.contentWindow.location.href.endsWith('/')) {
+                    document.getElementById('welcome').style.display = 'none';
+                    sessionStorage.setItem('currentFrameUrl', iframe.contentWindow.location.href);
+                }
+            } catch (e) {
+                document.getElementById('welcome').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

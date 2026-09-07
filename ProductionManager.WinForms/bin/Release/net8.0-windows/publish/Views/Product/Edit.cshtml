@@ -1,0 +1,479 @@
+﻿@model ProductionManager.Data.Product
+@{
+    ViewData["Title"] = "Cập nhật sản phẩm: " + Model.ProductCode;
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Sản Phẩm", Url.Action("Index", "Product")), 
+        ("Chỉnh Sửa Sản Phẩm", "") 
+    };
+}
+
+<style>
+    .bg-gradient-primary {
+        background: linear-gradient(45deg, #4e73df, #224abe);
+    }
+
+    .card {
+        border: none;
+        border-radius: 12px;
+        transition: transform 0.2s;
+    }
+
+    .form-control:focus {
+        box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+        border-color: #4e73df;
+    }
+
+    /* Ảnh trong Edit */
+    .edit-img-container {
+        position: relative;
+        display: inline-block;
+        width: 100%;
+    }
+
+    .btn-delete-img {
+        position: absolute;
+        top: 10px;
+        right: 25px;
+        background: rgba(220, 53, 69, 0.9);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: 0.2s;
+        cursor: pointer;
+    }
+
+        .btn-delete-img:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+</style>
+
+<div class="container-fluid py-3">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-0 fw-bold text-dark"><i class="fa-solid fa-cube text-primary"></i> @Model.ProductName</h4>
+            <small class="text-muted">Quản lý thông tin sản phẩm và các biến thể chi tiết</small>
+        </div>
+        <div>
+            <a asp-action="Index" class="btn btn-outline-secondary rounded-pill px-3 shadow-sm">
+                <i class="fa-solid fa-arrow-left"></i> Quay lại DS
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-lg mb-4">
+        <div class="card-header bg-gradient-primary text-white py-3">
+            <h6 class="m-0 fw-bold text-uppercase"><i class="fa-solid fa-circle-info"></i> Thông tin chung</h6>
+        </div>
+        <div class="card-body">
+            <form asp-action="Edit" method="post" enctype="multipart/form-data">
+                <input type="hidden" asp-for="Id" />
+
+                <div class="row">
+                    <div class="col-lg-3 text-center border-end">
+                        <label class="form-label fw-bold text-muted">Hình ảnh</label>
+
+                        <div class="edit-img-container mb-3">
+                            <img id="imgPreview"
+                                 src="@(string.IsNullOrEmpty(Model.ImagePath) ? "https://via.placeholder.com/300?text=No+Image" : "/product-images/" + Model.ImagePath)"
+                                 class="img-thumbnail shadow-sm"
+                                 style="width: 100%; height: 250px; object-fit: contain; background: #f8f9fa;">
+
+                            @if (!string.IsNullOrEmpty(Model.ImagePath))
+                            {
+                                <button type="button" class="btn-delete-img shadow" onclick="deleteImage(@Model.Id)" title="Xóa ảnh hiện tại">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            }
+                        </div>
+
+                        <div class="d-grid">
+                            <label class="btn btn-outline-primary btn-sm">
+                                <i class="fa-solid fa-camera me-1"></i> Tải ảnh mới
+                                <input type="file" name="imageFile" class="d-none" accept="image/*" onchange="previewImage(this)">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-9 ps-4">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-muted">Mã SP</label>
+                                <input asp-for="ProductCode" class="form-control fw-bold text-uppercase" placeholder="Mã..." />
+                            </div>
+                            <div class="col-md-5">
+                                <label class="small fw-bold text-muted">Tên SP (*)</label>
+                                <input asp-for="ProductName" class="form-control fw-bold text-primary" required />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small fw-bold text-success">💰 Giá bán</label>
+                                <input asp-for="DefaultPrice" type="number" class="form-control fw-bold text-success" />
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-4">
+                                <label class="small fw-bold text-muted">Quy cách (Dày x Rộng x Dài)</label>
+                                <div class="input-group input-group-sm">
+                                    <input asp-for="Thick" type="number" step="0.1" class="form-control text-center" placeholder="D" />
+                                    <span class="input-group-text">x</span>
+                                    <input asp-for="Width" type="number" step="0.1" class="form-control text-center" placeholder="R" />
+                                    <span class="input-group-text">x</span>
+                                    <input asp-for="Length" type="number" step="0.1" class="form-control text-center" placeholder="D" />
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-muted">Vật liệu</label>
+                                <input asp-for="MaterialType" class="form-control form-control-sm" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small fw-bold text-muted">ĐVT</label>
+                                <input asp-for="Unit" class="form-control form-control-sm" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-muted">Màu sắc</label>
+                                <input asp-for="Color" class="form-control form-control-sm" />
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-12">
+                                <label class="small fw-bold text-muted">Ghi chú</label>
+                                <input asp-for="Note" class="form-control form-control-sm" />
+                            </div>
+                        </div>
+
+                        <div class="mt-4 text-end border-top pt-3">
+                            <button type="submit" class="btn btn-primary fw-bold px-4 rounded-pill shadow-sm">
+                                <i class="fa-solid fa-floppy-disk"></i> LƯU THAY ĐỔI
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <div class="col-lg-8">
+
+            <div class="card shadow mb-4 border-0">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
+                    <h6 class="m-0 fw-bold text-primary"><i class="fa-solid fa-layer-group"></i> Danh sách Chi tiết cấu thành</h6>
+                    <button type="button" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm" onclick="resetForm()">
+                        <i class="fa-solid fa-plus"></i> Làm Mới
+                    </button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light text-secondary small text-uppercase">
+                            <tr>
+                                <th class="ps-3">Mã CT</th>
+                                <th>Tên chi tiết</th>
+                                <th>Quy cách (mm)</th>
+                                <th class="text-center">Số Lượng</th>
+                                <th>Vật liệu</th>
+                                <th class="text-end">Khối (M3)</th>
+                                <th class="text-end pe-3">Hành Động</th>
+                            </tr>
+                        </thead>
+                        <tbody class="border-top-0">
+                            @if (Model.ProductDetails != null && Model.ProductDetails.Any())
+                            {
+                                foreach (var v in Model.ProductDetails)
+                                {
+                                    // Tính khối lượng tại view để hiển thị
+                                    double vol = (v.Length * v.Width * v.Thick * v.Quantity) / 1000000000.0;
+                                    <tr>
+                                        <td class="ps-3 fw-bold text-muted small">@v.DetailCode</td>
+                                        <td class="fw-bold text-dark">@v.VariantName</td>
+                                        <td class="small">
+                                            <span class="badge badge-soft text-dark">@v.Thick x @v.Width x @v.Length</span>
+                                        </td>
+                                        <td class="text-center fw-bold text-primary">@v.Quantity</td>
+                                        <td class="small text-muted">@v.MaterialType</td>
+
+                                        <td class="text-end fw-bold text-danger">@vol.ToString("0.0000")</td>
+
+                                        <td class="text-end pe-3">
+                                            <button type="button" class="btn btn-link text-primary p-0 me-2" title="Sửa"
+                                                    onclick='editDetail(@Json.Serialize(new {
+                                                        id = v.Id,
+                                                        detailCode = v.DetailCode,
+                                                        variantName = v.VariantName,
+                                                        quantity = v.Quantity,
+                                                        price = v.Price,
+                                                        thick = v.Thick,
+                                                        width = v.Width,
+                                                        length = v.Length,
+                                                        color = v.Color,
+                                                        materialType = v.MaterialType,
+                                                        note = v.Note // Thêm note vào data
+                                                    }))'>
+                                                <i class="fa-solid fa-pen-to-square fa-lg"></i>
+                                            </button>
+                                            <a asp-action="DeleteVariant" asp-route-id="@v.Id" class="btn btn-link text-danger p-0" title="Xóa"
+                                               onclick="return confirm('Xóa chi tiết [@v.VariantName]?')">
+                                                <i class="fa-solid fa-trash-can fa-lg"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                                <tr class="table-secondary fw-bold text-dark">
+                                    <td colspan="3" class="text-end ps-3">TỔNG CỘNG:</td>
+                                    <td class="text-center text-danger">@Model.ProductDetails.Sum(x => x.Quantity)</td>
+                                    <td></td>
+                                    <td class="text-end text-danger">
+                                        @Model.ProductDetails.Sum(x => (x.Length * x.Width * x.Thick * x.Quantity) / 1000000000.0).ToString("0.0000")
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center py-5 text-muted">
+                                        <i class="fa-solid fa-box-open fa-3x mb-3 text-secondary opacity-50"></i>
+                                        <p>Chưa có chi tiết nào. Hãy thêm mới bên dưới!</p>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card shadow border-0" id="formContainer" style="background-color: #f8f9fc;">
+                <div class="card-body p-4">
+                    <h6 class="text-success fw-bold mb-3 d-flex align-items-center" id="formTitle">
+                        <span class="bg-success text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2" style="width:24px;height:24px;"><i class="fa-solid fa-plus" style="font-size:12px"></i></span>
+                        Thêm chi tiết mới
+                    </h6>
+
+                    <form asp-action="SaveVariant" method="post" id="detailForm">
+                        <input type="hidden" name="Id" id="d_Id" value="0" />
+                        <input type="hidden" name="ProductId" value="@Model.Id" />
+
+                        <div class="row g-3">
+                            <div class="col-md-2">
+                                <label class="small fw-bold text-muted">Mã CT</label>
+                                <input type="text" name="DetailCode" id="d_Code" class="form-control form-control-sm bg-white" placeholder="(Tự sinh)" readonly />
+                            </div>
+                            <div class="col-md-5">
+                                <label class="small fw-bold text-muted">Tên chi tiết (*)</label>
+                                <input type="text" name="VariantName" id="d_Name" class="form-control form-control-sm fw-bold border-success" required placeholder="VD: Chân ghế..." />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small fw-bold text-muted">Số lượng</label>
+                                <input type="number" name="Quantity" id="d_Qty" class="form-control form-control-sm text-center fw-bold" value="1" required />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-muted">Giá riêng (nếu có)</label>
+                                <input type="number" name="Price" id="d_Price" class="form-control form-control-sm text-end" value="0" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="small fw-bold text-muted">Kích thước (Dày x Rộng x Dài)</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white"><i class="fa-solid fa-ruler"></i></span>
+                                    <input type="number" step="0.1" name="Thick" id="d_Thick" class="form-control" placeholder="Dày" />
+                                    <input type="number" step="0.1" name="Width" id="d_Width" class="form-control" placeholder="Rộng" />
+                                    <input type="number" step="0.1" name="Length" id="d_Length" class="form-control" placeholder="Dài" />
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-muted">Vật liệu</label>
+                                <input type="text" name="MaterialType" id="d_Material" class="form-control form-control-sm" placeholder="Gỗ, Sắt..." />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-muted">Ghi chú</label>
+                                <input type="text" name="Note" id="d_Note" class="form-control form-control-sm" placeholder="Ghi chú..." />
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mt-3 pt-2 border-top">
+                            <button type="submit" class="btn btn-success fw-bold px-4 rounded-pill shadow-sm" id="btnSubmit">
+                                <i class="fa-solid fa-check"></i> Thêm Chi Tiết
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" onclick="resetForm()" style="display:none" id="btnCancel">
+                                <i class="fa-solid fa-xmark"></i> Hủy bỏ
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow border-0 h-100 summary-box">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h6 class="m-0 fw-bold text-primary"><i class="fa-solid fa-calculator"></i> TỔNG HỢP VẬT TƯ</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table mb-0 align-middle">
+                            <thead class="bg-light text-muted small text-uppercase">
+                                <tr>
+                                    <th class="ps-3">Loại Gỗ / Độ Dày</th>
+                                    <th class="text-center">Số Lượng</th>
+                                    <th class="text-end pe-3">Khối (m³)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.ProductDetails != null && Model.ProductDetails.Any())
+                                {
+                                    // 1. Nhóm theo Tên Vật Liệu trước
+                                    var woodGroups = Model.ProductDetails
+                                    .Where(x => !string.IsNullOrEmpty(x.MaterialType))
+                                    .GroupBy(x => x.MaterialType.Trim()) // Trim để tránh lỗi khoảng trắng
+                                    .Select(g => new
+                                    {
+                                        MaterialName = g.Key,
+                                        TotalVol = g.Sum(x => (x.Length * x.Width * x.Thick * x.Quantity) / 1000000000.0),
+                                        // 2. Bên trong mỗi loại gỗ, nhóm tiếp theo độ dày
+                                        Thicknesses = g.GroupBy(sub => sub.Thick)
+                                    .Select(sg => new
+                                    {
+                                        Thick = sg.Key,
+                                        Qty = sg.Sum(q => q.Quantity),
+                                        Vol = sg.Sum(v => (v.Length * v.Width * v.Thick * v.Quantity) / 1000000000.0)
+                                    }).OrderBy(t => t.Thick)
+                                    })
+                                    .OrderByDescending(x => x.TotalVol); // Loại nào nhiều gỗ nhất lên đầu
+
+                                    foreach (var wood in woodGroups)
+                                    {
+                                        <tr class="bg-light">
+                                            <td colspan="2" class="ps-3 text-primary fw-bold text-uppercase border-bottom-0">
+                                                <i class="fa-solid fa-tree me-1"></i> @wood.MaterialName
+                                            </td>
+                                            <td class="text-end pe-3 fw-bold text-primary border-bottom-0">
+                                                @wood.TotalVol.ToString("0.0000") <small>m³</small>
+                                            </td>
+                                        </tr>
+
+                                        foreach (var item in wood.Thicknesses)
+                                        {
+                                            <tr>
+                                                <td class="ps-4 small border-0">
+                                                    <span class="text-muted border-start border-2 ps-2">Dày <b>@item.Thick</b> mm</span>
+                                                </td>
+                                                <td class="text-center small border-0 text-muted">@item.Qty</td>
+                                                <td class="text-end pe-3 border-0 fw-bold text-dark font-monospace">
+                                                    @item.Vol.ToString("0.0000")
+                                                </td>
+                                            </tr>
+                                        }
+                                        <tr><td colspan="3" class="p-0 border-top"></td></tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr><td colspan="3" class="text-center text-muted small py-4 fst-italic">Chưa có dữ liệu.</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-white small text-muted border-top-0">
+                    <i class="fa-solid fa-circle-info text-primary"></i> Tổng hợp khối lượng theo loại gỗ & độ dày.
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function (e) { document.getElementById('imgPreview').src = e.target.result; }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function deleteImage(id) {
+        if (!confirm('Bạn có chắc muốn xóa ảnh này không?')) return;
+
+        fetch('/Product/DeleteImageOnly/' + id, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload(); // Tải lại trang để cập nhật giao diện
+                } else {
+                    alert('Lỗi: Không thể xóa ảnh.');
+                }
+            })
+            .catch(err => alert('Lỗi kết nối server'));
+    }
+
+    function editDetail(data) {
+        // 1. Đổi tiêu đề form & màu sắc
+        var title = document.getElementById('formTitle');
+        title.innerHTML = '<span class="bg-warning text-dark rounded-circle d-inline-flex justify-content-center align-items-center me-2" style="width:24px;height:24px;"><i class="fa-solid fa-pen" style="font-size:12px"></i></span> <span class="text-warning">Cập nhật: ' + data.variantName + '</span>';
+
+        // 2. Điền dữ liệu
+        document.getElementById('d_Id').value = data.id;
+        document.getElementById('d_Code').value = data.detailCode;
+        document.getElementById('d_Name').value = data.variantName;
+        document.getElementById('d_Qty').value = data.quantity;
+        document.getElementById('d_Price').value = data.price;
+
+        document.getElementById('d_Thick').value = data.thick;
+        document.getElementById('d_Width').value = data.width;
+        document.getElementById('d_Length').value = data.length;
+
+        document.getElementById('d_Material').value = data.materialType || '';
+        document.getElementById('d_Note').value = data.note || ''; // Load note cũ
+
+        // 3. Đổi nút bấm thành màu Vàng
+        var btn = document.getElementById('btnSubmit');
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu Thay Đổi';
+        btn.className = 'btn btn-warning text-dark fw-bold px-4 rounded-pill shadow-sm';
+
+        // Hiện nút Hủy
+        document.getElementById('btnCancel').style.display = 'block';
+
+        // Cuộn xuống form
+        document.getElementById('formContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Highlight form để user chú ý
+        document.getElementById('formContainer').classList.add('border-warning');
+        document.getElementById('formContainer').classList.add('border');
+    }
+
+    function resetForm() {
+        // Reset về trạng thái Thêm mới
+        document.getElementById('detailForm').reset();
+        document.getElementById('d_Id').value = 0;
+
+        document.getElementById('d_Code').value = "";
+        document.getElementById('d_Code').placeholder = "Hệ thống tự sinh...";
+
+        // Đổi lại tiêu đề
+        var title = document.getElementById('formTitle');
+        title.innerHTML = '<span class="bg-success text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2" style="width:24px;height:24px;"><i class="fa-solid fa-plus" style="font-size:12px"></i></span> Thêm chi tiết mới';
+
+        // Đổi lại nút bấm màu Xanh
+        var btn = document.getElementById('btnSubmit');
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Thêm Chi Tiết';
+        btn.className = 'btn btn-success fw-bold px-4 rounded-pill shadow-sm';
+
+        document.getElementById('btnCancel').style.display = 'none';
+
+        // Bỏ highlight
+        document.getElementById('formContainer').classList.remove('border-warning');
+        document.getElementById('formContainer').classList.remove('border');
+    }
+</script>

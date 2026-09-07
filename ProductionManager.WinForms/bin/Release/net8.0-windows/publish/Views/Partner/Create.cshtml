@@ -1,0 +1,97 @@
+﻿@model ProductionManager.Data.PartnerContact
+
+@{
+    ViewData["Title"] = "Thêm Mới Đối Tác";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Quản Lý Danh Bạ", Url.Action("Index", "Partner")), 
+        ("Thêm Mới", "") 
+    };
+}
+
+<div class="container py-4" style="max-width: 900px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold text-primary mb-1"><i class="fa-solid fa-user-plus me-2"></i>THÊM MỚI ĐỐI TÁC</h4>
+            <a asp-action="Index" class="text-decoration-none text-muted"><i class="fa-solid fa-arrow-left me-1"></i> Quay lại danh sách</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body p-4">
+            <form asp-action="Create" method="post">
+                <div class="row g-4">
+                    <div class="col-12">
+                        <h6 class="fw-bold text-dark border-bottom pb-2"><i class="fa-solid fa-building me-2 text-muted"></i>Thông tin tổ chức</h6>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Công ty / Tổ chức <span class="text-danger">*</span></label>
+                        <input asp-for="Company" class="form-control" placeholder="VD: Công ty ABC..." required />
+                        <span asp-validation-for="Company" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Bộ phận / Phòng ban</label>
+                        <input asp-for="Department" class="form-control" placeholder="VD: Phòng Thu Mua..." />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Người liên hệ <span class="text-danger">*</span></label>
+                        <input asp-for="ContactName" class="form-control" placeholder="VD: Mr. John..." required />
+                        <span asp-validation-for="ContactName" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Số điện thoại</label>
+                        <input asp-for="Phone" class="form-control" placeholder="VD: 0909..." />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-danger"><i class="fa-solid fa-envelope me-1"></i> Email</label>
+                        <input asp-for="Email" class="form-control" type="email" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-primary"><span class="fw-black me-1">Z</span> Zalo</label>
+                        <input asp-for="Zalo" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-info"><i class="fa-brands fa-telegram me-1"></i> Telegram</label>
+                        <input asp-for="Telegram" class="form-control" />
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <h6 class="fw-bold text-dark border-bottom pb-2"><i class="fa-solid fa-calendar-days me-2 text-muted"></i>Thời gian & Trạng thái</h6>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Ngày bắt đầu</label>
+                        <input asp-for="StartDate" class="form-control" type="date" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Ngày kết thúc</label>
+                        <input asp-for="EndDate" class="form-control" type="date" />
+                        <small class="text-muted">Bỏ trống nếu đang làm việc</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Trạng thái</label>
+                        <select asp-for="Status" class="form-select" asp-items="Html.GetEnumSelectList<ProductionManager.Data.PartnerStatus>()"></select>
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <h6 class="fw-bold text-dark border-bottom pb-2"><i class="fa-solid fa-briefcase me-2 text-muted"></i>Mô tả công việc</h6>
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">Mảng phụ trách / Nội dung công việc</label>
+                        <textarea asp-for="JobDescription" class="form-control" rows="3" placeholder="Ghi chú chi tiết người này phụ trách việc gì..."></textarea>
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">Ghi chú thêm</label>
+                        <textarea asp-for="Notes" class="form-control" rows="2"></textarea>
+                    </div>
+
+                    <div class="col-12 text-end mt-4">
+                        <a asp-action="Index" class="btn btn-light px-4 me-2">Hủy bỏ</a>
+                        <button type="submit" class="btn btn-primary px-5 fw-bold"><i class="fa-solid fa-floppy-disk me-2"></i>Lưu Dữ Liệu</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

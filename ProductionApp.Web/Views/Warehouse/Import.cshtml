@@ -1,0 +1,168 @@
+﻿@model ProductionManager.Data.WarehouseTicket
+@{
+    ViewData["Title"] = "Lập Phiếu Nhập Kho";
+    var productList = ViewBag.ProductList as IEnumerable<dynamic>;
+}
+
+<div class="container mt-4" style="max-width: 900px;">
+    <form asp-action="Import" method="post" id="ticketForm">
+
+        <div class="card shadow mb-4">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fa-solid fa-download"></i> PHIẾU NHẬP KHO</h5>
+                <a href="/Warehouse" class="btn btn-sm btn-light text-success fw-bold">Quay lại</a>
+            </div>
+            <div class="card-body bg-light">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Người giao hàng / Nhà cung cấp</label>
+                        <input asp-for="Subject" class="form-control" required placeholder="Nhập tên người giao..." />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Mã phiếu (Để trống tự sinh)</label>
+                        <input asp-for="TicketCode" class="form-control" placeholder="NK-..." />
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-primary">Tổng giá trị đơn hàng</label>
+                        <div class="input-group">
+                            <input type="text" id="txtTotalVisual" class="form-control fs-5 fw-bold text-primary"
+                                   placeholder="0" oninput="formatCurrency(this)" autocomplete="off" required />
+                            <span class="input-group-text fw-bold">VNĐ</span>
+                            <input type="hidden" name="TotalAmount" id="txtTotalReal" value="0" />
+                        </div>
+                        <div class="form-text small fst-italic">* Nhập tổng số tiền để theo dõi công nợ/thanh toán.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Ghi chú</label>
+                        <textarea asp-for="Note" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold text-secondary mb-0">DANH SÁCH HÀNG HÓA</h6>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()">
+                    <i class="fa-solid fa-plus"></i> Thêm dòng
+                </button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered mb-0" id="detailsTable">
+                    <thead class="table-light text-center">
+                        <tr>
+                            <th style="width: 50%">Sản phẩm</th>
+                            <th style="width: 20%">Số lượng nhập</th>
+                            <th style="width: 10%">Xóa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card border-primary mb-4 shadow-sm">
+            <div class="card-header bg-primary text-white fw-bold">
+                <i class="fa-solid fa-money-bill-wave me-2"></i> THÔNG TIN THANH TOÁN
+            </div>
+            <div class="card-body bg-light">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="chkPayNow" name="isPayNow" value="true" onchange="togglePayment()">
+                        <label class="form-check-label fw-bold text-dark" for="chkPayNow">Thanh toán ngay</label>
+                    </div>
+                    <span class="text-danger small fw-bold" id="debtNote">
+                        <i class="fa-solid fa-circle-exclamation me-1"></i> Phiếu này sẽ được ghi vào <b>Sổ Công Nợ Phải Trả</b>.
+                    </span>
+                </div>
+
+                <div id="paymentDetails" style="display:none;" class="p-3 bg-white rounded border animate__animated animate__fadeIn">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="small fw-bold text-muted mb-1">Hình thức thanh toán</label>
+                            <select name="paymentMethod" class="form-select fw-bold">
+                                <option value="1">Tiền mặt</option>
+                                <option value="2">Chuyển khoản</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-center">
+                            <div class="text-success small fw-bold mt-4">
+                                <i class="fa-solid fa-check-circle me-1"></i> Hệ thống sẽ tự động tạo <b>Phiếu Chi</b> (Đã trả hết).
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-end mb-5">
+            <button type="submit" class="btn btn-success fw-bold px-5 py-3 shadow">
+                <i class="fa-solid fa-floppy-disk me-2"></i> LƯU PHIẾU NHẬP
+            </button>
+        </div>
+
+    </form>
+</div>
+
+<script>
+    let rowIndex = 0;
+    const products = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(productList));
+
+    // --- LOGIC BẢNG HÀNG HÓA ---
+    function addRow() {
+        const table = document.getElementById("detailsTable").getElementsByTagName('tbody')[0];
+        const row = table.insertRow();
+
+        let options = '<option value="">-- Chọn hàng --</option>';
+        products.forEach(p => {
+            options += `<option value="${p.Id}">${p.Name}</option>`;
+        });
+
+        row.innerHTML = `
+                <td>
+                    <select name="TicketDetails[${rowIndex}].ProductDetailId" class="form-select" required>
+                        ${options}
+                    </select>
+                </td>
+                <td>
+                    <input type="number" name="TicketDetails[${rowIndex}].Quantity" class="form-control text-center fw-bold" min="1" value="1" required />
+                </td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            `;
+        rowIndex++;
+    }
+
+    // --- LOGIC FORMAT TIỀN TỆ ---
+    function formatCurrency(input) {
+        let value = input.value.replace(/\D/g, ""); // Chỉ giữ lại số
+        document.getElementById("txtTotalReal").value = value; // Gán vào input ẩn
+        if (value) input.value = new Intl.NumberFormat('vi-VN').format(value); // Format hiển thị
+        else input.value = "";
+    }
+
+    // --- LOGIC ẨN/HIỆN THANH TOÁN ---
+    function togglePayment() {
+        var isPay = document.getElementById('chkPayNow').checked;
+        var box = document.getElementById('paymentDetails');
+        var note = document.getElementById('debtNote');
+
+        if (isPay) {
+            box.style.display = 'block';
+            note.style.display = 'none';
+        } else {
+            box.style.display = 'none';
+            note.style.display = 'inline';
+        }
+    }
+
+    // Init
+    document.addEventListener("DOMContentLoaded", () => {
+        addRow();
+        togglePayment(); // Chạy lần đầu để set trạng thái đúng
+    });
+</script>

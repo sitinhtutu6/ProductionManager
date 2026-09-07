@@ -1,0 +1,137 @@
+﻿@model List<ProductionApp.Web.Controllers.OrderController.OrderImportPreviewModel>
+@{
+    ViewData["Title"] = "Kiểm tra dữ liệu đơn hàng";
+
+    // Đếm số liệu thống kê để cảnh báo Sếp
+    int totalRows = Model.Count;
+    int validRows = Model.Count(x => x.CustomerExists && x.ProductExists && !x.IsDuplicate);
+    int errorRows = totalRows - validRows;
+}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    .table-preview th {
+        text-transform: uppercase;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+    }
+
+    .table-preview td {
+        vertical-align: middle;
+        font-size: 13.5px;
+    }
+
+    .row-invalid {
+        background-color: #fff1f2 !important;
+    }
+
+    .row-duplicate {
+        background-color: #fef9c3 !important;
+    }
+
+    .row-valid {
+        background-color: #f8fafc;
+    }
+
+    .error-text {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h5 class="mb-1 fw-800 text-primary"><i class="fa-solid fa-file-circle-check me-2"></i> KIỂM TRA TRƯỚC KHI LƯU DỮ LIỆU</h5>
+                <small class="text-muted d-block">
+                    Hệ thống đã quét <strong class="text-dark">@totalRows dòng</strong>.
+                    Phát hiện <strong class="text-danger">@errorRows dòng lỗi</strong> không thể Import.
+                </small>
+            </div>
+            <div class="d-flex gap-2">
+                <a asp-action="Index" class="btn btn-light border fw-bold px-4 rounded-pill">Hủy bỏ</a>
+                <form asp-action="ConfirmImport" method="post">
+                    <input type="hidden" name="jsonData" value='@System.Text.Json.JsonSerializer.Serialize(Model)' />
+                    <button type="submit" class="btn btn-success fw-bold px-4 rounded-pill shadow-sm" @(validRows == 0 ? "disabled" : "")>
+                        <i class="fa-solid fa-cloud-arrow-up me-2"></i> LƯU @validRows DÒNG HỢP LỆ
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        @if (errorRows > 0)
+        {
+            <div class="alert alert-warning m-3 border-warning border-opacity-50 small fw-bold">
+                <i class="fa-solid fa-triangle-exclamation me-1"></i> Lưu ý: Những dòng bị lỗi (Sai Khách hàng, Sai Tên Sản phẩm, Trùng Mã Đơn) sẽ tự động bị bỏ qua khi nhấn "Lưu vào hệ thống".
+            </div>
+        }
+
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 65vh;">
+                <table class="table table-hover align-middle mb-0 table-preview">
+                    <thead class="bg-light sticky-top shadow-sm text-secondary">
+                        <tr class="text-center">
+                            <th class="ps-4 text-start">Mã Đơn</th>
+                            <th class="text-start">Khách Hàng</th>
+                            <th class="text-start">Tên Sản Phẩm / Chi Tiết</th>
+                            <th class="bg-info bg-opacity-10 text-primary">SL TỔNG</th>
+                            <th>Ngày Giao</th>
+                            <th>Ngày Nhận</th>
+                            <th class="pe-4 text-start">Trạng Thái Hệ Thống</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            string rowClass = "row-valid";
+                            if (item.IsDuplicate) { rowClass = "row-duplicate"; }
+                            else if (!item.CustomerExists || !item.ProductExists) { rowClass = "row-invalid"; }
+
+                            <tr class="@rowClass">
+                                <td class="ps-4 fw-bold font-monospace text-dark">@item.OrderCode</td>
+
+                                <td class="text-start">
+                                    <div class="fw-bold @(item.CustomerExists ? "text-dark" : "text-danger")">@item.CustomerName</div>
+                                    @if (!item.CustomerExists)
+                                    {
+                                        <span class="error-text bg-danger text-white mt-1 d-inline-block"><i class="fa-solid fa-xmark me-1"></i> Không tìm thấy Khách</span>
+                                    }
+                                </td>
+
+                                <td class="text-start">
+                                    <div class="fw-bold @(item.ProductExists ? "text-primary" : "text-danger")">@item.ProductName</div>
+                                    @if (!item.ProductExists)
+                                    {
+                                        <span class="error-text bg-danger text-white mt-1 d-inline-block"><i class="fa-solid fa-xmark me-1"></i> Mã/Tên Sản phẩm không tồn tại</span>
+                                    }
+                                </td>
+
+                                <td class="text-center fw-900 text-primary bg-info bg-opacity-10 fs-6">@item.TotalQty</td>
+                                <td class="text-center fw-600 text-danger">@(item.Deadline?.ToString("dd/MM/yyyy") ?? "-")</td>
+                                <td class="text-center fw-600">@item.OrderDate.ToString("dd/MM/yyyy")</td>
+
+                                <td class="pe-4 text-start">
+                                    @if (item.IsDuplicate)
+                                    {
+                                        <div class="text-warning fw-bold"><i class="fa-solid fa-copy me-1"></i> Bỏ qua (Trùng PO)</div>
+                                    }
+                                    else if (!item.CustomerExists || !item.ProductExists)
+                                    {
+                                        <div class="text-danger fw-bold"><i class="fa-solid fa-ban me-1"></i> Bỏ qua (Sai Dữ Liệu)</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-success fw-bold"><i class="fa-solid fa-check-circle me-1"></i> Hợp lệ (Sẵn sàng)</div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

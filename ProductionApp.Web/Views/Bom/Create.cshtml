@@ -1,0 +1,613 @@
+﻿@model ProductionApp.Web.Models.ViewModels.BomCreateVM
+@{
+    ViewData["Title"] = "Thiết lập BOM";
+
+    // Đón nhận dữ liệu vật tư kèm giá từ ViewBag
+    var materialsRawJson = ViewBag.MaterialsJson as string ?? "[]";
+    var matNames = ViewBag.MatNames as Dictionary<int, string>;
+    var matUnits = ViewBag.MatUnits as Dictionary<int, string>;
+
+    string exactMatch = Model.ProductId > 0 ? $"{Model.ProductId}|{ViewBag.SelectedVariant}" : "";
+    var prodList = ViewBag.ProductsList as List<SelectListItem>;
+}
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+    body {
+    background-color: #f1f5f9;
+    font-family: 'Inter', sans-serif;
+    }
+
+    .bom-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    .card-header-custom {
+    background: #0ea5e9;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 12px 12px 0 0;
+    }
+
+    .bom-row {
+    transition: all 0.2s;
+    border-left: 4px solid transparent;
+    }
+
+    .bom-row:hover {
+    background-color: #f8fafc;
+    border-left-color: #0ea5e9;
+    }
+
+    .table-modern {
+    margin-bottom: 0;
+    }
+
+    .table-modern th {
+    background-color: #f8fafc;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 12px;
+    vertical-align: middle;
+    }
+
+    .table-modern td {
+    padding: 10px;
+    vertical-align: middle;
+    border-bottom: 1px solid #e2e8f0;
+    }
+
+    .form-control-xs {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    }
+
+    .form-control-xs:focus {
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 0.2rem rgba(14, 165, 233, 0.15);
+    }
+
+    /* Trạng thái khóa */
+    .input-locked {
+    cursor: not-allowed !important;
+    background-color: #f1f5f9 !important;
+    color: #94a3b8 !important;
+    border-style: dashed !important;
+    }
+
+    .sticky-summary {
+    position: sticky;
+    top: 20px;
+    z-index: 99;
+    }
+
+    /* Search Box Tùy chỉnh */
+    .suggestion-box {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 250px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #cbd5e1;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    z-index: 1000;
+    display: none;
+    }
+
+    .suggestion-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.9rem;
+    transition: 0.1s;
+    }
+
+    .suggestion-item:hover {
+    background-color: #e0f2fe;
+    color: #0284c7;
+    padding-left: 20px;
+    }
+
+    .price-tag {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-style: italic;
+    display: block;
+    margin-top: 4px;
+    }
+
+    /* Input ĐVT tự gõ */
+    .inp-unit {
+    max-width: 65px;
+    border-left: 1px solid #cbd5e1;
+    background-color: #f8fafc;
+    font-size: 0.85rem;
+    transition: 0.2s;
+    }
+
+    .inp-unit:focus {
+    background-color: #fff;
+    border-color: #0ea5e9;
+    box-shadow: inset 0 0 0 1px #0ea5e9;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <form asp-action="Create" method="post" id="bomForm">
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger shadow-sm mb-4 border-0 border-start border-danger border-4">
+                <h6 class="fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-2"></i> Lỗi dữ liệu:</h6>
+                <div asp-validation-summary="All" class="mb-0 small fw-bold"></div>
+            </div>
+        }
+
+        <div class="row g-4">
+            <div class="col-lg-9">
+                <div class="bom-card border border-primary border-opacity-25">
+                    <div class="card-header-custom d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold text-uppercase"><i class="fa-solid fa-pen-ruler me-2"></i> THIẾT LẬP BOM & GIÁ VỐN</h6>
+                        <span class="badge bg-white text-primary rounded-pill px-3 shadow-sm"><i class="fa-solid fa-cube me-1"></i> <span id="rowCount">0</span> Items</span>
+                    </div>
+
+                    <div class="p-3">
+                        <div class="bg-primary bg-opacity-10 p-3 rounded-3 mb-4 border border-primary border-opacity-25">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <label class="fw-bold text-dark small mb-2">📦 Sản Phẩm Cần Thiết Lập BOM <span class="text-danger">*</span></label>
+                                    <select id="cbProductSelect" name="cbProductSelect" class="form-select fw-bold border-primary shadow-sm" style="height:42px;">
+                                        <option value="">-- Tìm kiếm Sản phẩm hoặc Chi tiết --</option>
+                                        @if (prodList != null)
+                                        {
+                                            foreach (var item in prodList)
+                                            {
+                                                <option value="@item.Value" selected="@(item.Value == exactMatch)">@item.Text</option>
+                                            }
+                                        }
+                                    </select>
+                                    <input type="hidden" asp-for="ProductId" id="realProductId" />
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="alert alert-light mb-0 py-2 small border-0 shadow-sm text-muted">
+                                        <i class="fa-solid fa-lightbulb text-warning me-2 fs-5 float-start"></i>
+                                        <b>Sự kiện thông minh:</b> Có thể tự gõ đổi Đơn vị tính. Nếu gõ "m3" hoặc "m2", hệ thống sẽ lập tức mở khóa ô Quy cách (D-R-C) để tự động tính khối.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border rounded-3 overflow-hidden shadow-sm">
+                            <div class="table-responsive" style="min-height: 400px;">
+                                <table class="table table-modern align-middle" id="bomTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center" width="40">#</th>
+                                            <th width="24%">📦 Tìm Vật tư & ĐVT</th>
+                                            <th width="15%">🧩 Tên Bộ phận</th>
+                                            <th class="text-center" width="20%">📏 Quy cách (D-R-C)</th>
+                                            <th class="text-center" width="13%">🔢 SL x HS</th>
+                                            <th width="10%">📝 Ghi chú</th>
+                                            <th class="text-end pe-3" width="15%">📊 Tổng Tiêu hao</th>
+                                            <th width="40"></th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody id="bomBody">
+                                        @if (Model.Items != null && Model.Items.Any(x => x.MaterialId > 0))
+                                        {
+                                            for (int i = 0; i < Model.Items.Count; i++)
+                                            {
+                                                var item = Model.Items[i];
+                                                if (item.MaterialId <= 0) continue;
+
+                                                var mName = (matNames != null && matNames.ContainsKey(item.MaterialId)) ? matNames[item.MaterialId] : "";
+
+                                                // 🔥 Lấy Unit tùy chỉnh (Nếu có), nếu không lấy Unit gốc của vật tư
+                                                var mUnit = !string.IsNullOrEmpty(item.Unit) ? item.Unit : ((matUnits != null && matUnits.ContainsKey(item.MaterialId)) ? matUnits[item.MaterialId] : "ĐVT");
+
+                                                var vL = item.Length?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+                                                var vW = item.Width?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+                                                var vH = item.Height?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+                                                var vQty = item.CutQuantity.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+                                                var vCoef = item.Coefficient.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "1";
+
+                                                <tr class="bom-row">
+                                                    <td class="text-center fw-bold text-muted small row-idx">@(i + 1)</td>
+                                                    <td class="p-2 position-relative">
+                                                        <input type="hidden" name="Items[@i].MaterialId" class="inp-matId" value="@item.MaterialId">
+                                                        <div class="input-group input-group-sm shadow-sm">
+                                                            <span class="input-group-text bg-white text-primary border-end-0"><i class="fa-solid fa-search"></i></span>
+                                                            <input type="text" class="form-control border-start-0 fw-bold inp-search" style="border-color: #10b981;" value="@mName" placeholder="Gõ tên vật tư..." onkeyup="BomManager.filter(this)" autocomplete="off">
+                                                            <input type="text" name="Items[@i].Unit" class="form-control text-center fw-bold text-secondary inp-unit" value="@mUnit" oninput="BomManager.handleUnitChange(this)" autocomplete="off" title="Bạn có thể tự sửa ĐVT">
+                                                        </div>
+                                                        <div class="suggestion-box"></div>
+                                                    </td>
+                                                    <td class="p-2">
+                                                        <input type="text" name="Items[@i].ComponentName" value="@item.ComponentName" class="form-control form-control-sm fw-bold text-primary inp-comp" placeholder="Bộ phận..." autocomplete="off">
+                                                    </td>
+                                                    <td class="p-2">
+                                                        <div class="d-flex align-items-center gap-1">
+                                                            <input type="number" step="any" name="Items[@i].Length" value="@vL" class="form-control form-control-xs inp-l" placeholder="Dài" oninput="BomManager.calc(this)">
+                                                            <input type="number" step="any" name="Items[@i].Width" value="@vW" class="form-control form-control-xs inp-w" placeholder="Rộng" oninput="BomManager.calc(this)">
+                                                            <input type="number" step="any" name="Items[@i].Height" value="@vH" class="form-control form-control-xs inp-h" placeholder="Dày" oninput="BomManager.calc(this)">
+                                                        </div>
+                                                    </td>
+                                                    <td class="p-2">
+                                                        <div class="d-flex gap-1">
+                                                            <input type="number" step="any" name="Items[@i].CutQuantity" value="@vQty" class="form-control form-control-xs fw-bold text-dark inp-qty" placeholder="SL" oninput="BomManager.calc(this)">
+                                                            <input type="number" step="any" name="Items[@i].Coefficient" value="@vCoef" class="form-control form-control-xs text-danger fw-bold inp-coef" placeholder="HS" oninput="BomManager.calc(this)">
+                                                        </div>
+                                                    </td>
+                                                    <td class="p-2">
+                                                        <input type="text" name="Items[@i].Note" value="@item.Note" class="form-control form-control-sm text-muted inp-note" placeholder="Ghi chú..." autocomplete="off">
+                                                    </td>
+                                                    <td class="p-2 text-end bg-light bg-opacity-50 border-start">
+                                                        <div class="fw-800 text-success fs-6 preview-qty">0</div>
+                                                        <span class="price-tag preview-price" data-qty="0" data-cost="0">0 ₫</span>
+                                                    </td>
+                                                    <td class="p-2 text-center">
+                                                        <button type="button" class="btn btn-sm text-danger" onclick="BomManager.remove(this)" title="Xóa dòng"><i class="fa-solid fa-trash-can"></i></button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="p-2 text-center bg-light border-top">
+                                <button type="button" class="btn fw-bold w-100 py-2 text-primary" style="background: #e0f2fe; border: 2px dashed #bae6fd;" onclick="BomManager.addRow()" onmouseover="this.style.backgroundColor='#bae6fd'" onmouseout="this.style.backgroundColor='#e0f2fe'">
+                                    <i class="fa-solid fa-plus-circle me-2"></i> THÊM DÒNG VẬT TƯ MỚI
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3">
+                <div class="sticky-summary">
+                    <div class="bom-card border-success border-opacity-50 mb-3">
+                        <div class="card-header-custom bg-success d-flex justify-content-center">
+                            <h6 class="m-0 fw-bold text-uppercase"><i class="fa-solid fa-calculator me-2"></i> TỔNG HỢP VẬT TƯ</h6>
+                        </div>
+                        <div class="p-0">
+                            <table class="table table-hover mb-0">
+                                <thead class="bg-light text-muted small">
+                                    <tr><th class="ps-3 border-bottom-0">Tên Vật Tư</th><th class="text-end pe-3 border-bottom-0">Nhu Cầu</th></tr>
+                                </thead>
+                                <tbody id="summaryTableBody">
+                                    <tr><td colspan="2" class="text-center text-muted py-4 small fst-italic">Đang chờ dữ liệu...</td></tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="bg-warning bg-opacity-10 border-top border-warning border-2">
+                                        <td class="ps-3 fw-800 py-3 text-dark">TỔNG GIÁ VỐN:</td>
+                                        <td class="text-end pe-3 fw-800 text-danger fs-5 py-3" id="totalEstimatedCost">0 ₫</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bom-card p-3 border-0 shadow-sm bg-white">
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary fw-bold py-2 shadow-sm fs-6"><i class="fa-solid fa-floppy-disk me-2"></i> LƯU ĐỊNH MỨC (BOM)</button>
+                            <a asp-action="Index" class="btn btn-light fw-bold py-2 border text-muted">Hủy bỏ / Quay lại</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<template id="rowTemplate">
+    <tr class="bom-row">
+        <td class="text-center fw-bold text-muted small row-idx">1</td>
+        <td class="p-2 position-relative">
+            <input type="hidden" name="Items[0].MaterialId" class="inp-matId">
+            <div class="input-group input-group-sm shadow-sm">
+                <span class="input-group-text bg-white text-primary border-end-0"><i class="fa-solid fa-search"></i></span>
+                <input type="text" class="form-control border-start-0 fw-bold inp-search" placeholder="Gõ tên vật tư..." onkeyup="BomManager.filter(this)" autocomplete="off">
+                <input type="text" name="Items[0].Unit" class="form-control text-center fw-bold text-secondary inp-unit" value="ĐVT" oninput="BomManager.handleUnitChange(this)" autocomplete="off" title="Bạn có thể tự sửa ĐVT">
+            </div>
+            <div class="suggestion-box"></div>
+        </td>
+        <td class="p-2">
+            <input type="text" name="Items[0].ComponentName" class="form-control form-control-sm fw-bold text-primary inp-comp input-locked" placeholder="Bộ phận..." readonly>
+        </td>
+        <td class="p-2">
+            <div class="d-flex align-items-center gap-1">
+                <input type="number" step="any" name="Items[0].Length" class="form-control form-control-xs inp-l input-locked" placeholder="Dài" oninput="BomManager.calc(this)" readonly>
+                <input type="number" step="any" name="Items[0].Width" class="form-control form-control-xs inp-w input-locked" placeholder="Rộng" oninput="BomManager.calc(this)" readonly>
+                <input type="number" step="any" name="Items[0].Height" class="form-control form-control-xs inp-h input-locked" placeholder="Dày" oninput="BomManager.calc(this)" readonly>
+            </div>
+        </td>
+        <td class="p-2">
+            <div class="d-flex gap-1">
+                <input type="number" step="any" name="Items[0].CutQuantity" class="form-control form-control-xs fw-bold text-dark inp-qty input-locked" placeholder="SL" oninput="BomManager.calc(this)" readonly>
+                <input type="number" step="any" name="Items[0].Coefficient" value="1" class="form-control form-control-xs text-danger fw-bold inp-coef input-locked" placeholder="HS" oninput="BomManager.calc(this)" readonly>
+            </div>
+        </td>
+        <td class="p-2">
+            <input type="text" name="Items[0].Note" class="form-control form-control-sm text-muted inp-note input-locked" placeholder="Ghi chú..." readonly>
+        </td>
+        <td class="p-2 text-end bg-light bg-opacity-50 border-start">
+            <div class="fw-800 text-success fs-6 preview-qty">0</div>
+            <span class="price-tag preview-price" data-qty="0" data-cost="0">0 ₫</span>
+        </td>
+        <td class="p-2 text-center">
+            <button type="button" class="btn btn-sm text-danger" onclick="BomManager.remove(this)" title="Xóa dòng"><i class="fa-solid fa-trash-can"></i></button>
+        </td>
+    </tr>
+</template>
+
+<script>
+    const materialsData = @Html.Raw(materialsRawJson);
+
+    const BomManager = {
+    tbody: null,
+    template: null,
+
+    init: function () {
+    this.tbody = document.getElementById('bomBody');
+    this.template = document.getElementById('rowTemplate');
+    $('#cbProductSelect').select2({ placeholder: "-- Tìm tên Sản phẩm / Biến thể --", allowClear: true });
+
+    // 1. Phục hồi và "Đánh thức" các dòng Edit từ Server
+    const rows = this.tbody.querySelectorAll('.bom-row');
+    rows.forEach(row => {
+    let matId = row.querySelector('.inp-matId').value;
+    if (matId) {
+    let matInfo = materialsData.find(m => (m.Id || m.id) == matId);
+    if (matInfo) {
+    row.setAttribute('data-price', matInfo.CostPrice || matInfo.costPrice || 0);
+    this.handleUnitChange(row.querySelector('.inp-unit')); // Mở khóa tùy theo ĐVT
+    }
+    }
+    });
+
+    // 2. Nếu trống trơn thì tự add dòng đầu tiên
+    if (this.tbody.children.length === 0) this.addRow();
+
+    this.reindex();
+
+    document.addEventListener('click', e => {
+    if (!e.target.closest('.position-relative')) {
+    document.querySelectorAll('.suggestion-box').forEach(b => b.style.display = 'none');
+    }
+    });
+    },
+
+    addRow: function () {
+    const clone = this.template.content.cloneNode(true);
+    this.tbody.appendChild(clone);
+    this.reindex();
+    return this.tbody.lastElementChild;
+    },
+
+    remove: function (btn) {
+    btn.closest('tr').remove();
+    this.reindex();
+    this.updateSummary();
+    },
+
+    reindex: function () {
+    const rows = this.tbody.querySelectorAll('.bom-row');
+    document.getElementById('rowCount').innerText = rows.length;
+
+    rows.forEach((row, index) => {
+    row.querySelector('.row-idx').innerText = index + 1;
+
+    // Đánh lại Name chuẩn xác để ASP.NET Core bind được thành List
+    row.querySelector('.inp-matId').name = `Items[${index}].MaterialId`;
+    row.querySelector('.inp-comp').name = `Items[${index}].ComponentName`;
+    row.querySelector('.inp-l').name = `Items[${index}].Length`;
+    row.querySelector('.inp-w').name = `Items[${index}].Width`;
+    row.querySelector('.inp-h').name = `Items[${index}].Height`;
+    row.querySelector('.inp-qty').name = `Items[${index}].CutQuantity`;
+    row.querySelector('.inp-coef').name = `Items[${index}].Coefficient`;
+    row.querySelector('.inp-note').name = `Items[${index}].Note`;
+
+    // 🔥 THẺ NÀY RẤT QUAN TRỌNG ĐỂ LƯU ĐVT VĨNH VIỄN VÀO DB
+    row.querySelector('.inp-unit').name = `Items[${index}].Unit`;
+    });
+    },
+
+    filter: function (input) {
+    const row = input.closest('tr');
+    const box = row.querySelector('.suggestion-box');
+    let filterText = input.value.toLowerCase().trim();
+
+    box.innerHTML = '';
+
+    if (filterText.length < 1) {
+    box.style.display = 'none';
+    row.querySelector('.inp-matId').value = "";
+    this.lockInputs(row);
+    this.calc(input);
+    return;
+    }
+
+    let matches = materialsData.filter(m => (m.Name || m.name || "").toLowerCase().includes(filterText));
+
+    if (matches.length > 0) {
+    matches.slice(0, 15).forEach(m => {
+    let div = document.createElement('div');
+    div.className = 'suggestion-item';
+    let priceFormat = (m.CostPrice || m.costPrice || 0).toLocaleString('vi-VN');
+    let unitDisplay = m.Unit || m.unit || 'Cái';
+    div.innerHTML = `<strong>${m.Name || m.name}</strong> <div class="small text-muted"><i class="fa-solid fa-tag me-1"></i>ĐVT Gốc: ${unitDisplay} | Giá: ${priceFormat}đ</div>`;
+
+    div.onclick = () => this.selectMaterial(row, m.Id || m.id, m.Name || m.name, unitDisplay, m.CostPrice || m.costPrice);
+    box.appendChild(div);
+    });
+    box.style.display = 'block';
+    } else {
+    box.innerHTML = `<div class="p-2 text-muted small fst-italic">Không tìm thấy vật tư...</div>`;
+    box.style.display = 'block';
+    }
+    },
+
+    selectMaterial: function (row, id, name, unit, costPrice) {
+    row.querySelector('.inp-search').value = name;
+    row.querySelector('.inp-search').style.borderColor = "#10b981";
+    row.querySelector('.inp-matId').value = id;
+
+    let inpUnit = row.querySelector('.inp-unit');
+    inpUnit.value = unit || "Cái";
+
+    row.querySelector('.suggestion-box').style.display = 'none';
+    row.setAttribute('data-price', costPrice || 0);
+
+    this.handleUnitChange(inpUnit);
+    },
+
+    handleUnitChange: function (el) {
+    const row = el.closest('tr');
+    let unitLower = (row.querySelector('.inp-unit').value || "").toLowerCase();
+    let isWood = unitLower.includes("m3") || unitLower.includes("khối") || unitLower.includes("m2") || unitLower.includes("m");
+
+    this.unlockInputs(row, isWood);
+    this.calc(el);
+    },
+
+    lockInputs: function (row) {
+    row.querySelectorAll('input:not(.inp-search):not(.inp-matId)').forEach(inp => {
+    inp.readOnly = true;
+    inp.classList.add('input-locked');
+    inp.value = '';
+    });
+    row.querySelector('.inp-unit').value = "ĐVT";
+    row.querySelector('.inp-unit').readOnly = true;
+    row.querySelector('.inp-unit').classList.add('input-locked');
+    },
+
+    unlockInputs: function (row, isWood) {
+    // Luôn mở ComponentName, Note, Qty, Coef, Unit
+    ['.inp-comp', '.inp-qty', '.inp-coef', '.inp-note', '.inp-unit'].forEach(selector => {
+    let inp = row.querySelector(selector);
+    if (inp) { inp.readOnly = false; inp.classList.remove('input-locked'); }
+    });
+
+    // Mở hoặc Khóa L, W, H
+    ['.inp-l', '.inp-w', '.inp-h'].forEach(selector => {
+    let inp = row.querySelector(selector);
+    if (inp) {
+    if (isWood) {
+    inp.readOnly = false;
+    inp.classList.remove('input-locked');
+    } else {
+    inp.readOnly = true;
+    inp.classList.add('input-locked');
+    inp.value = '';
+    }
+    }
+    });
+    },
+
+    calc: function (el) {
+    const row = el.closest('tr');
+
+    let l = parseFloat(row.querySelector('.inp-l').value) || 0;
+    let w = parseFloat(row.querySelector('.inp-w').value) || 0;
+    let h = parseFloat(row.querySelector('.inp-h').value) || 0;
+    let cutQty = parseFloat(row.querySelector('.inp-qty').value) || 0;
+    let coef = parseFloat(row.querySelector('.inp-coef').value) || 1;
+
+    let unit = row.querySelector('.inp-unit').value.toLowerCase().trim().replace("³", "3").replace("²", "2");
+    let price = parseFloat(row.getAttribute('data-price')) || 0;
+
+    let isVolume = unit.includes("m3") || unit.includes("khối");
+    let isArea = unit.includes("m2") || unit.includes("vuông");
+    let isLength = unit === "m" || unit.includes("mét");
+
+    let actualQty = 0;
+
+    if (isVolume && l > 0 && w > 0 && h > 0) {
+    actualQty = ((l * w * h) / 1000000000.0) * cutQty * coef;
+    } else if (isArea && l > 0 && w > 0) {
+    actualQty = ((l * w) / 1000000.0) * cutQty * coef;
+    } else if (isLength && l > 0) {
+    actualQty = (l / 1000.0) * cutQty * coef;
+    } else {
+    actualQty = cutQty * coef;
+    if (unit.includes("cái") || unit.includes("bộ") || unit.includes("chiếc") || unit.includes("con")) {
+    actualQty = Math.ceil(actualQty);
+    }
+    }
+
+    let lineCost = actualQty * price;
+
+    let priceTag = row.querySelector('.preview-price');
+    priceTag.setAttribute('data-qty', actualQty);
+    priceTag.setAttribute('data-cost', lineCost);
+
+    row.querySelector('.preview-qty').innerText = actualQty < 1 && actualQty > 0 ? actualQty.toFixed(5) : actualQty.toFixed(2);
+    priceTag.innerText = lineCost.toLocaleString('vi-VN') + ' ₫';
+
+    this.updateSummary();
+    },
+
+    updateSummary: function () {
+    let summaryMap = {};
+    let grandTotal = 0;
+
+    this.tbody.querySelectorAll('.bom-row').forEach(row => {
+    let matId = row.querySelector('.inp-matId').value;
+    if (!matId) return;
+
+    let matName = row.querySelector('.inp-search').value;
+    let unit = row.querySelector('.inp-unit').value || "ĐVT";
+
+    let qty = parseFloat(row.querySelector('.preview-price').getAttribute('data-qty')) || 0;
+    let cost = parseFloat(row.querySelector('.preview-price').getAttribute('data-cost')) || 0;
+
+    let dictKey = matName + '|' + unit;
+
+    if (summaryMap[dictKey]) {
+    summaryMap[dictKey].qty += qty;
+    summaryMap[dictKey].cost += cost;
+    } else {
+    summaryMap[dictKey] = { name: matName, qty: qty, unit: unit, cost: cost };
+    }
+
+    grandTotal += cost;
+    });
+
+    let html = '';
+    for (let key in summaryMap) {
+    let s = summaryMap[key];
+    let icon = s.unit.toLowerCase().includes("m3") ? 'fa-tree text-success opacity-75' : 'fa-screwdriver-wrench text-warning opacity-75';
+    let displayQty = s.qty < 1 && s.qty > 0 ? s.qty.toFixed(5) : s.qty.toFixed(2);
+
+    html += `<tr>
+    <td class="ps-3 small fw-bold text-dark"><i class="fa-solid ${icon} me-2"></i> ${s.name}</td>
+    <td class="text-end pe-3 fw-bold text-primary">${displayQty} <small class="text-muted fw-normal">${s.unit}</small></td>
+    </tr>`;
+    }
+
+    document.getElementById('summaryTableBody').innerHTML = html || '<tr><td colspan="2" class="text-center py-4 small fst-italic text-muted">Bảng định mức trống...</td></tr>';
+    document.getElementById('totalEstimatedCost').innerText = grandTotal.toLocaleString('vi-VN') + ' ₫';
+    }
+    };
+
+    $(document).ready(function () {
+    BomManager.init();
+    });
+</script>

@@ -1,0 +1,303 @@
+﻿@{
+    ViewData["Title"] = "Tạo Đơn Đặt Hàng";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Đặt Hàng", Url.Action("Index", "PurchaseOrder")),
+        ("Tạo Mới", "")
+    };
+    var itemsJson = ViewBag.ItemsJson;
+    var suppJson = ViewBag.SuppliersJson;
+}
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<style>
+    .select2-container .select2-selection--single {
+        height: 38px !important;
+        padding: 5px 8px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 36px !important;
+        right: 8px;
+    }
+
+    .input-locked {
+        cursor: not-allowed !important;
+        opacity: 0.6;
+        background-color: #f8f9fa !important;
+    }
+
+    .financial-summary-table td {
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+</style>
+
+<div class="container-fluid py-4" style="max-width: 1200px;">
+    <form id="poForm" onsubmit="submitPO(event)">
+        <div class="card shadow-sm border-0 mb-4 rounded-4 overflow-hidden">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-primary"><i class="fa-solid fa-file-circle-plus me-2"></i>THÔNG TIN ĐƠN ĐẶT HÀNG</h5>
+                <a href="/PurchaseOrder" class="btn btn-sm btn-light fw-bold text-secondary border shadow-sm px-3 rounded-pill">Trở về</a>
+            </div>
+            <div class="card-body bg-light p-4">
+                <div class="row g-4">
+                    <div class="col-md-3">
+                        <label class="fw-bold small text-muted text-uppercase mb-1">Mã Đơn</label>
+                        <input id="poCode" class="form-control fw-bold text-primary bg-white shadow-sm" value="@ViewBag.AutoCode" readonly />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="fw-bold small text-muted text-uppercase mb-1"><i class="fa-regular fa-calendar me-1"></i> Ngày Đặt</label>
+                        <input type="text" id="orderDate" class="form-control bg-white fw-bold datepicker shadow-sm" value="@DateTime.Now.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="fw-bold small text-muted text-uppercase mb-1">Loại Đơn (*)</label>
+                        <select id="poType" class="form-select fw-bold text-dark shadow-sm">
+                            <option value="1">Mua hàng thương mại</option>
+                            <option value="2">Đặt gia công ngoài</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="fw-bold small text-danger text-uppercase mb-1">Nhà Cung Cấp (*)</label>
+                        <select id="supplierId" class="form-control fw-bold shadow-sm" required>
+                            <option value="">-- Chọn NCC --</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="fw-bold small text-muted text-uppercase mb-1">Ghi chú nội bộ</label>
+                        <input id="note" class="form-control shadow-sm" placeholder="Nhập ghi chú (nếu có)..." />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <h6 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-boxes-stacked me-2"></i>DANH SÁCH VẬT TƯ & TÀI CHÍNH</h6>
+                <button type="button" class="btn btn-sm btn-primary fw-bold rounded-pill px-3 shadow-sm" onclick="addRow()">
+                    <i class="fa-solid fa-plus me-1"></i> Thêm dòng
+                </button>
+            </div>
+
+            <div class="table-responsive" style="min-height: 200px;">
+                <table class="table table-hover mb-0 align-middle" id="tblDetails">
+                    <thead class="bg-light text-center small text-muted text-uppercase border-bottom">
+                        <tr>
+                            <th style="width: 35%" class="text-start ps-4">Sản phẩm / Vật tư</th>
+                            <th style="width: 10%">ĐVT</th>
+                            <th style="width: 15%">Số lượng Đặt</th>
+                            <th style="width: 20%">Đơn giá (VNĐ)</th>
+                            <th style="width: 15%" class="text-end">Thành Tiền</th>
+                            <th style="width: 5%"></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="card-footer bg-white border-top p-4">
+                <div class="row">
+                    <div class="col-lg-6 mb-3 mb-lg-0 d-flex align-items-end">
+                        <div class="alert alert-info border-0 shadow-sm mb-0 w-100 d-flex align-items-center">
+                            <i class="fa-solid fa-circle-info fa-2x me-3 text-info"></i>
+                            <div class="small">
+                                <strong class="text-info d-block mb-1">Smart Lock Enabled</strong>
+                                Vui lòng chọn vật tư trước khi nhập Số lượng và Đơn giá. Đơn giá nhập kho sẽ được set bằng 0 để không nhân đôi công nợ.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="bg-light p-3 rounded-4 shadow-sm border">
+                            <table class="table table-borderless financial-summary-table mb-0 w-100">
+                                <tr>
+                                    <td class="text-end fw-bold text-muted">Cộng tiền hàng:</td>
+                                    <td width="200" class="text-end fw-bold fs-6 text-dark" id="lblTotalAmount">0</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end fw-bold text-muted">
+                                        Thuế VAT (%)
+                                        <input type="number" id="vatPercent" class="form-control form-control-sm d-inline-block text-center ms-2 fw-bold" style="width: 70px;" value="0" min="0" max="100" oninput="calcTotalFinancial()" />
+                                    </td>
+                                    <td width="200" class="text-end fw-bold text-muted" id="lblVatAmount">0</td>
+                                </tr>
+                                <tr class="border-top border-bottom border-2 border-primary">
+                                    <td class="text-end fw-bold text-primary text-uppercase">Tổng Thanh Toán:</td>
+                                    <td width="200" class="text-end fw-bold text-primary fs-4" id="lblFinalTotal">0</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end fw-bold text-danger pt-3">Tiền đặt cọc trước:</td>
+                                    <td width="200" class="pt-3">
+                                        <input type="number" id="depositAmount" class="form-control text-end fw-bold text-danger shadow-sm" value="0" min="0" oninput="calcTotalFinancial()" />
+                                    </td>
+                                </tr>
+                                <tr class="border-top border-secondary border-dashed">
+                                    <td class="text-end fw-bold text-uppercase pt-3">Còn Lại (Phải Trả):</td>
+                                    <td width="200" class="text-end fw-bold text-success fs-4 pt-3" id="lblRemainingAmount">0</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-footer bg-light text-end py-3">
+                <button type="submit" class="btn btn-success btn-lg fw-bold px-5 shadow-sm rounded-pill">
+                    <i class="fa-solid fa-floppy-disk me-2"></i> LƯU ĐƠN HÀNG
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        const itemList = @Html.Raw(itemsJson);
+        const suppList = @Html.Raw(suppJson);
+        let rowIndex = 0;
+
+        $(document).ready(function () {
+            flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn" });
+
+            let suppSelect = $('#supplierId');
+            suppList.forEach(s => { suppSelect.append(new Option(s.Text, s.Id)); });
+            suppSelect.select2({ theme: 'bootstrap-5', width: '100%', placeholder: "🔍 Tìm kiếm NCC...", allowClear: true });
+
+            addRow();
+        });
+
+        function addRow() {
+            const tbody = document.querySelector("#tblDetails tbody");
+            const row = tbody.insertRow();
+            row.id = `row-${rowIndex}`;
+
+            let options = '<option value="">-- Tìm vật tư --</option>';
+            itemList.forEach(item => { options += `<option value="${item.Id}" data-unit="${item.Unit}" data-price="${item.Price || 0}">${item.Code} - ${item.Name}</option>`; });
+
+            row.innerHTML = `
+                        <td class="ps-4"><select class="form-control row-item" required>${options}</select></td>
+                        <td class="text-center fw-bold text-secondary row-unit bg-light align-middle"></td>
+                        <td><input type="number" class="form-control text-center fw-bold text-primary row-qty input-locked" value="1" min="0.01" step="0.01" required readonly></td>
+                        <td><input type="number" class="form-control text-end fw-bold text-dark row-price input-locked" value="0" min="0" readonly></td>
+                        <td class="text-end fw-bold text-success row-total align-middle fs-6">0</td>
+                        <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-light text-danger shadow-sm rounded-circle" onclick="removeRow(this)"><i class="fa-solid fa-trash"></i></button></td>
+                    `;
+
+            let newSelect = $(row).find('.row-item');
+            newSelect.select2({ theme: 'bootstrap-5', width: '100%' });
+
+            newSelect.on('select2:select', function (e) { onItemChange(this); });
+            newSelect.on('select2:unselect', function (e) { lockRow(this.closest('tr')); });
+
+            rowIndex++;
+        }
+
+        function removeRow(btn) { btn.closest('tr').remove(); calcTotalFinancial(); }
+
+        function lockRow(tr) {
+            tr.querySelector('.row-unit').innerText = '';
+            let qtyInp = tr.querySelector('.row-qty');
+            let priceInp = tr.querySelector('.row-price');
+            qtyInp.readOnly = true; qtyInp.classList.add('input-locked'); qtyInp.value = 1;
+            priceInp.readOnly = true; priceInp.classList.add('input-locked'); priceInp.value = 0;
+            calcTotalFinancial();
+        }
+
+        function onItemChange(select) {
+            const opt = select.selectedOptions[0];
+            let tr = select.closest('tr');
+
+            if (opt && opt.value) {
+                tr.querySelector('.row-unit').innerText = opt.getAttribute('data-unit') || '';
+                let qtyInp = tr.querySelector('.row-qty');
+                let priceInp = tr.querySelector('.row-price');
+
+                qtyInp.readOnly = false; qtyInp.classList.remove('input-locked');
+                priceInp.readOnly = false; priceInp.classList.remove('input-locked');
+
+                let defaultPrice = opt.getAttribute('data-price');
+                if (defaultPrice && !isNaN(defaultPrice)) priceInp.value = defaultPrice;
+            } else { lockRow(tr); }
+            calcTotalFinancial();
+        }
+
+        function calcTotalFinancial() {
+            let total = 0;
+            document.querySelectorAll("#tblDetails tbody tr").forEach(row => {
+                let qty = parseFloat(row.querySelector(".row-qty").value) || 0;
+                let price = parseFloat(row.querySelector(".row-price").value) || 0;
+                let lineTotal = qty * price;
+                row.querySelector(".row-total").innerText = lineTotal.toLocaleString('vi-VN');
+                total += lineTotal;
+            });
+
+            let vatPercent = parseFloat(document.getElementById("vatPercent").value) || 0;
+            let vatAmt = total * (vatPercent / 100);
+            let finalT = total + vatAmt;
+            let deposit = parseFloat(document.getElementById("depositAmount").value) || 0;
+            let remain = finalT - deposit;
+
+            document.getElementById("lblTotalAmount").innerText = total.toLocaleString('vi-VN');
+            document.getElementById("lblVatAmount").innerText = vatAmt.toLocaleString('vi-VN');
+            document.getElementById("lblFinalTotal").innerText = finalT.toLocaleString('vi-VN');
+            document.getElementById("lblRemainingAmount").innerText = remain.toLocaleString('vi-VN');
+        }
+
+        $(document).on('input', '.row-qty, .row-price', function () { calcTotalFinancial(); });
+
+        function submitPO(e) {
+            e.preventDefault();
+            const suppSelect = document.getElementById("supplierId");
+            if (!suppSelect.value) { Swal.fire("Lỗi", "Vui lòng chọn Nhà Cung Cấp!", "warning"); return; }
+
+            let rawSuppName = suppSelect.options[suppSelect.selectedIndex].text;
+            let cleanSuppName = rawSuppName.substring(rawSuppName.indexOf("]") + 1).trim();
+
+            const poData = {
+                POCode: document.getElementById("poCode").value,
+                OrderDate: document.getElementById("orderDate").value,
+                SupplierId: parseInt(suppSelect.value),
+                SupplierName: cleanSuppName,
+                Type: parseInt(document.getElementById("poType").value),
+                Note: document.getElementById("note").value,
+                VATPercent: parseFloat(document.getElementById("vatPercent").value) || 0,
+                DepositAmount: parseFloat(document.getElementById("depositAmount").value) || 0,
+                Details: []
+            };
+
+            const rows = document.querySelectorAll("#tblDetails tbody tr");
+            if (rows.length === 0) { Swal.fire("Lỗi", "Vui lòng nhập ít nhất 1 vật tư", "warning"); return; }
+
+            let isValid = true;
+            rows.forEach(row => {
+                const itemId = row.querySelector(".row-item").value;
+                const qty = parseFloat(row.querySelector(".row-qty").value);
+                const price = parseFloat(row.querySelector(".row-price").value) || 0;
+                if (!itemId) isValid = false;
+                if (qty <= 0) isValid = false;
+                if (itemId) poData.Details.push({ WarehouseItemId: parseInt(itemId), QuantityOrdered: qty, UnitPrice: price });
+            });
+
+            if (!isValid) { Swal.fire("Lỗi", "Kiểm tra lại dữ liệu vật tư (Chưa chọn hoặc SL <= 0)", "error"); return; }
+
+            Swal.fire({ title: 'Đang khởi tạo...', didOpen: () => Swal.showLoading() });
+            fetch('/PurchaseOrder/Create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(poData)
+            }).then(res => res.json()).then(res => {
+                if (res.success) { Swal.fire("Thành công", "Đơn hàng đã được tạo!", "success").then(() => window.location.href = "/PurchaseOrder/Index"); }
+                else { Swal.fire("Lỗi", res.message, "error"); }
+            });
+        }
+    </script>
+}

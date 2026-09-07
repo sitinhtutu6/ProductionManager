@@ -1,0 +1,369 @@
+﻿@model ProductionManager.Data.ExportShipment
+@using ProductionManager.Data
+@{
+    ViewData["Title"] = "Điều phối xe: " + Model.ShipmentCode;
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Quản Lý Xe Giao Hàng", Url.Action("Index", "Export")),
+        ("Thông Tin Chuyến Xe", "")
+    };
+}
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<style>
+    .select2-container .select2-selection--single, .select2-container .select2-selection--multiple {
+        min-height: 38px !important;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 36px !important;
+    }
+</style>
+
+<div class="container-fluid py-3">
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+        <h4 class="fw-800 mb-0 text-dark">
+            <i class="fa-solid fa-truck-ramp-box text-primary me-2"></i>ĐIỀU PHỐI CHUYẾN: <span class="text-primary font-monospace">@Model.ShipmentCode</span>
+        </h4>
+        <div>
+            <a asp-action="Workflow" asp-route-id="@Model.Id" class="btn btn-warning fw-bold shadow-sm me-2"><i class="fa-solid fa-folder-open me-2"></i> Hồ Sơ Chứng Từ</a>
+            <a asp-action="Index" class="btn btn-light border fw-bold shadow-sm"><i class="fa-solid fa-arrow-left me-2"></i> Quay lại</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <!-- CỘT 1: THÔNG TIN VẬN TẢI & GẮN ĐƠN HÀNG -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100 border-0 rounded-4 overflow-hidden">
+                <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center py-3 border-0">
+                    <span class="text-uppercase"><i class="fa-solid fa-circle-info me-2"></i>1. Kế Hoạch & Vận Tải</span>
+                    <button type="button" class="btn btn-sm btn-light text-primary fw-bold shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#editLogisticsModal">
+                        <i class="fa-solid fa-pen-to-square me-1"></i> Sửa chuyến
+                    </button>
+                </div>
+                <div class="card-body bg-light bg-opacity-50 p-4">
+
+                    <div class="bg-white p-3 rounded-3 mb-4 shadow-sm border border-light">
+                        <div class="row g-3">
+                            <div class="col-6"><span class="text-muted small fw-bold">Loại phương tiện:</span> <br /><b class="text-dark">@(Model.TransportType == TransportType.Truck ? "Tải / Ghép Nội Địa" : "Container / Tàu Biển")</b></div>
+                            <div class="col-6"><span class="text-muted small fw-bold">Đại diện lô hàng:</span> <br /><b class="text-primary">@Model.Customer?.CompanyName</b></div>
+
+                            <div class="col-6"><span class="text-muted small fw-bold">Nơi đi:</span> <br /><b class="text-dark"><i class="fa-solid fa-location-dot text-success me-1"></i> @(Model.Departure ?? "---")</b></div>
+                            <div class="col-6"><span class="text-muted small fw-bold">Nơi đến:</span> <br /><b class="text-dark"><i class="fa-solid fa-location-dot text-danger me-1"></i> @(Model.Destination ?? "---")</b></div>
+
+                            <div class="col-6"><span class="text-muted small fw-bold">Biển số / Số Cont:</span> <br /><b class="text-dark">@(string.IsNullOrEmpty(Model.LicensePlate) ? "---" : Model.LicensePlate)</b></div>
+                            <div class="col-6"><span class="text-muted small fw-bold">Booking / Lệnh:</span> <br /><b class="text-dark">@(string.IsNullOrEmpty(Model.BookingNumber) ? "---" : Model.BookingNumber)</b></div>
+
+                            <div class="col-6"><span class="text-muted small fw-bold">Ngày đi (ETD):</span> <br /><b class="text-primary">@(Model.ETD?.ToString("dd/MM/yyyy") ?? "Chưa chốt")</b></div>
+                            <div class="col-6"><span class="text-muted small fw-bold">Nhà xe/Hãng tàu:</span> <br /><b class="text-dark">@(string.IsNullOrEmpty(Model.CarrierName) ? "---" : Model.CarrierName)</b></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-3 rounded-3 shadow-sm border border-light">
+                        <h6 class="fw-bold text-dark mb-3 border-bottom pb-2 text-uppercase"><i class="fa-solid fa-cubes text-warning me-2"></i>Đơn hàng cần giao (Kế Hoạch)</h6>
+                        <table class="table table-sm align-middle mb-4">
+                            @if (Model.ShipmentOrders != null && Model.ShipmentOrders.Any())
+                            {
+                                foreach (var item in Model.ShipmentOrders)
+                                {
+                                    <tr>
+                                        <td><span class="badge bg-light text-dark border fs-6"><i class="fa-solid fa-file-invoice me-2 text-warning"></i>@item.Order?.OrderCode</span></td>
+                                        <td class="text-end">
+                                            <form asp-action="RemoveOrderFromPlan" class="d-inline">
+                                                <input type="hidden" name="exportId" value="@Model.Id" />
+                                                <input type="hidden" name="orderId" value="@item.OrderId" />
+                                                <button class="btn btn-sm text-danger" title="Xóa khỏi xe"><i class="fa-solid fa-xmark fa-lg"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr><td colspan="2" class="text-muted small fst-italic py-3 text-center">Chưa có đơn hàng nào được ghép vào xe.</td></tr>
+                            }
+                        </table>
+
+                        <div class="mb-3 border-bottom pb-3">
+                            <label class="small fw-bold text-primary mb-1"><i class="fa-solid fa-users me-1"></i> BƯỚC 1. Bộ lọc Khách Hàng</label>
+                            <select id="customerFilter" class="form-select fw-bold shadow-sm" multiple="multiple">
+                                @{
+                                    var pendingCustomers = ViewBag.PendingCustomers as IEnumerable<ProductionManager.Data.Customer>;
+                                    var currentCustIds = ViewBag.CurrentCustomerIds as List<int> ?? new List<int>();
+                                    if (pendingCustomers != null)
+                                    {
+                                        foreach (var c in pendingCustomers)
+                                        {
+                                            if (currentCustIds.Contains(c.Id))
+                                            {
+                                                <option value="@c.Id" selected>@c.CompanyName</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@c.Id">@c.CompanyName</option>
+                                            }
+                                        }
+                                    }
+                                }
+                            </select>
+                        </div>
+
+                        <form asp-action="AddOrderToPlan" method="post">
+                            <input type="hidden" name="exportId" value="@Model.Id" />
+                            <label class="small fw-bold text-success mb-1"><i class="fa-solid fa-cubes me-1"></i> BƯỚC 2. Chọn Đơn Hàng Để Ghép</label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <div class="flex-grow-1">
+                                    <select name="orderId" id="orderSelect" class="form-control fw-bold shadow-sm" required disabled>
+                                        <option value="">-- Chọn đơn hàng --</option>
+                                        @{
+                                            var availableOrders = ViewBag.AvailableOrders as IEnumerable<ProductionManager.Data.Order>;
+                                            if (availableOrders != null)
+                                            {
+                                                foreach (var o in availableOrders)
+                                                {
+                                                    string statusText = o.Status switch
+                                                    {
+                                                        ProductionManager.Data.OrderStatus.Approved => "Chờ SX",
+                                                        ProductionManager.Data.OrderStatus.InProduction => "Đang SX",
+                                                        ProductionManager.Data.OrderStatus.Completed => "Thành phẩm",
+                                                        ProductionManager.Data.OrderStatus.Packing => "Đóng gói",
+                                                        ProductionManager.Data.OrderStatus.Delivered => "NỢ HÀNG LỖI",
+                                                        _ => o.Status.ToString()
+                                                    };
+                                                    <option value="@o.Id" data-customer-id="@o.CustomerId">[@(o.Customer?.CustomerCode ?? "KL")] @o.OrderCode - SL Đặt: @o.OrderDetails.Sum(x => x.Quantity) [@statusText]</option>
+                                                }
+                                            }
+                                        }
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary fw-bold px-3 shadow-sm" style="height: 38px;"><i class="fa-solid fa-plus"></i></button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CỘT 2: THỰC TẾ XUẤT KHO -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100 border-0 rounded-4 overflow-hidden">
+                <div class="card-header bg-success text-white fw-bold d-flex justify-content-between align-items-center py-3 border-0">
+                    <span class="text-uppercase"><i class="fa-solid fa-boxes-packing me-2"></i>2. Hàng Thực Tế Lên Xe (Kho)</span>
+                    <a href="/Shipment/Create?exportId=@Model.Id" class="btn btn-light btn-sm fw-bold text-success shadow-sm rounded-pill px-3"><i class="fa-solid fa-dolly me-1"></i> BẤM VÀO ĐÂY ĐỂ XUẤT KHO</a>
+                </div>
+                <div class="card-body p-4 bg-light bg-opacity-50">
+                    @if (Model.Shipments != null && Model.Shipments.Any())
+                    {
+                        foreach (var ship in Model.Shipments)
+                        {
+                            <div class="card mb-3 border-0 shadow-sm rounded-3 overflow-hidden border-start border-4 border-success">
+                                <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center border-bottom-0">
+                                    <div>
+                                        <a href="/Shipment/Details/@ship.Id" target="_blank" class="fw-bold text-success fs-5 text-decoration-none"><i class="fa-solid fa-file-export me-2"></i>@ship.ShipmentCode</a>
+                                        <span class="badge bg-light text-muted border ms-2">@ship.ShipmentDate.ToString("dd/MM/yyyy HH:mm")</span>
+                                    </div>
+                                    <a href="/Shipment/Print/@ship.Id" target="_blank" class="btn btn-sm btn-outline-secondary rounded-circle" title="In Phiếu"><i class="fa-solid fa-print"></i></a>
+                                </div>
+                                <div class="card-body p-0">
+                                    <table class="table table-sm table-hover mb-0 align-middle">
+                                        <thead class="table-light small text-muted text-uppercase">
+                                            <tr><th class="ps-3">Sản phẩm</th><th>Quy cách</th><th class="text-center">ĐVT</th><th class="text-center text-primary">Số Lượng</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            @if (ship.ShipmentDetails != null && ship.ShipmentDetails.Any())
+                                            {
+                                                foreach (var detail in ship.ShipmentDetails)
+                                                {
+                                                    <tr>
+                                                        <td class="ps-3 fw-bold text-dark">@detail.OrderDetail?.ProductName</td>
+                                                        <td class="small text-muted fst-italic">@detail.OrderDetail?.Specifications</td>
+                                                        <td class="text-center small">Cái</td>
+                                                        <td class="text-center fw-bold fs-6 text-primary bg-primary bg-opacity-10">@detail.QuantityShipped.ToString("N0")</td>
+                                                    </tr>
+                                                }
+                                                <tr><td colspan="3" class="text-end fw-bold small text-muted pe-3 py-2">Tổng xuất lên xe theo Phiếu này:</td><td class="text-center fw-bold text-danger fs-5 bg-light py-2">@ship.ShipmentDetails.Sum(x => x.QuantityShipped).ToString("N0")</td></tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center py-5 text-muted bg-white rounded-3 border border-dashed shadow-sm">
+                            <i class="fa-solid fa-box-open fa-4x mb-3 text-secondary opacity-25"></i><h5 class="fw-bold text-dark">Thùng Xe Đang Trống</h5>
+                            <p class="mb-0">Vui lòng Bấm nút <strong>"BẤM VÀO ĐÂY ĐỂ XUẤT KHO"</strong> ở góc trên để tiến hành xuất hàng.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL SỬA THÔNG TIN LOGISTICS CÓ ĐIỂM ĐI/ĐẾN -->
+<div class="modal fade" id="editLogisticsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <form asp-action="UpdateLogisticsInfo" method="post" class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-truck-fast me-2"></i> Cập nhật Thông tin Chuyến Xe</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light p-4">
+                <input type="hidden" name="Id" value="@Model.Id" />
+                <div class="row g-3">
+                    <div class="col-md-12">
+                        <label class="small fw-bold text-muted mb-1">Khách Hàng (Đại diện chuyến)</label>
+                        <select id="editCustomerId" name="CustomerId" class="form-select fw-bold border-primary shadow-sm">
+                            <option value="">-- Chọn khách hàng --</option>
+                            @if (ViewBag.Customers != null)
+                            {
+                                foreach (var c in ViewBag.Customers)
+                                {
+                                    <option value="@c.Id" selected="@(Model.CustomerId == c.Id)">@c.CompanyName</option>
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <!-- NƠI ĐI VÀ NƠI ĐẾN -->
+                    <div class="col-md-6">
+                        <label class="small fw-bold text-muted mb-1"><i class="fa-solid fa-location-dot text-success me-1"></i> Nơi xuất phát (Kho đi)</label>
+                        <input type="text" name="Departure" class="form-control fw-bold shadow-sm" value="@Model.Departure" placeholder="VD: Kho Tổng BD..." />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-bold text-muted mb-1"><i class="fa-solid fa-location-dot text-danger me-1"></i> Nơi đến (Điểm giao)</label>
+                        <input type="text" name="Destination" class="form-control fw-bold shadow-sm" value="@Model.Destination" placeholder="VD: Cảng Cát Lái / Kho KH..." />
+                    </div>
+
+                    <hr class="my-2 border-secondary opacity-25" />
+
+                    <div class="col-md-6">
+                        <label class="small fw-bold text-muted mb-1">Loại Xe / Vận tải</label>
+                        <select name="TransportType" class="form-select fw-bold shadow-sm">
+                            <option value="Truck" selected="@(Model.TransportType == ProductionManager.Data.TransportType.Truck)">Tải / Ghép</option>
+                            <option value="Container" selected="@(Model.TransportType == ProductionManager.Data.TransportType.Container)">Container / Tàu biển</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-bold text-muted mb-1">Tên Nhà Xe / Hãng Tàu</label>
+                        <input type="text" name="CarrierName" class="form-control fw-bold text-primary shadow-sm" value="@Model.CarrierName" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="small fw-bold text-muted mb-1">Ngày đi dự kiến (ETD)</label>
+                        <input type="text" name="ETD" class="form-control fw-bold datepicker shadow-sm" value="@Model.ETD?.ToString("yyyy-MM-dd")" placeholder="Chọn ngày đi..." />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-bold text-muted mb-1">Ngày đến dự kiến (ETA)</label>
+                        <input type="text" name="ETA" class="form-control fw-bold datepicker shadow-sm" value="@Model.ETA?.ToString("yyyy-MM-dd")" placeholder="Chọn ngày đến..." />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="small fw-bold text-muted mb-1">Biển số xe / Số Cont</label>
+                        <input type="text" name="LicensePlate" class="form-control fw-bold text-dark shadow-sm" value="@Model.LicensePlate" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="small fw-bold text-muted mb-1">Số Booking / B/L</label>
+                        <input type="text" name="BookingNumber" class="form-control fw-bold text-dark shadow-sm" value="@Model.BookingNumber" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="small fw-bold text-muted mb-1">Số Seal</label>
+                        <input type="text" name="SealNumber" class="form-control fw-bold text-dark shadow-sm" value="@Model.SealNumber" />
+                    </div>
+                    <div class="col-md-12">
+                        <label class="small fw-bold text-muted mb-1">Tên Tàu / Chuyến bay (Vessel/Flight)</label>
+                        <input type="text" name="VesselName" class="form-control fw-bold text-dark shadow-sm" value="@Model.VesselName" />
+                    </div>
+
+                    <!-- CHỈ TÀI KHOẢN ADMIN/MANAGER MỚI THẤY ĐƯỢC CHỖ NÀY - BẢO MẬT GIÁ CƯỚC -->
+                    @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Accountant"))
+                    {
+                        <hr class="my-2 border-secondary opacity-25" />
+                        <div class="col-md-6">
+                            <label class="small fw-bold text-muted mb-1">Cước phí Vận tải (VNĐ)</label>
+                            <div class="input-group shadow-sm">
+                                <input type="text" id="displayShippingCost" class="form-control text-danger fw-bold fs-5 border-end-0" value="@Model.ShippingCost.ToString("N0")" oninput="formatCurrency(this)" />
+                                <span class="input-group-text bg-white text-muted border-start-0">VNĐ</span>
+                            </div>
+                            <input type="hidden" id="rawShippingCost" name="ShippingCost" value="@Model.ShippingCost.ToString("0")" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold text-muted mb-1">Trạng thái Thanh toán</label>
+                            <select name="PaymentStatus" class="form-select fw-bold shadow-sm">
+                                <option value="Unpaid" selected="@(Model.PaymentStatus == ProductionManager.Data.PaymentStatuses.Unpaid)">Ghi Nợ (Chưa thanh toán)</option>
+                                <option value="Paid" selected="@(Model.PaymentStatus == ProductionManager.Data.PaymentStatuses.Paid)">Đã Trả Cước</option>
+                            </select>
+                        </div>
+                    }
+                    else
+                    {
+                        <input type="hidden" name="ShippingCost" value="@Model.ShippingCost.ToString("0")" />
+                        <input type="hidden" name="PaymentStatus" value="@Model.PaymentStatus" />
+                    }
+                </div>
+            </div>
+            <div class="modal-footer bg-white border-0">
+                <button type="button" class="btn btn-light border fw-bold px-4" data-bs-dismiss="modal">Hủy</button>
+                <button type="submit" class="btn btn-primary fw-bold px-5 shadow-sm"><i class="fa-solid fa-floppy-disk me-1"></i> LƯU THAY ĐỔI</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        document.addEventListener("turbo:load", function () {
+        if(typeof flatpickr !== 'undefined') flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn", allowInput: true });
+
+        if($.fn.select2) {
+        $('#customerFilter').select2({ theme: 'bootstrap-5', width: '100%', placeholder: "🔍 Chọn khách hàng..." });
+        $('#orderSelect').select2({ theme: 'bootstrap-5', width: '100%' });
+        $('#editCustomerId').select2({ theme: 'bootstrap-5', width: '100%', dropdownParent: $('#editLogisticsModal'), placeholder: "-- Chọn khách hàng --" });
+
+        var allOrderOptions = $('#orderSelect option').clone();
+        $('#customerFilter').off('change').on('change', function () {
+        var selectedCustomers = $(this).val();
+        var orderSelect = $('#orderSelect');
+        orderSelect.empty().append('<option value="">-- Gõ tìm mã đơn / trạng thái --</option>');
+
+        if (selectedCustomers && selectedCustomers.length > 0) {
+        allOrderOptions.each(function () {
+        var custId = $(this).attr('data-customer-id');
+        if (custId && selectedCustomers.includes(custId.toString())) orderSelect.append($(this).clone());
+        });
+        orderSelect.prop('disabled', false).select2({ theme: 'bootstrap-5', width: '100%', placeholder: "🔍 Gõ mã đơn..." });
+        } else {
+        orderSelect.prop('disabled', true).select2({ theme: 'bootstrap-5', width: '100%', placeholder: "⚠️ Chọn Khách hàng ở trên trước!" });
+        }
+        });
+        $('#customerFilter').trigger('change');
+        }
+        });
+
+        function formatCurrency(input) {
+        let value = input.value.replace(/[^0-9]/g, '');
+        if (!value) { input.value = ''; document.getElementById('rawShippingCost').value = 0; return; }
+        document.getElementById('rawShippingCost').value = value;
+        input.value = parseInt(value, 10).toLocaleString('en-US');
+        }
+
+        @if (TempData["Success"] != null)
+        {
+            <text>Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: '@Html.Raw(TempData["Success"])', showConfirmButton: false, timer: 3000 });</text>
+        }
+    </script>
+}

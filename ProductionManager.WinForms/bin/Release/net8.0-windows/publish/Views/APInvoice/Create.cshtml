@@ -1,0 +1,108 @@
+﻿@{ ViewData["Title"] = "Lập Hóa Đơn Đầu Vào (Mua hàng/Vận tải)"; }
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div class="container-fluid py-3">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-dark text-white fw-bold"><i class="fa-solid fa-file-invoice-dollar me-2"></i> GOM CHUYẾN XE / LẬP HÓA ĐƠN</div>
+        <div class="card-body">
+            <div class="row g-4">
+                <div class="col-md-3 border-end">
+                    <label class="fw-bold mb-2">1. Chọn Đối tác (Nhà xe)</label>
+                    <select id="ddlPartner" class="form-select border-primary" onchange="loadUnbilled()">
+                        <option value="">-- Chọn Nhà xe --</option>
+                        @foreach (var p in ViewBag.Partners) { <option value="@p">@p</option> }
+                    </select>
+                </div>
+
+                <div class="col-md-5 border-end">
+                    <label class="fw-bold mb-2">2. Chọn các chuyến xe (Chưa có HĐ)</label>
+                    <div class="table-responsive" style="max-height: 400px;">
+                        <table class="table table-hover align-middle">
+                            <thead class="bg-light sticky-top">
+                                <tr>
+                                    <th width="40"><input type="checkbox" id="chkAll" onchange="toggleAll(this)"></th>
+                                    <th>Mã chuyến</th>
+                                    <th class="text-end">Cước phí (Chưa VAT)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tblItems"><tr><td colspan="3" class="text-center text-muted">Vui lòng chọn đối tác</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="fw-bold mb-2 text-primary">3. Khai báo Hóa đơn (VAT)</label>
+                    <form id="frmInvoice">
+                        <div class="mb-2"><label class="small text-muted">Số Hóa đơn (Khách xuất)</label><input type="text" id="invNo" class="form-control font-monospace" required></div>
+                        <div class="mb-2"><label class="small text-muted">Ngày xuất HĐ</label><input type="text" id="invDate" class="form-control datepicker" required></div>
+                        <div class="mb-2"><label class="small text-muted">Thuế VAT (%)</label><input type="number" id="vatRate" class="form-control text-primary fw-bold" value="10" oninput="calculateTotal()" required></div>
+                        
+                        <hr />
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted">Tổng Cước phí:</span><span id="lblSub" class="fw-bold">0</span></div>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted">Tiền thuế VAT:</span><span id="lblVat" class="fw-bold text-primary">0</span></div>
+                        <div class="d-flex justify-content-between mb-3"><span class="fw-bold">TỔNG CỘNG HĐ:</span><span id="lblTotal" class="fw-bold text-danger fs-5">0</span></div>
+                        
+                        <button type="button" onclick="submitInvoice()" class="btn btn-success w-100 fw-bold shadow-sm"><i class="fa-solid fa-floppy-disk me-2"></i> LƯU HÓA ĐƠN</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    flatpickr(".datepicker", { dateFormat: "Y-m-d", defaultDate: "today" });
+
+    function loadUnbilled() {
+        let partner = document.getElementById('ddlPartner').value;
+        if (!partner) return;
+        fetch(`/APInvoice/GetUnbilledItems?partnerName=${partner}`).then(res => res.json()).then(data => {
+            let tbody = document.getElementById('tblItems'); tbody.innerHTML = "";
+            data.forEach(item => {
+                tbody.innerHTML += `<tr>
+                    <td><input type="checkbox" class="chk-item" value="${item.id}" data-amount="${item.amount}" onchange="calculateTotal()"></td>
+                    <td>${item.code}<br><small class="text-muted">${item.date}</small></td>
+                    <td class="text-end fw-bold">${new Intl.NumberFormat('vi-VN').format(item.amount)}</td>
+                </tr>`;
+            });
+            calculateTotal();
+        });
+    }
+
+    function toggleAll(source) {
+        document.querySelectorAll('.chk-item').forEach(chk => chk.checked = source.checked);
+        calculateTotal();
+    }
+
+    function calculateTotal() {
+        let subTotal = 0;
+        document.querySelectorAll('.chk-item:checked').forEach(chk => { subTotal += parseFloat(chk.getAttribute('data-amount')); });
+        let vatRate = parseFloat(document.getElementById('vatRate').value || 0);
+        let vatAmount = subTotal * (vatRate / 100);
+        let total = subTotal + vatAmount;
+
+        document.getElementById('lblSub').innerText = new Intl.NumberFormat('vi-VN').format(subTotal);
+        document.getElementById('lblVat').innerText = new Intl.NumberFormat('vi-VN').format(vatAmount);
+        document.getElementById('lblTotal').innerText = new Intl.NumberFormat('vi-VN').format(total);
+    }
+
+    function submitInvoice() {
+        let selectedIds = [];
+        document.querySelectorAll('.chk-item:checked').forEach(chk => selectedIds.push(parseInt(chk.value)));
+        if (selectedIds.length === 0) { Swal.fire("Lỗi", "Chưa chọn chuyến xe nào!", "warning"); return; }
+        
+        let formData = new FormData();
+        formData.append("invoiceNo", document.getElementById('invNo').value);
+        formData.append("date", document.getElementById('invDate').value);
+        formData.append("partnerName", document.getElementById('ddlPartner').value);
+        formData.append("itemIds", JSON.stringify(selectedIds));
+        formData.append("vatRate", document.getElementById('vatRate').value);
+
+        fetch('/APInvoice/GenerateInvoice', { method: 'POST', body: formData }).then(res => res.json()).then(res => {
+            if(res.success) Swal.fire("Xong!", res.message, "success").then(() => location.reload());
+            else Swal.fire("Lỗi", res.message, "error");
+        });
+    }
+</script>

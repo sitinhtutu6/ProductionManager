@@ -1,0 +1,315 @@
+﻿@model IEnumerable<ProductionManager.Data.PurchaseOrder>
+@using ProductionManager.Data
+@{
+    ViewData["Title"] = "Quản lý Đơn Đặt Hàng";
+}
+
+<meta name="turbo-visit-control" content="reload">
+<link rel="stylesheet" href="https://cdn3.devexpress.com/jslib/23.1.6/css/dx.material.blue.light.css" />
+
+<style>
+    .dx-datagrid { font-family: 'Segoe UI', system-ui, sans-serif !important; border-radius: 1rem; overflow: hidden; }
+    .dx-datagrid-headers { background-color: #f8fafc !important; text-transform: uppercase; font-size: 13px; font-weight: bold; }
+    .dx-datagrid-group-panel { background-color: #eff6ff; border-bottom: 2px dashed #93c5fd !important; padding: 15px !important; font-weight: 600; color: #1e3a8a; }
+    .dx-group-row { background-color: #f1f5f9 !important; font-weight: bold !important; color: #0f172a !important; }
+    #gridContainer { min-height: 600px; height: calc(100vh - 200px); }
+</style>
+
+@{
+    // 🔥 ĐÃ FIX: Chỉ truyền Chữ (Text) thuần tuý từ C#, không nhồi HTML để xuất Excel không bị lỗi
+    var orderData = Model.Select(item => new {
+        Id = item.Id,
+        POCode = item.POCode ?? "",
+        InvoiceNumber = item.InvoiceNumber ?? "",
+        IsDebtFinalized = item.IsDebtFinalized,
+        OrderDate = item.OrderDate.ToString("yyyy-MM-ddTHH:mm:ss"), 
+        SupplierName = (item.Type == ProductionManager.Data.POType.Outsourcing ? "🛠 " : "") + (item.SupplierName ?? ""),
+        FinalTotal = item.FinalTotal,
+        DepositAmount = item.DepositAmount,
+        RemainingAmount = item.RemainingAmount,
+        
+        // Chuỗi trạng thái sạch sẽ
+        PaymentStatusStr = item.PaymentStatusPO == PaymentStatusPO.Paid ? "Trả đủ" : (item.PaymentStatusPO == PaymentStatusPO.Deposited ? "Đã cọc" : "Chưa trả"),
+        StatusStr = item.Status == POStatus.Completed ? "Xong" : (item.Status == POStatus.Cancelled ? "Đã hủy" : (item.Status == POStatus.Partial ? "Đang giao" : "Chờ giao")),
+        
+        CanEdit = (!item.IsDebtFinalized && item.Status != ProductionManager.Data.POStatus.Completed && item.Status != ProductionManager.Data.POStatus.Cancelled),
+        
+        Details = item.Details?.Select(d => new {
+            Name = d.WarehouseItem?.Name ?? "N/A",
+            Unit = d.WarehouseItem?.Unit ?? "-",
+            Ordered = d.QuantityOrdered,
+            Received = d.QuantityReceived,
+            Bad = d.QuantityBad,
+            Remain = d.QuantityOrdered - d.QuantityReceived - d.QuantityBad
+        }) 
+    }).ToList();
+
+    var jsonOptions = new System.Text.Json.JsonSerializerOptions {
+        PropertyNamingPolicy = null, 
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping 
+    };
+    var jsonString = System.Text.Json.JsonSerializer.Serialize(orderData, jsonOptions);
+}
+
+<div class="container-fluid py-4" style="max-width: 1400px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="text-primary fw-bold mb-1"><i class="fa-solid fa-cart-shopping me-2"></i>Đơn Đặt Hàng</h3>
+            <p class="text-muted small mb-0">Kéo tiêu đề cột thả lên trên để gom nhóm (Group) và xem Tổng tiền.</p>
+        </div>
+        <div>
+            <a asp-action="DebtFinalization" class="btn btn-warning btn-lg fw-bold shadow-sm rounded-pill px-4 text-dark me-2" data-turbo="false">
+                <i class="fa-solid fa-file-invoice-dollar me-2"></i> CHỐT CÔNG NỢ
+            </a>
+            <a asp-action="Create" class="btn btn-primary btn-lg fw-bold shadow-sm rounded-pill px-4" data-turbo="false">
+                <i class="fa-solid fa-plus me-2"></i> LẬP ĐƠN MỚI
+            </a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 p-2">
+        <div id="gridContainer">
+            <div class="text-center py-5 text-muted" id="loadingIndicator">
+                <i class="fa-solid fa-spinner fa-spin fa-2x mb-2"></i>
+                <p>Đang tải thư viện giao diện...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script id="po-data-json" type="application/json">
+        @Html.Raw(jsonString)
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/7.10.1/polyfill.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn3.devexpress.com/jslib/23.1.6/js/dx.all.js"></script>
+
+    <script>
+        function initDataGrid() {
+            const container = document.getElementById("gridContainer");
+            if (!container || container.dataset.init === "true") return;
+
+            let retryCount = 0;
+            function tryDrawGrid() {
+                if (typeof DevExpress === 'undefined') {
+                    if (retryCount < 50) {
+                        retryCount++; setTimeout(tryDrawGrid, 100); return;
+                    } else {
+                        container.innerHTML = `<div class="alert alert-danger m-4">Lỗi Mạng: Không tải được thư viện.</div>`; return;
+                    }
+                }
+
+                try {
+                    const jsonText = document.getElementById("po-data-json").textContent;
+                    const rawData = JSON.parse(jsonText);
+                    document.getElementById("loadingIndicator").style.display = "none"; 
+
+                    new DevExpress.ui.dxDataGrid(container, {
+                        dataSource: rawData,
+                        keyExpr: "Id", 
+                        showBorders: false,
+                        rowAlternationEnabled: true,
+                        hoverStateEnabled: true,
+                        allowColumnResizing: true,
+                        allowColumnReordering: true, 
+                        columnAutoWidth: true,
+
+                        // ===========================================
+                        // XUẤT EXCEL & PDF CỰC KỲ AN TOÀN
+                        // ===========================================
+                        export: {
+                            enabled: true,
+                            formats: ['xlsx', 'pdf'], 
+                            allowExportSelectedData: false
+                        },
+                        onExporting: function(e) {
+                            if (e.format === 'xlsx') {
+                                const workbook = new ExcelJS.Workbook();
+                                const worksheet = workbook.addWorksheet('DanhSach');
+
+                                // Ép biến e.cancel thành một Promise để Grid tự động hiểu và TẮT vòng quay (Spinner) khi chạy xong
+                                e.cancel = DevExpress.excelExporter.exportDataGrid({
+                                    component: e.component,
+                                    worksheet: worksheet,
+                                    autoFilterEnabled: true
+                                }).then(function() {
+                                    return workbook.xlsx.writeBuffer();
+                                }).then(function(buffer) {
+                                    saveAs(new Blob([buffer], { type: 'application/octet-stream' }), 'BaoCao_DonHang.xlsx');
+                                }).catch(function(err) {
+                                    console.error("Lỗi xuất Excel:", err);
+                                    alert("Đã xảy ra lỗi xuất file Excel: " + err.message);
+                                });
+                            } 
+                            else if (e.format === 'pdf') {
+                                const doc = new jspdf.jsPDF('landscape'); 
+                                
+                                e.cancel = DevExpress.pdfExporter.exportDataGrid({
+                                    jsPDFDocument: doc,
+                                    component: e.component,
+                                }).then(function() {
+                                    doc.save('BaoCao_DonHang.pdf');
+                                }).catch(function(err) {
+                                    console.error("Lỗi xuất PDF:", err);
+                                    alert("Đã xảy ra lỗi xuất file PDF: " + err.message);
+                                });
+                            }
+                        },
+
+                        groupPanel: { visible: true, emptyPanelText: "👉 Kéo tiêu đề cột (Ví dụ: Nhà Cung Cấp, Ngày Đặt) thả vào đây để gom nhóm" },
+                        filterRow: { visible: true },
+                        headerFilter: { visible: true },
+                        searchPanel: { visible: true, width: 300, placeholder: "Tìm kiếm tự do..." },
+                        paging: { pageSize: 15 },
+                        pager: { showPageSizeSelector: true, allowedPageSizes: [15, 30, 50, 100], showInfo: true },
+
+                        columns: [
+                            {
+                                dataField: "POCode", caption: "Mã Đơn / Hóa Đơn",
+                                cellTemplate: function (cellElement, options) {
+                                    let d = options.data;
+                                    let val = options.value || "";
+                                    let html = `<div class="fw-bold text-primary font-monospace fs-6">${val}</div>`;
+                                    if (d && d.IsDebtFinalized && d.InvoiceNumber) {
+                                        html += `<div class="mt-1"><span class="badge bg-secondary small"><i class="fa-solid fa-lock me-1"></i> HĐ: ${d.InvoiceNumber}</span></div>`;
+                                    }
+                                    let el = cellElement[0] || cellElement;
+                                    el.innerHTML = html;
+                                }
+                            },
+                            { dataField: "OrderDate", caption: "Ngày Đặt", dataType: "date", format: "dd/MM/yyyy", sortOrder: "desc", width: 120 },
+                            {
+                                dataField: "SupplierName", caption: "Nhà Cung Cấp",
+                                cellTemplate: function (cellElement, options) { 
+                                    let val = options.value || "";
+                                    let el = cellElement[0] || cellElement;
+                                    el.innerHTML = `<div class="fw-bold text-secondary">${val}</div>`; 
+                                }
+                            },
+                            { dataField: "FinalTotal", caption: "Tổng (Sau VAT)", dataType: "number", format: "#,##0", alignment: "right", cssClass: "fw-bold text-dark" },
+                            { dataField: "DepositAmount", caption: "Tiền Cọc/Trả", dataType: "number", format: "#,##0", alignment: "right", cssClass: "fw-bold text-danger" },
+                            {
+                                dataField: "RemainingAmount", caption: "Còn Lại", dataType: "number", alignment: "right",
+                                cellTemplate: function (cellElement, options) {
+                                    let val = options.value || 0; 
+                                    let colorClass = val < 0 ? "text-danger" : "text-success";
+                                    let el = cellElement[0] || cellElement;
+                                    el.innerHTML = `<div class="fw-bold fs-6 ${colorClass}">${val.toLocaleString('en-US')}</div>`;
+                                }
+                            },
+                            // 🔥 ĐÃ FIX: Vẽ màu sắc bằng Javascript, nhưng dữ liệu thô vẫn là chữ "Trả đủ"
+                            { 
+                                dataField: "PaymentStatusStr", caption: "Thanh Toán", alignment: "center",
+                                cellTemplate: function (cellElement, options) {
+                                    let val = options.value || "Chưa trả";
+                                    let cssClass = val === "Trả đủ" ? "bg-success text-success border-success" : (val === "Đã cọc" ? "bg-warning text-warning border-warning" : "bg-secondary text-secondary border-secondary");
+                                    let el = cellElement[0] || cellElement;
+                                    el.innerHTML = `<span class="badge ${cssClass} bg-opacity-10 border rounded-pill px-3">${val}</span>`;
+                                }
+                            },
+                            // 🔥 ĐÃ FIX: Vẽ màu sắc bằng Javascript
+                            { 
+                                dataField: "StatusStr", caption: "Trạng Thái", alignment: "center",
+                                cellTemplate: function (cellElement, options) {
+                                    let val = options.value || "Chờ giao";
+                                    let badge = val === "Xong" ? `<span class="badge bg-success rounded-pill px-3"><i class="fa-solid fa-check me-1"></i> Xong</span>` :
+                                                val === "Đã hủy" ? `<span class="badge bg-dark rounded-pill px-3">Đã hủy</span>` :
+                                                val === "Đang giao" ? `<span class="badge bg-warning text-dark rounded-pill px-3"><i class="fa-solid fa-truck-fast me-1"></i> Đang giao</span>` :
+                                                `<span class="badge bg-info text-dark rounded-pill px-3">Chờ giao</span>`;
+                                    let el = cellElement[0] || cellElement;
+                                    el.innerHTML = badge;
+                                }
+                            },
+                            {
+                                caption: "Thao tác", alignment: "center", allowGrouping: false, allowSorting: false, allowFiltering: false, fixed: true, fixedPosition: "right", width: 140,
+                                allowExporting: false, 
+                                cellTemplate: function (cellElement, options) {
+                                    let d = options.data;
+                                    if (!d) return; 
+                                    let buttons = `<div class="btn-group shadow-sm rounded-pill bg-white border">
+                                                    <a href="/PurchaseOrder/Details/${d.Id}" data-turbo="false" class="btn btn-sm btn-light text-primary border-end px-2" title="Xem chi tiết"><i class="fa-solid fa-eye"></i></a>`;
+                                    if (d.CanEdit) {
+                                        buttons += `<a href="/PurchaseOrder/Edit/${d.Id}" data-turbo="false" class="btn btn-sm btn-light text-warning border-end px-2" title="Chỉnh sửa"><i class="fa-solid fa-pen"></i></a>
+                                                    <a href="/Warehouse/ImportExport?type=Import&poId=${d.Id}" data-turbo="false" class="btn btn-sm btn-light text-success px-2" title="Nhập kho"><i class="fa-solid fa-truck-ramp-box"></i></a>`;
+                                    }
+                                    buttons += `</div>`;
+                                    let el = cellElement[0] || cellElement;
+                                    el.innerHTML = buttons;
+                                }
+                            }
+                        ],
+
+                        summary: {
+                            groupItems: [
+                                { column: "FinalTotal", summaryType: "sum", valueFormat: "#,##0", displayFormat: "Tổng: {0}", showInGroupFooter: false },
+                                { column: "DepositAmount", summaryType: "sum", valueFormat: "#,##0", displayFormat: "Cọc: {0}", showInGroupFooter: false },
+                                { column: "RemainingAmount", summaryType: "sum", valueFormat: "#,##0", displayFormat: "Còn nợ: {0}", showInGroupFooter: false }
+                            ]
+                        },
+
+                        masterDetail: {
+                            enabled: true,
+                            template: function (container, options) {
+                                let d = options.data;
+                                if (!d) return;
+                                let details = d.Details || [];
+                                let html = `
+                                    <div class="p-3 bg-white rounded-4 border shadow-sm mx-4">
+                                        <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-box-open me-2"></i>Tiến độ nhận vật tư: ${d.POCode}</h6>
+                                        <table class="table table-sm table-borderless align-middle text-center mb-0 border rounded-3">
+                                            <thead class="bg-light text-muted">
+                                                <tr>
+                                                    <th class="text-start ps-3">Tên Vật Tư</th>
+                                                    <th>ĐVT</th>
+                                                    <th class="text-primary">SL Đặt</th>
+                                                    <th class="text-success">Đã Nhận</th>
+                                                    <th class="text-danger">Lỗi (NG)</th>
+                                                    <th class="text-warning">Còn Thiếu</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>`;
+
+                                if(details.length === 0) {
+                                    html += `<tr><td colspan="6" class="py-3 text-muted">Chưa có vật tư nào</td></tr>`;
+                                } else {
+                                    details.forEach(detail => {
+                                        let r = detail.Remain > 0 ? detail.Remain.toLocaleString() : "Đủ";
+                                        let rc = detail.Remain > 0 ? "text-warning bg-warning bg-opacity-10" : "text-muted";
+                                        html += `
+                                            <tr class="border-bottom">
+                                                <td class="text-start fw-bold text-dark ps-3 py-2">${detail.Name}</td>
+                                                <td><span class="badge bg-light text-dark border">${detail.Unit}</span></td>
+                                                <td class="fw-bold text-primary bg-primary bg-opacity-10">${detail.Ordered}</td>
+                                                <td class="fw-bold text-success">${detail.Received}</td>
+                                                <td class="fw-bold text-danger">${detail.Bad}</td>
+                                                <td class="fw-bold ${rc}">${r}</td>
+                                            </tr>`;
+                                    });
+                                }
+                                html += `</tbody></table></div>`;
+                                
+                                let el = container[0] || container;
+                                el.innerHTML = html;
+                            }
+                        }
+                    });
+
+                    container.dataset.init = "true";
+
+                } catch (err) {
+                    console.error("Lỗi vẽ Grid:", err);
+                }
+            }
+
+            tryDrawGrid();
+        }
+
+        document.addEventListener("DOMContentLoaded", initDataGrid);
+        document.addEventListener("turbo:load", initDataGrid);
+        if (document.readyState === "complete" || document.readyState === "interactive") { setTimeout(initDataGrid, 100); }
+    </script>
+}

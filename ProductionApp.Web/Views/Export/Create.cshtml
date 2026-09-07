@@ -1,0 +1,165 @@
+﻿@model ProductionManager.Data.ExportShipment
+@using ProductionManager.Data
+
+@{
+    ViewData["Title"] = "Điều Phối Chuyến Xe Mới";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Quản Lý Xe Giao Hàng", Url.Action("Index", "Export")),
+        ("Tạo Chuyến Xe Mới", "")
+    };
+}
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+                <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center border-0">
+                    <h5 class="fw-bold mb-0"><i class="fa-solid fa-truck-ramp-box me-2"></i>KHỞI TẠO CHUYẾN XE / LÔ HÀNG VẬN TẢI</h5>
+                </div>
+                <div class="card-body p-4 bg-white">
+                    <form asp-action="Create" method="post">
+                        <div asp-validation-summary="All" class="text-danger mb-3 fw-bold small"></div>
+
+                        <!-- 1. LOẠI HÌNH VẬN TẢI -->
+                        <div class="mb-4 p-3 bg-light rounded-3 border">
+                            <label class="form-label fw-bold text-dark mb-3"><i class="fa-solid fa-route me-2 text-primary"></i>Chọn Loại Hình Vận Tải</label>
+                            <div class="d-flex gap-5 px-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="TransportType" id="typeTruck" value="Truck" checked onchange="toggleFields()">
+                                    <label class="form-check-label fw-bold text-dark fs-6 cursor-pointer" for="typeTruck">
+                                        <i class="fa-solid fa-truck-fast text-success fa-lg me-2"></i> Xe Tải / Nội Địa
+                                    </label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="TransportType" id="typeContainer" value="Container" onchange="toggleFields()">
+                                    <label class="form-check-label fw-bold text-dark fs-6 cursor-pointer" for="typeContainer">
+                                        <i class="fa-solid fa-ship text-info fa-lg me-2"></i> Container / Xuất Khẩu
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. THÔNG TIN CHUNG & TUYẾN ĐƯỜNG -->
+                        <h6 class="fw-bold text-secondary text-uppercase mb-3"><i class="fa-solid fa-circle-info me-2"></i>Thông Tin & Tuyến Đường</h6>
+                        <div class="row mb-4 g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-muted small">Mã Chuyến / Mã Lô</label>
+                                <div class="input-group shadow-sm">
+                                    <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-barcode text-muted"></i></span>
+                                    <input asp-for="ShipmentCode" class="form-control fw-bold text-primary border-start-0 ps-0" placeholder="Để trống để tự động sinh mã..." data-val="false" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-muted small">Khách Hàng (Đại diện chuyến) <span class="text-danger">*</span></label>
+                                <div class="input-group shadow-sm">
+                                    <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-building-user text-muted"></i></span>
+                                    <select asp-for="CustomerId" class="form-select fw-bold border-start-0 ps-0" asp-items="ViewBag.CustomerId" required>
+                                        <option value="">-- Chọn khách hàng --</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-muted small">Nơi xuất phát (Kho đi)</label>
+                                <div class="input-group shadow-sm">
+                                    <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-location-dot text-success"></i></span>
+                                    <input asp-for="Departure" class="form-control fw-bold text-dark border-start-0 ps-0" placeholder="VD: Kho Tổng BD..." />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-muted small">Nơi đến (Điểm giao)</label>
+                                <div class="input-group shadow-sm">
+                                    <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-location-dot text-danger"></i></span>
+                                    <input asp-for="Destination" class="form-control fw-bold text-dark border-start-0 ps-0" placeholder="VD: Cảng Cát Lái / Kho KH..." />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. PHƯƠNG TIỆN VẬN TẢI -->
+                        <div id="truckFields" class="row bg-success bg-opacity-10 p-3 rounded-3 mb-4 mx-0 border border-success border-opacity-25">
+                            <h6 class="fw-bold text-success small mb-3 text-uppercase"><i class="fa-solid fa-truck me-2"></i>Thông tin Xe Tải</h6>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold text-secondary small">Biển Số Xe</label>
+                                <input asp-for="LicensePlate" class="form-control shadow-sm fw-bold" placeholder="VD: 61C-123.45" id="txtLicensePlate" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold text-secondary small">Tên Nhà Xe / Tài Xế</label>
+                                <input asp-for="CarrierName" class="form-control shadow-sm fw-bold" placeholder="Tên đơn vị vận tải..." id="txtCarrierName" />
+                            </div>
+                        </div>
+
+                        <div id="containerFields" class="row bg-info bg-opacity-10 p-3 rounded-3 mb-4 mx-0 border border-info border-opacity-25" style="display: none;">
+                            <h6 class="fw-bold text-info small mb-3 text-uppercase"><i class="fa-solid fa-ship me-2"></i>Thông tin Container / Tàu</h6>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold text-secondary small">Số Booking</label>
+                                <input asp-for="BookingNumber" class="form-control shadow-sm fw-bold" placeholder="VD: SGN123456" />
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold text-secondary small">Tên Tàu (Vessel)</label>
+                                <input asp-for="VesselName" class="form-control shadow-sm fw-bold" placeholder="VD: WAN HAI 311" />
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold text-secondary small">Số Container</label>
+                                <input type="text" name="LicensePlateCont" class="form-control shadow-sm fw-bold" placeholder="VD: TLLU1234567" id="txtContNumber" />
+                            </div>
+                        </div>
+
+                        <!-- 4. THỜI GIAN -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary small">Ngày Khởi Hành (ETD)</label>
+                                <div class="input-group shadow-sm">
+                                    <span class="input-group-text bg-light text-muted border-end-0"><i class="fa-regular fa-calendar-check"></i></span>
+                                    <input asp-for="ETD" type="text" class="form-control fw-bold text-primary border-start-0 ps-0 datepicker" placeholder="dd/mm/yyyy" value="@DateTime.Now.ToString("yyyy-MM-dd")" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="text-muted opacity-25" />
+
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <a asp-action="Index" class="btn btn-light border fw-bold px-4 text-muted shadow-sm"><i class="fa-solid fa-arrow-left me-2"></i>Hủy Bỏ</a>
+                            <button type="submit" class="btn btn-primary fw-bold px-5 btn-lg shadow-sm" onclick="prepareSubmit()">
+                                <i class="fa-solid fa-check-double me-2"></i>Tạo Chuyến Xe
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+    <script>
+        $(document).ready(function() {
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", allowInput: true, locale: "vn" });
+        toggleFields();
+        });
+
+        function toggleFields() {
+        let typeContainer = document.getElementById("typeContainer");
+        if (!typeContainer) return;
+
+        if (typeContainer.checked) {
+        document.getElementById("truckFields").style.display = "none";
+        document.getElementById("containerFields").style.display = "flex";
+        } else {
+        document.getElementById("truckFields").style.display = "flex";
+        document.getElementById("containerFields").style.display = "none";
+        }
+        }
+
+        function prepareSubmit() {
+        let isContainer = document.getElementById("typeContainer").checked;
+        if(isContainer) {
+        document.getElementById("txtLicensePlate").value = document.getElementById("txtContNumber").value;
+        }
+        }
+    </script>
+}

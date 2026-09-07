@@ -1,0 +1,292 @@
+﻿@using ProductionApp.Web.Models.ViewModels
+@using ProductionManager.Data
+@model IEnumerable<PartnerDebtGroup>
+@{
+    int type = ViewBag.Type ?? 1;
+    bool isReceivable = type == 1;
+    ViewData["Title"] = isReceivable ? "Thanh toán Công Nợ Phải Thu" : "Thanh toán Công Nợ Phải Trả";
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<style>
+    body {
+        background-color: #f1f5f9;
+    }
+
+    .partner-item {
+        cursor: pointer;
+        transition: 0.2s;
+        border: 1px solid transparent;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+        .partner-item:hover {
+            background-color: #f8fafc;
+        }
+
+        .partner-item.active {
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            border-color: #bfdbfe;
+        }
+
+    .payment-panel {
+        height: calc(100vh - 120px);
+        overflow-y: auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    .sticky-footer {
+        position: sticky;
+        bottom: 0;
+        background: white;
+        border-top: 2px solid #e2e8f0;
+        z-index: 10;
+        padding: 15px;
+    }
+
+    .chk-row {
+        transform: scale(1.2);
+        cursor: pointer;
+    }
+</style>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold text-dark mb-0">
+            <i class="fa-solid fa-cash-register text-primary me-2"></i> @ViewData["Title"]
+        </h4>
+        <div>
+            <div class="btn-group shadow-sm">
+                <a href="/Debt/BatchPayment?type=1" class="btn @(isReceivable ? "btn-primary" : "btn-light border") fw-bold"><i class="fa-solid fa-arrow-down-up-across-line me-2"></i>Thu Khách Hàng</a>
+                <a href="/Debt/BatchPayment?type=2" class="btn @(!isReceivable ? "btn-danger" : "btn-light border") fw-bold"><i class="fa-solid fa-truck-fast me-2"></i>Trả NCC/Vận tải</a>
+            </div>
+            <a href="/Debt/Index?type=@type" class="btn btn-outline-secondary ms-2 fw-bold"><i class="fa-solid fa-arrow-left me-1"></i> Trở về Sổ Chi Tiết</a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4 col-lg-3">
+            <div class="payment-panel p-0">
+                <div class="p-3 bg-dark text-white sticky-top">
+                    <h6 class="mb-2 fw-bold text-uppercase">Chọn Đối Tác</h6>
+                    <input type="text" id="searchPartner" class="form-control form-control-sm" placeholder="🔍 Tìm tên hoặc mã..." onkeyup="filterPartners()">
+                </div>
+                <div class="list-group list-group-flush" id="partnerList">
+                    @foreach (var p in Model)
+                    {
+                        <div class="partner-item p-3" data-code="@p.PartnerCode" onclick="loadDebts('@p.PartnerCode', this)">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold text-dark partner-name">@p.PartnerName</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-light text-secondary border">@p.PartnerCode</span>
+                                <span class="fw-bold text-danger">@p.TotalDebt.ToString("N0") đ</span>
+                            </div>
+                        </div>
+                    }
+                    @if (!Model.Any())
+                    {
+                        <div class="p-4 text-center text-muted fst-italic">Không có đối tác nào đang nợ.</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8 col-lg-9">
+            <div class="payment-panel d-flex flex-column position-relative" id="rightPanel">
+                <div id="emptyState" class="m-auto text-center opacity-50">
+                    <i class="fa-solid fa-hand-pointer fa-4x mb-3 text-muted"></i>
+                    <h5 class="text-muted">Vui lòng chọn đối tác bên trái để thanh toán</h5>
+                </div>
+
+                <div id="workSpace" class="d-none d-flex flex-column h-100">
+                    <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="fw-bold text-primary mb-0" id="lblPartnerName">Tên Khách Hàng</h5>
+                            <span class="text-muted small">Tổng nợ: <strong class="text-danger" id="lblTotalDebt">0</strong> đ</span>
+                        </div>
+                    </div>
+
+                    <div class="flex-grow-1 overflow-auto p-0">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-white sticky-top shadow-sm" style="z-index: 1;">
+                                <tr>
+                                    <th width="50" class="text-center"><input type="checkbox" id="chkAll" class="form-check-input chk-row" onchange="toggleAll(this)"></th>
+                                    <th>Mã CT</th>
+                                    <th>Ngày</th>
+                                    <th>Ghi chú</th>
+                                    <th class="text-end">Giá trị</th>
+                                    <th class="text-end">CÒN NỢ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tblDebts">
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="sticky-footer bg-light">
+                        <form id="frmBatchPay" class="row g-2 align-items-end">
+                            <input type="hidden" id="payType" name="type" value="@type" />
+                            <input type="hidden" id="payBatchData" name="batchDataJson" />
+                            <input type="hidden" id="payPartnerName" name="partnerName" />
+
+                            <div class="col-md-2">
+                                <label class="small fw-bold text-muted">Đã chọn</label>
+                                <div class="fs-5 fw-bold text-primary"><span id="lblSelectedCount">0</span> mục</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-dark">Số tiền nhận / chi <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" id="payAmountVisual" class="form-control fw-bold text-success fs-5" oninput="formatCurrency(this)" placeholder="0" required>
+                                    <span class="input-group-text fw-bold">đ</span>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small fw-bold text-dark">Mã Chứng Từ (Giấy) <span class="text-danger">*</span></label>
+                                <input type="text" id="payVoucher" name="paperVoucherNumber" class="form-control fw-bold border-primary" placeholder="VD: UNC-001" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small fw-bold text-dark">Ngày TT</label>
+                                <input type="text" id="payDate" name="date" class="form-control datepicker" required>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="button" onclick="submitBatchPayment()" class="btn btn-success w-100 fw-bold fs-5 py-2 shadow-sm" id="btnSubmit" disabled>
+                                    <i class="fa-solid fa-check-double me-2"></i> THANH TOÁN
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentPartnerCode = "";
+
+    document.addEventListener("DOMContentLoaded", function () {
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn", defaultDate: "today" });
+    });
+
+    function filterPartners() {
+        let keyword = document.getElementById('searchPartner').value.toLowerCase();
+        let items = document.querySelectorAll('.partner-item');
+        items.forEach(item => {
+            let text = item.innerText.toLowerCase();
+            item.style.display = text.includes(keyword) ? "" : "none";
+        });
+    }
+
+    function loadDebts(code, el) {
+        document.querySelectorAll('.partner-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        currentPartnerCode = code;
+
+        Swal.fire({ title: 'Đang tải...', didOpen: () => Swal.showLoading() });
+
+        let type = document.getElementById('payType').value;
+        fetch(`/Debt/GetPartnerDebts?partnerCode=${code}&type=${type}`)
+            .then(res => res.json())
+            .then(data => {
+                Swal.close();
+                document.getElementById('emptyState').classList.add('d-none');
+                document.getElementById('workSpace').classList.remove('d-none');
+
+                document.getElementById('lblPartnerName').innerText = data.partnerName;
+                document.getElementById('payPartnerName').value = data.partnerName;
+                document.getElementById('lblTotalDebt').innerText = new Intl.NumberFormat('vi-VN').format(data.totalDebt);
+
+                let tbody = document.getElementById('tblDebts');
+                tbody.innerHTML = "";
+                data.items.forEach(item => {
+                    let tr = document.createElement('tr');
+                    tr.style.cursor = "pointer";
+                    tr.onclick = function (e) {
+                        if (e.target.tagName !== 'INPUT') {
+                            let chk = this.querySelector('.chk-row');
+                            chk.checked = !chk.checked;
+                            calculateTotal();
+                        }
+                    };
+
+                    tr.innerHTML = `
+                            <td class="text-center"><input type="checkbox" class="form-check-input chk-row" value="${item.id}" data-code="${item.code}" data-remain="${item.remain}" onchange="calculateTotal()"></td>
+                            <td><span class="badge bg-light text-dark border font-monospace">${item.code}</span></td>
+                            <td>${item.date}</td>
+                            <td class="text-muted small">${item.note || ''}</td>
+                            <td class="text-end">${new Intl.NumberFormat('vi-VN').format(item.total)}</td>
+                            <td class="text-end fw-bold text-danger">${new Intl.NumberFormat('vi-VN').format(item.remain)}</td>
+                        `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('chkAll').checked = false;
+                calculateTotal();
+            });
+    }
+
+    function toggleAll(source) {
+        let checkboxes = document.querySelectorAll('#tblDebts .chk-row');
+        checkboxes.forEach(chk => chk.checked = source.checked);
+        calculateTotal();
+    }
+
+    function calculateTotal() {
+        let checkboxes = document.querySelectorAll('#tblDebts .chk-row:checked');
+        let totalRemain = 0;
+        let batchData = [];
+
+        checkboxes.forEach(chk => {
+            let remain = parseFloat(chk.getAttribute('data-remain'));
+            totalRemain += remain;
+            batchData.push({ Id: parseInt(chk.value), Code: chk.getAttribute('data-code'), Remain: remain });
+        });
+
+        document.getElementById('lblSelectedCount').innerText = checkboxes.length;
+        document.getElementById('payAmountVisual').value = new Intl.NumberFormat('vi-VN').format(totalRemain);
+        document.getElementById('payBatchData').value = JSON.stringify(batchData);
+        document.getElementById('btnSubmit').disabled = checkboxes.length === 0;
+    }
+
+    function formatCurrency(input) {
+        let value = input.value.replace(/\D/g, '');
+        if (value === '') value = '0';
+        input.value = new Intl.NumberFormat('vi-VN').format(parseInt(value));
+    }
+
+    function submitBatchPayment() {
+        let form = document.getElementById('frmBatchPay');
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+
+        let amountStr = document.getElementById('payAmountVisual').value.replace(/\D/g, '');
+        let amount = parseFloat(amountStr);
+        if (isNaN(amount) || amount <= 0) { Swal.fire("Lỗi", "Số tiền không hợp lệ", "warning"); return; }
+
+        Swal.fire({ title: 'Đang xử lý...', didOpen: () => Swal.showLoading() });
+
+        let formData = new FormData(form);
+        formData.append("amount", amount);
+        formData.append("method", "2");
+
+        fetch('/Debt/ProcessBatchPayment', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    Swal.fire("Thành công!", res.message, "success").then(() => {
+                        // Tải lại đúng đối tác đang chọn thay vì load lại trang
+                        document.querySelector(`.partner-item[data-code='${currentPartnerCode}']`).click();
+                    });
+                }
+                else Swal.fire("Lỗi", res.message, "error");
+            })
+            .catch(err => Swal.fire("Lỗi hệ thống", err.message, "error"));
+    }
+</script>

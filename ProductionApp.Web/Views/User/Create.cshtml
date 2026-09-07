@@ -1,0 +1,47 @@
+﻿@model ProductionManager.Data.AppUser
+@{ ViewData["Title"] = "Thêm User mới"; }
+
+<div class="container mt-4" style="max-width: 700px;">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0"><i class="fa-solid fa-user-plus me-2"></i>Thêm Tài khoản</h4>
+        </div>
+        <div class="card-body">
+            <form asp-action="Create" method="post">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Email (Đăng nhập) <span class="text-danger">*</span></label>
+                        <input asp-for="Email" type="email" class="form-control" required placeholder="name@example.com" />
+                        <span asp-validation-for="Email" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Mật khẩu <span class="text-danger">*</span></label>
+                        <input name="password" type="password" class="form-control" required placeholder="Nhập mật khẩu..." />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Họ và Tên</label>
+                    <input asp-for="FullName" class="form-control" placeholder="Nguyễn Văn A" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Địa chỉ</label>
+                    <input asp-for="Address" class="form-control" />
+                </div>
+
+                <div class="mb-3 form-check p-3 bg-light rounded border">
+                    <input class="form-check-input ms-0 me-2" type="checkbox" asp-for="IsActive" checked style="transform: scale(1.2);">
+                    <label class="form-check-label fw-bold" asp-for="IsActive">Kích hoạt tài khoản ngay</label>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a asp-action="Index" class="btn btn-secondary">Hủy bỏ</a>
+                    <button type="submit" class="btn btn-success px-4 fw-bold">Lưu Tài Khoản</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

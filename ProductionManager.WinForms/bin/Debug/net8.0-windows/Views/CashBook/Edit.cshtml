@@ -1,0 +1,403 @@
+﻿@model ProductionManager.Data.CashEntry
+@{
+    var isReceipt = Model.Type == ProductionManager.Data.TransactionType.Receipt;
+    ViewData["Title"] = isReceipt ? "Chỉnh Sửa Phiếu Thu" : "Chỉnh Sửa Phiếu Chi";
+    var colorClass = isReceipt ? "success" : "danger";
+    // Khai báo đường dẫn để _Layout.cshtml vẽ Breadcrumbs
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Sổ Quỹ", Url.Action("Index", "CashBook")),
+        (isReceipt ? "Sửa Phiếu Thu" : "Sửa Phiếu Chi", "")
+    };
+    string GetEmoji(int sectionId) => sectionId switch
+    {
+        1 => "👥",
+        2 => "⚡",
+        3 => "🚚",
+        4 => "🏢",
+        5 => "📢",
+        99 => "💸",
+        _ => "📌"
+    };
+}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<style>
+    /* Tuỳ chỉnh Select2 cho đẹp */
+    .select2-container .select2-selection--single {
+        height: 36px !important;
+        padding: 3px 8px;
+        border: 1px solid #ced4da !important;
+        border-radius: 6px;
+        font-weight: 700 !important;
+        font-size: 0.875rem;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 34px !important;
+        right: 8px;
+    }
+
+    .select2-dropdown {
+        border: 1px solid #ced4da !important;
+        border-radius: 8px !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    .select2-results__option {
+        font-weight: 600;
+        padding: 10px 14px;
+        font-size: 0.9rem;
+        transition: 0.2s;
+    }
+
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background-color: var(--bs-@colorClass) !important;
+        color: white !important;
+    }
+
+    .select2-search__field {
+        border-radius: 6px !important;
+        padding: 6px 12px !important;
+    }
+</style>
+
+<div class="container py-4">
+    <div class="card shadow-lg border-0" style="max-width: 800px; margin: 0 auto;">
+        <div class="card-header bg-primary text-white py-3">
+            <h5 class="mb-0 fw-bold text-uppercase">
+                <i class="fa-solid fa-pen-to-square me-2"></i> @ViewData["Title"]
+            </h5>
+        </div>
+        <div class="card-body p-4">
+
+            <form asp-action="Edit" method="post" id="frmEdit">
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" asp-for="Type" />
+                <input type="hidden" asp-for="CreatedBy" />
+                <input type="hidden" asp-for="CreatedAt" />
+                <input type="hidden" asp-for="VoucherCode" />
+
+                @if (Model.ParentId != null)
+                {
+                    <input type="hidden" name="CurrentParentId" value="@Model.ParentId" />
+                }
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="fw-bold small text-muted">Mã Hệ Thống</label>
+                        <input asp-for="VoucherCode" class="form-control fw-bold bg-light" readonly />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small text-muted">Số Phiếu (Giấy)</label>
+                        <input asp-for="PaperVoucherNumber" class="form-control fw-bold text-primary" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small text-muted">Ngày Chứng Từ</label>
+                        <input asp-for="TransactionDate" type="text" class="form-control fw-bold datepicker" value="@Model.TransactionDate.ToString("yyyy-MM-dd")" />
+                    </div>
+                </div>
+
+                <div class="mb-3 bg-warning bg-opacity-10 p-3 rounded border border-warning">
+                    <label class="fw-bold small text-dark mb-1">Phân loại dòng tiền (*)</label>
+                    <select asp-for="Category" id="ddlCategory" class="form-select form-select-sm fw-bold text-dark" onchange="updateFormUI(true)">
+                        <option value="@((int)ProductionManager.Data.EntryCategory.Business)">Kinh doanh (Hạch toán P&L)</option>
+                        <option value="@((int)ProductionManager.Data.EntryCategory.Loan)">Vay / Nợ</option>
+                        <option value="3">Nội bộ / Thu Chi Khác (Không Vào Báo Cáo)</option>
+                    </select>
+
+                    <div id="boxLoanSelect" style="display:none;" class="mt-2 border-top border-warning pt-2">
+                        <label class="small fw-bold text-danger mb-1"><i class="fa-solid fa-link me-1"></i> Liên kết khoản vay</label>
+                        <select asp-for="ParentId" class="form-select form-select-sm fw-bold text-danger">
+                            <option value="">-- Giữ nguyên (Hoặc Không liên kết) --</option>
+                            @if (ViewBag.ActiveLoans != null)
+                            {
+                                foreach (var item in ViewBag.ActiveLoans as List<SelectListItem>)
+                                {
+                                    <option value="@item.Value" selected="@(item.Value == Model.ParentId?.ToString())">@item.Text</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                @if (!isReceipt)
+                {
+                    <div class="mb-3 bg-info bg-opacity-10 p-3 rounded border border-info">
+                        <label class="fw-bold small text-primary mb-1"><i class="fa-solid fa-truck-field me-1"></i> Trả nợ Nhà Cung Cấp</label>
+                        <select asp-for="MaterialImportId" class="form-select form-select-sm fw-bold text-dark" id="ddlSupplierDebt" onchange="updateFormUI(true)">
+                            <option value="">-- Chi khác (Không trả nợ hàng) --</option>
+                            @if (ViewBag.SupplierDebts != null)
+                            {
+                                foreach (var item in ViewBag.SupplierDebts as List<SelectListItem>)
+                                {
+                                    var isSelected = ViewBag.PreSelectedImportId != null && item.Value == ViewBag.PreSelectedImportId.ToString();
+                                    <option value="@item.Value" selected="@isSelected">@item.Text</option>
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <div id="boxPnL" class="mb-3 bg-danger bg-opacity-10 p-3 rounded border border-danger" style="display:none;">
+                        <h6 class="fw-bold text-danger mb-2"><i class="fa-solid fa-chart-pie me-1"></i> Hạch toán Chi phí (Báo cáo P&L)</h6>
+
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="small fw-bold text-dark">Phân loại chi phí (*)</label>
+                                <select asp-for="CostCategoryId" id="ddlCostCategory" class="form-select form-select-sm fw-bold border-danger" style="width: 100%;">
+                                    <option value="" data-section="0">🚫 -- Không hạch toán OPEX --</option>
+                                    @if (ViewBag.CostCategories != null)
+                                    {
+                                        var categories = ViewBag.CostCategories as IEnumerable<ProductionManager.Data.CostCategory>;
+                                        if (categories != null && categories.Any())
+                                        {
+                                            foreach (var cat in categories)
+                                            {
+                                                var isSelected = Model.CostCategoryId == cat.Id ? "selected" : "";
+                                                var emoji = GetEmoji((int)cat.Section);
+                                                @Html.Raw($"<option value='{cat.Id}' data-section='{(int)cat.Section}' {isSelected}>{emoji} {cat.Name}</option>")
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <option value="" disabled class="text-danger">⚠️ DB Rỗng! Vui lòng tạo Danh mục P&L trước</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-dark">Thuộc Tháng</label>
+                                <select asp-for="ForMonth" id="ddlMonth" class="form-select form-select-sm fw-bold">
+                                    <option value="">-- Chọn --</option>
+                                    @for (int i = 1; i <= 12; i++)
+                                    {
+                                        <option value="@i">Tháng @i</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-dark">Năm</label>
+                                <select asp-for="ForYear" id="ddlYear" class="form-select form-select-sm fw-bold">
+                                    <option value="">-- Chọn --</option>
+                                    @for (int i = DateTime.Now.Year - 1; i <= DateTime.Now.Year + 1; i++)
+                                    {
+                                        <option value="@i">Năm @i</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 border-top border-danger pt-2">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" id="chkAllocate" onchange="toggleAllocation()" @(Model.AllocatedMonths > 1 ? "checked" : "")>
+                                <label class="form-check-label fw-bold text-danger small" for="chkAllocate">
+                                    <i class="fa-solid fa-calendar-days me-1"></i> Phân bổ chi phí này cho nhiều tháng
+                                </label>
+                            </div>
+                            <div id="divAllocate" style="display: @(Model.AllocatedMonths > 1 ? "block" : "none");" class="mt-2 ms-2 ps-3 border-start border-3 border-danger">
+                                <label class="form-label fw-bold text-dark small mb-1">Nhập số tháng phân bổ:</label>
+                                <div class="input-group input-group-sm" style="max-width: 150px;">
+                                    <input asp-for="AllocatedMonths" class="form-control fw-bold text-center" type="number" min="1" max="120" id="inputAllocatedMonths" />
+                                    <span class="input-group-text bg-white fw-bold">Tháng</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="card bg-light border-0 mb-3">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="fw-bold small text-muted mb-1">Tham chiếu Đơn hàng (Lọc đơn đã giao/hoàn thành)</label>
+                            <select asp-for="OrderId" class="form-select fw-bold" id="ddlOrder" style="width: 100%;">
+                                <option value="">-- Thu/Chi ngoài --</option>
+                                @if (ViewBag.OrderId != null)
+                                {
+                                    @foreach (var item in ViewBag.OrderId as SelectList)
+                                    {
+                                        <option value="@item.Value" selected="@(item.Value == Model.OrderId?.ToString())">@item.Text</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-0">
+                            <label class="fw-bold small text-muted mb-1">Người @(isReceipt ? "nộp" : "nhận")</label>
+                            <input asp-for="TargetName" class="form-control" id="txtTargetName" required />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-8">
+                        <label class="fw-bold small text-muted">Số Tiền</label>
+                        <div class="input-group">
+                            <input type="text" id="txtAmountVisual" class="form-control fs-4 fw-bold text-@colorClass" value="@Model.Amount.ToString("N0")" required oninput="formatCurrency(this)" autocomplete="off" />
+                            <span class="input-group-text fw-bold">VNĐ</span>
+                            <input asp-for="Amount" type="hidden" id="txtAmountReal" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small text-muted">Hình Thức</label>
+                        <select asp-for="Method" class="form-select" asp-items="Html.GetEnumSelectList<ProductionManager.Data.PaymentMethod>()"></select>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="fw-bold small text-muted">Nội Dung</label>
+                    <textarea asp-for="Description" id="txtDesc" class="form-control" rows="2"></textarea>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <a asp-action="Index" class="btn btn-light border w-50 fw-bold">Hủy bỏ</a>
+                    <button type="submit" class="btn btn-primary w-50 fw-bold shadow">CẬP NHẬT</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function formatCurrency(input) {
+        let value = input.value.replace(/\D/g, "");
+        document.getElementById("txtAmountReal").value = value;
+        if (value) input.value = new Intl.NumberFormat('vi-VN').format(value);
+        else input.value = "";
+    }
+
+    function toggleAllocation() {
+        var chk = document.getElementById('chkAllocate');
+        var div = document.getElementById('divAllocate');
+        var input = document.getElementById('inputAllocatedMonths');
+        if (chk && chk.checked) { div.style.display = 'block'; }
+        else { if (div) div.style.display = 'none'; if (input) input.value = 1; }
+    }
+
+    function updateFormUI(isUserAction = false) {
+        var isReceipt = @(isReceipt.ToString().ToLower());
+        var cat = document.getElementById("ddlCategory");
+        if (!cat) return;
+        var selectedVal = cat.value;
+
+        var valBusiness = '@((int)ProductionManager.Data.EntryCategory.Business)';
+        var valLoan = '@((int)ProductionManager.Data.EntryCategory.Loan)';
+        var boxLoan = document.getElementById("boxLoanSelect");
+        if (boxLoan) {
+            boxLoan.style.display = (selectedVal == valLoan) ? "block" : "none";
+        }
+
+        var boxPnL = document.getElementById("boxPnL");
+        var ddlCostCategory = document.getElementById("ddlCostCategory");
+        var ddlSupplierDebt = document.getElementById("ddlSupplierDebt");
+
+        if (!isReceipt && boxPnL) {
+            var isBusiness = (selectedVal == valBusiness);
+            var isPayingMaterial = ddlSupplierDebt && ddlSupplierDebt.value !== "";
+
+            if (isBusiness && !isPayingMaterial) {
+                boxPnL.style.display = "block";
+            } else {
+                boxPnL.style.display = "none";
+                if (isUserAction) {
+                    if (ddlCostCategory) $(ddlCostCategory).val('').trigger('change.select2');
+                    var m = document.getElementById("ddlMonth"); if (m) m.value = "";
+                    var y = document.getElementById("ddlYear"); if (y) y.value = "";
+                    var chk = document.getElementById('chkAllocate');
+                    if (chk) { chk.checked = false; toggleAllocation(); }
+                }
+            }
+        }
+    }
+
+    function autoSetPeriod() {
+        var ddl = document.getElementById("ddlCostCategory");
+        if (!ddl) return;
+        var sectionId = ddl.options[ddl.selectedIndex].getAttribute("data-section");
+        var ddlMonth = document.getElementById("ddlMonth");
+        var ddlYear = document.getElementById("ddlYear");
+        if (sectionId === "0" || !sectionId) {
+            ddlMonth.value = "";
+            ddlYear.value = ""; return;
+        }
+        if (ddlMonth.value === "") {
+            var today = new Date();
+            var isEarlyMonth = today.getDate() <= 15;
+            var targetMonth = isEarlyMonth ? today.getMonth() : today.getMonth() + 1;
+            var targetYear = isEarlyMonth && targetMonth === 0 ? today.getFullYear() - 1 : today.getFullYear();
+            if (targetMonth === 0) targetMonth = 12;
+            ddlMonth.value = targetMonth; ddlYear.value = targetYear;
+        }
+    }
+
+    document.getElementById('ddlSupplierDebt')?.addEventListener('change', function () {
+        if (this.value) {
+            var text = this.options[this.selectedIndex].text;
+            if (text.includes("Còn nợ:")) {
+                var debtStr = text.split("Còn nợ:")[1].replace(")", "").trim().replace(/\./g, "").replace(/,/g, "");
+                document.getElementById('txtAmountReal').value = debtStr;
+                document.getElementById('txtAmountVisual').value = new Intl.NumberFormat('vi-VN').format(debtStr);
+                document.getElementById('txtDesc').value = "Thanh toán công nợ " + text.split("-")[0].trim();
+                document.getElementById('txtTargetName').value = text.split("-")[1].split("(")[0].trim();
+            }
+        }
+    });
+
+    // Dùng jQuery Document Ready chuẩn để đảm bảo chạy 100% khi load trang
+    $(document).ready(function () {
+        // 1. Khởi tạo UI (Sẽ tự động đọc Category và ParentId từ DB để mở đúng Box)
+        updateFormUI(false);
+
+        var currentAmount = "@Model.Amount.ToString("0")";
+        document.getElementById("txtAmountReal").value = currentAmount;
+        flatpickr(".datepicker", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", allowInput: true, locale: "vn" });
+
+        $('#ddlCostCategory').select2({
+            placeholder: "🔍 Gõ tên chi phí để tìm...",
+            allowClear: false,
+            language: { noResults: function () { return "❌ Không tìm thấy danh mục này!"; } }
+        });
+
+        $('#ddlCostCategory').on('select2:select', function (e) {
+            autoSetPeriod();
+        });
+
+        // Khởi tạo Select2 cho Dropdown Đơn Hàng
+        $('#ddlOrder').select2({
+            placeholder: "🔍 Gõ mã đơn hoặc tên khách để tìm...",
+            allowClear: true,
+            language: { noResults: function () { return "❌ Không tìm thấy đơn hàng phù hợp!"; } }
+        });
+
+        // Tự động điền dữ liệu khi chọn đơn hàng (chỉ khi có thay đổi mới)
+        var ordersData = @Html.Raw(ViewBag.OrdersJson ?? "[]");
+        var isReceipt = @(isReceipt.ToString().ToLower());
+
+        $('#ddlOrder').on('change', function () {
+            var orderId = $(this).val();
+
+            if (!orderId) {
+                document.getElementById('txtAmountReal').value = "";
+                document.getElementById('txtAmountVisual').value = "";
+                document.getElementById('txtTargetName').value = "";
+                return;
+            }
+
+            var order = ordersData.find(x => x.Id == orderId);
+            if (order) {
+                var remain = order.TotalAmount - order.Paid;
+                var finalAmount = remain > 0 ? remain : 0;
+                document.getElementById('txtAmountReal').value = finalAmount;
+                document.getElementById('txtAmountVisual').value = new Intl.NumberFormat('vi-VN').format(finalAmount);
+                document.getElementById('txtTargetName').value = order.CustomerName;
+                document.getElementById('txtDesc').value = (isReceipt ? "Thu tiền đơn " : "Chi tiền đơn ") + order.OrderCode;
+            }
+        });
+    });
+</script>

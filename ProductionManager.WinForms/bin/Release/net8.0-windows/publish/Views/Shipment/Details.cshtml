@@ -1,0 +1,191 @@
+﻿@model ProductionManager.Data.Shipment
+@using ProductionManager.Data
+@{
+    // Nhận diện loại Phiếu để đổi giao diện động
+    bool isReturn = Model.Type == ShipmentType.Return;
+    bool isWarranty = Model.Type == ShipmentType.Warranty;
+
+    string typeName = isReturn ? "Nhận hàng lỗi" : (isWarranty ? "Xuất bù / Bảo hành" : "Xuất bán");
+    ViewData["Title"] = $"Chi tiết {typeName}: {Model.ShipmentCode}";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Xuất Hàng Hoá", Url.Action("Index", "Shipment")),  isReturn ? ("Nhận hàng lỗi","") : ((isWarranty ? "Xuất bù" : "Xuất bán"),"")
+    };
+
+    var orderCodes = ViewBag.OrderCodes as Dictionary<int, string>;
+
+    // Đổi màu sắc Theme theo loại phiếu
+    string themeColor = isReturn ? "warning" : (isWarranty ? "danger" : "primary");
+    string iconClass = isReturn ? "fa-rotate-left text-warning" : (isWarranty ? "fa-shield-heart text-danger" : "fa-truck-fast text-primary");
+    string qtyLabel = isReturn ? "SỐ LƯỢNG THU HỒI" : "SỐ LƯỢNG XUẤT";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-0 fw-bold text-dark">
+                <i class="fa-solid @iconClass me-2"></i>@Model.ShipmentCode
+            </h4>
+            <span class="text-muted small">Chi tiết phiếu @typeName.ToLower()</span>
+        </div>
+        <div>
+            <a asp-action="Index" class="btn btn-light border fw-bold shadow-sm me-2">
+                <i class="fa-solid fa-arrow-left"></i> Quay lại
+            </a>
+
+            <a asp-action="Print" asp-route-id="@Model.Id" target="_blank" class="btn btn-secondary fw-bold shadow-sm me-2">
+                <i class="fa-solid fa-print"></i> In Phiếu
+            </a>
+
+            <form asp-action="Delete" asp-route-id="@Model.Id" class="d-inline" onsubmit="return confirm('CẢNH BÁO: Xóa phiếu này sẽ hoàn tác trạng thái và dữ liệu của các đơn hàng liên quan. Bạn có chắc chắn không?');">
+                <button type="submit" class="btn btn-outline-danger fw-bold shadow-sm">
+                    <i class="fa-solid fa-trash-can"></i> Xóa phiếu
+                </button>
+            </form>
+        </div>
+    </div>
+
+    @if (isReturn)
+    {
+        <div class="alert alert-warning border-warning shadow-sm mb-4 d-flex align-items-center">
+            <i class="fa-solid fa-triangle-exclamation fa-2x me-3 text-warning"></i>
+            <div>
+                <h6 class="fw-bold mb-1 text-dark">Phiếu Nhận Hàng Lỗi (RMA)</h6>
+                <span class="small text-dark">Đây là chứng từ ghi nhận hàng bị hỏng/lỗi do khách trả về để đem đi sửa chữa. <strong>Không làm giảm</strong> tiến độ của đơn hàng gốc.</span>
+            </div>
+        </div>
+    }
+    else if (isWarranty)
+    {
+        <div class="alert alert-danger border-danger shadow-sm mb-4 d-flex align-items-center">
+            <i class="fa-solid fa-shield-heart fa-2x me-3 text-danger"></i>
+            <div>
+                <h6 class="fw-bold mb-1 text-danger">Phiếu Xuất Bù / Bảo Hành</h6>
+                <span class="small text-danger">Đây là chứng từ xuất trả lại hàng đã sửa xong cho khách. <strong>Không tính vào doanh thu</strong> và không làm tăng tiến độ xuất mới.</span>
+            </div>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h6 class="m-0 fw-bold text-@themeColor"><i class="fa-solid fa-user-tag me-2"></i>THÔNG TIN KHÁCH HÀNG</h6>
+                </div>
+                <div class="card-body">
+                    <h5 class="fw-bold text-dark mb-1">@Model.Customer?.CompanyName</h5>
+                    <div class="mb-2">
+                        <span class="badge bg-light text-dark border me-1">@Model.Customer?.CustomerCode</span>
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success">Khách hàng</span>
+                    </div>
+                    <hr class="my-2 dashed" />
+                    <p class="mb-1 small"><i class="fa-solid fa-user me-2 text-muted" style="width: 20px;"></i> @Model.Customer?.ContactPerson</p>
+                    <p class="mb-1 small"><i class="fa-solid fa-phone me-2 text-muted" style="width: 20px;"></i> @Model.Customer?.PhoneNumber</p>
+                    <p class="mb-0 small"><i class="fa-solid fa-location-dot me-2 text-muted" style="width: 20px;"></i> @Model.Customer?.Address</p>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h6 class="m-0 fw-bold text-@themeColor"><i class="fa-solid fa-truck-fast me-2"></i>THÔNG TIN GIAO NHẬN</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small">Ngày thực hiện:</span>
+                        <span class="fw-bold">@Model.ShipmentDate.ToString("dd/MM/yyyy")</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small">Giờ thực hiện:</span>
+                        <span class="fw-bold">@Model.ShipmentDate.ToString("HH:mm")</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="text-muted small">Số xe / Tài xế:</span>
+                        @if (!string.IsNullOrEmpty(Model.VehicleNumber))
+                        {
+                            <span class="badge bg-dark text-white"><i class="fa-solid fa-truck me-1"></i> @Model.VehicleNumber</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted fst-italic">Giao nhận tại kho</span>
+                        }
+                    </div>
+
+                    @if (Model.ExportShipment != null)
+                    {
+                        <div class="alert alert-info border border-info mb-3 small shadow-sm">
+                            <div class="fw-bold mb-1 text-primary"><i class="fa-solid fa-link me-1"></i> Lô hàng Logistic:</div>
+                            Mã chuyến: <a href="/Export/Details/@Model.ExportShipmentId" class="fw-bold text-dark text-decoration-underline">@Model.ExportShipment.ShipmentCode</a><br />
+                            Loại: @(Model.ExportShipment.TransportType == TransportType.Container ? "Container" : "Xe tải") <br />
+                            Biển/Cont: <span class="fw-bold text-dark">@(Model.ExportShipment.LicensePlate ?? Model.ExportShipment.ContainerNumber)</span>
+                        </div>
+                    }
+
+                    <div class="alert alert-light border mb-0 small">
+                        <i class="fa-solid fa-note-sticky text-warning me-1"></i>
+                        <strong>Ghi chú:</strong> @(string.IsNullOrEmpty(Model.Notes) ? "Không có" : Model.Notes)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold text-@themeColor"><i class="fa-solid fa-boxes-packing me-2"></i>CHI TIẾT HÀNG HÓA</h6>
+                    <span class="badge bg-@themeColor rounded-pill">@Model.ShipmentDetails.Count loại hàng</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light small text-uppercase text-muted">
+                            <tr>
+                                <th class="ps-4">Sản phẩm / Quy cách</th>
+                                <th class="text-center">Đơn hàng gốc</th>
+                                <th class="text-center">ĐVT</th>
+                                <th class="text-center text-@themeColor fw-bold" width="150">@qtyLabel</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.ShipmentDetails != null && Model.ShipmentDetails.Any())
+                            {
+                                foreach (var item in Model.ShipmentDetails)
+                                {
+                                    string oCode = orderCodes != null && orderCodes.ContainsKey(item.OrderDetailId) ? orderCodes[item.OrderDetailId] : "-";
+                                    <tr>
+                                        <td class="ps-4">
+                                            <div class="fw-bold text-dark">@item.OrderDetail?.ProductName</div>
+                                            <div class="small text-muted fst-italic">@item.OrderDetail?.Specifications</div>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-light text-secondary border text-decoration-none">
+                                                <i class="fa-solid fa-file-invoice me-1"></i>@oCode
+                                            </span>
+                                        </td>
+                                        <td class="text-center text-muted small">Cái</td>
+                                        <td class="text-center">
+                                            <span class="fs-5 fw-bold text-@themeColor">@Math.Abs(item.QuantityShipped).ToString("N0")</span>
+                                        </td>
+                                    </tr>
+                                }
+                                <tr class="bg-light">
+                                    <td colspan="3" class="text-end fw-bold text-uppercase small text-muted pe-3">Tổng cộng:</td>
+                                    <td class="text-center fw-bold fs-5 text-dark">
+                                        @Model.ShipmentDetails.Sum(x => Math.Abs(x.QuantityShipped)).ToString("N0")
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-center py-5 text-muted">
+                                        <i class="fa-solid fa-box-open fa-2x mb-3 opacity-25"></i><br />
+                                        Không có dữ liệu chi tiết.
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

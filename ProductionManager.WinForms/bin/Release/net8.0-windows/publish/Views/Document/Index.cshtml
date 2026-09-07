@@ -1,0 +1,136 @@
+﻿@using ProductionApp.Web.Constants
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService AuthorizationService
+@model IEnumerable<ProductionManager.Data.Document>
+
+@{
+    ViewData["Title"] = "Quản lý Tài liệu";
+    // Check quyền ngay trên View để ẩn/hiện nút
+    bool canUpload = (await AuthorizationService.AuthorizeAsync(User, AppPermissions.Documents.Upload)).Succeeded;
+    bool canDelete = (await AuthorizationService.AuthorizeAsync(User, AppPermissions.Documents.Delete)).Succeeded;
+}
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-primary"><i class="fa-solid fa-folder-open me-2"></i>Kho Tài liệu Số</h3>
+
+        @if (canUpload)
+        {
+            <button class="btn btn-success rounded-pill px-4 shadow-sm fw-bold" onclick="document.getElementById('fileInput').click()">
+                <i class="fa-solid fa-cloud-arrow-up me-2"></i> Tải lên
+            </button>
+            <form asp-action="Upload" method="post" enctype="multipart/form-data" id="uploadForm" style="display:none;">
+                <input type="file" id="fileInput" name="files" multiple onchange="document.getElementById('uploadForm').submit()" />
+            </form>
+        }
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4 bg-light">
+        <div class="card-body p-3">
+            <div class="row g-3">
+                <form method="get" class="col-md-5 d-flex gap-2">
+                    <input type="text" name="fromDate" class="form-control date-picker" value="@ViewData["fromDate"]" placeholder="Từ ngày (dd/mm/yyyy)" />
+                    <input type="text" name="toDate" class="form-control date-picker" value="@ViewData["toDate"]" placeholder="Đến ngày (dd/mm/yyyy)" />
+                    <button class="btn btn-primary"><i class="fa-solid fa-filter"></i></button>
+                </form>
+
+                <div class="col-md-7">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                        <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Tìm kiếm..." autocomplete="off">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0 align-middle" id="docTable">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">Tên Tài liệu</th>
+                        <th>Phân loại</th>
+                        <th>Kích thước</th>
+                        <th>Người đăng</th>
+                        <th>Ngày tạo</th>
+                        <th class="text-end pe-4">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        // Logic chọn Icon đẹp
+                        string icon = "fa-file";
+                        string color = "text-secondary";
+                        string badgeClass = "bg-secondary";
+
+                        if (item.FileName.Contains(".pdf")) { icon = "fa-file-pdf"; color = "text-danger"; }
+                        else if (item.FileName.Contains(".xls")) { icon = "fa-file-excel"; color = "text-success"; }
+                        else if (item.FileName.Contains(".doc")) { icon = "fa-file-word"; color = "text-primary"; }
+                        else if (item.Group == "Bản vẽ") { icon = "fa-compass-drafting"; color = "text-warning"; }
+
+                        if (item.Group == "Hợp đồng") badgeClass = "bg-primary";
+                        else if (item.Group == "Bản vẽ") badgeClass = "bg-warning text-dark";
+                        else if (item.Group.Contains("Hóa đơn")) badgeClass = "bg-danger";
+
+                        <tr class="search-item">
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <i class="fa-solid @icon @color fs-4 me-3"></i>
+                                    <div>
+                                        <div class="fw-bold text-dark search-text">@item.FileName</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="badge @badgeClass rounded-pill search-text">@item.Group</span></td>
+                            <td>@item.FileSize KB</td>
+                            <td class="search-text">@item.UploadedBy</td>
+                            <td>@item.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td class="text-end pe-4">
+                                <a href="@item.FilePath" download class="btn btn-sm btn-outline-primary rounded-circle me-1" title="Tải về">
+                                    <i class="fa-solid fa-download"></i>
+                                </a>
+                                @if (canDelete)
+                                {
+                                    <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-outline-danger rounded-circle"
+                                       onclick="return confirm('Xóa vĩnh viễn file này?')" title="Xóa">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <div id="noResult" class="text-center py-5 d-none">
+                <i class="fa-solid fa-box-open fa-3x text-muted mb-3 opacity-50"></i>
+                <p class="text-muted">Không tìm thấy kết quả phù hợp.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('searchInput').addEventListener('keyup', function () {
+        let searchText = this.value.toLowerCase();
+        let rows = document.querySelectorAll('.search-item');
+        let hasResult = false;
+
+        rows.forEach(row => {
+            // Gom tất cả text trong các thẻ có class .search-text của dòng đó
+            let textContent = "";
+            row.querySelectorAll('.search-text').forEach(el => textContent += el.innerText.toLowerCase() + " ");
+
+            if (textContent.includes(searchText)) {
+                row.style.display = '';
+                hasResult = true;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        document.getElementById('noResult').classList.toggle('d-none', hasResult);
+    });
+</script>

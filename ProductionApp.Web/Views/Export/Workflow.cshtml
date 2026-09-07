@@ -1,0 +1,211 @@
+﻿@using ProductionManager.Data
+@using ProductionApp.Web.Constants
+@model ExportShipment
+
+@{
+    ViewData["Title"] = "Chứng từ & Tiến độ: " + Model.ShipmentCode;
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Quản Lý Xe Giao Hàng", Url.Action("Index", "Export")), 
+        ("Chứng Từ Xe Hàng", "") 
+    };
+}
+
+<style>
+    /* 1. STEPPER NGANG CHUẨN CỦA BẠN */
+    .stepper-wrapper { display: flex; justify-content: space-between; margin-bottom: 30px; position: relative; padding: 0 20px; }
+    .stepper-item { position: relative; display: flex; flex-direction: column; align-items: center; flex: 1; z-index: 2; }
+    .stepper-item::before { content: ""; position: absolute; top: 15px; left: -50%; width: 100%; height: 4px; background-color: #e2e8f0; z-index: -1; transition: background-color 0.4s ease; }
+    .stepper-item:first-child::before { content: none; }
+    
+    .step-counter { width: 35px; height: 35px; display: flex; justify-content: center; align-items: center; border-radius: 50%; background: #fff; border: 3px solid #e2e8f0; font-weight: bold; color: #94a3b8; margin-bottom: 8px; font-size: 0.9rem; transition: all 0.3s; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .step-name { font-size: 0.75rem; font-weight: 700; color: #64748b; text-align: center; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Trạng thái Stepper */
+    .stepper-item.completed .step-counter { background-color: #10b981; color: white; border-color: #10b981; }
+    .stepper-item.completed::before { background-color: #10b981; }
+    .stepper-item.completed .step-name { color: #10b981; }
+
+    .stepper-item.active .step-counter { border-color: #3b82f6; color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); }
+    .stepper-item.active .step-name { color: #3b82f6; }
+
+    .step-counter:hover { transform: scale(1.15); }
+
+    /* 2. CARD CHỨNG TỪ */
+    .doc-card { border: 1px solid #e9ecef; border-radius: 12px; transition: transform 0.2s; background: #fff; height: 100%; }
+    .doc-card:hover { box-shadow: 0 5px 15px rgba(0,0,0,0.08); transform: translateY(-2px); border-color: #86b7fe; }
+    .file-item { background: #f8f9fa; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #dee2e6; }
+</style>
+
+@functions {
+    public string GetShortStepName(ExportStep step) => step switch {
+        ExportStep.Contract => "Hợp đồng", ExportStep.Booking => "Booking", ExportStep.Packing => "Packing",
+        ExportStep.Container => "Đóng hàng", ExportStep.Customs => "Hải quan", ExportStep.PortDropOff => "Hạ bãi",
+        ExportStep.BillOfLading => "B/L", ExportStep.DocSend => "Gửi CT", ExportStep.Payment => "Tiền về", _ => ""
+    };
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 bg-white p-3 rounded shadow-sm border-start border-5 border-primary">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fa-solid fa-folder-tree text-primary me-2"></i>Hồ Sơ & Chứng Từ: @Model.ShipmentCode</h4>
+            <div class="text-muted small">
+                Khách hàng: <strong>@Model.Customer?.CompanyName</strong> | 
+                Loại: <strong>@(Model.TransportType == TransportType.Container ? "Container Xuất khẩu" : "Xe Tải")</strong>
+                @if(Model.TransportType == TransportType.Container) { <span> | Booking: <strong>@Model.BookingNumber</strong></span> }
+            </div>
+        </div>
+        <div>
+            <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary fw-bold rounded-pill px-4 shadow-sm">
+                <i class="fa-solid fa-truck-fast me-2"></i>Về Trang Điều Phối Lô
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null) { <div class="alert alert-success shadow-sm">@TempData["Success"]</div> }
+    @if (TempData["Error"] != null) { <div class="alert alert-danger shadow-sm">@TempData["Error"]</div> }
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body py-4">
+            <div class="stepper-wrapper">
+                @foreach (ExportStep step in Enum.GetValues(typeof(ExportStep)))
+                {
+                    var tracker = Model.StepTrackers?.FirstOrDefault(t => t.Step == step);
+                    var statusClass = "";
+                    if (tracker?.Status == StepStatus.Done) statusClass = "completed";
+                    else if (tracker?.Status == StepStatus.Active) statusClass = "active";
+
+                    <div class="stepper-item @statusClass">
+                        <div class="step-counter" onclick="openStepModal('@( (int)step )', '@GetShortStepName(step)', '@(tracker?.Status.ToString() ?? "Pending")')" title="Cập nhật trạng thái">
+                            @if (tracker?.Status == StepStatus.Done) { <i class="fa-solid fa-check"></i> }
+                            else { @((int)step) }
+                        </div>
+                        <div class="step-name">@GetShortStepName(step)</div>
+                    </div>
+                }
+            </div>
+            <div class="text-center mt-2">
+                <span class="badge bg-primary rounded-pill px-3 py-2 fs-6">Tiến độ tổng: @Model.ProgressPercent%</span>
+                <small class="text-muted d-block mt-1 fst-italic">Bấm vào các vòng tròn số ở trên để cập nhật trạng thái bước.</small>
+            </div>
+        </div>
+    </div>
+
+    <h5 class="fw-bold mb-3 text-dark"><i class="fa-solid fa-cloud-arrow-up me-2 text-success"></i>Tài liệu chứng từ đính kèm</h5>
+    <div class="row g-3">
+        @foreach (ExportStep step in Enum.GetValues(typeof(ExportStep)))
+        {
+            var stepDocs = Model.Documents?.Where(d => d.Step == step).ToList() ?? new List<ExportDocument>();
+            
+            <div class="col-md-4 col-lg-3">
+                <div class="doc-card p-3 d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                        <h6 class="fw-bold text-primary mb-0">@((int)step). @GetShortStepName(step)</h6>
+                        <span class="badge bg-light text-dark border">@stepDocs.Count file</span>
+                    </div>
+
+                    <div class="flex-grow-1 overflow-auto mb-3" style="max-height: 120px;">
+                        @if (stepDocs.Any())
+                        {
+                            foreach (var doc in stepDocs)
+                            {
+                                <div class="file-item">
+                                    <div class="text-truncate me-2" style="max-width: 150px;" title="@doc.FileName">
+                                        <a href="~/@doc.FilePath" target="_blank" class="text-decoration-none fw-bold text-dark small">
+                                            <i class="fa-solid fa-file-pdf text-danger me-1"></i> @doc.FileName
+                                        </a>
+                                    </div>
+                                    <form asp-action="DeleteDocument" method="post" class="m-0" onsubmit="return confirm('Xóa file này?');">
+                                        <input type="hidden" name="id" value="@doc.Id" />
+                                        <button class="btn btn-sm text-danger p-0"><i class="fa-solid fa-xmark"></i></button>
+                                    </form>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted small mt-2 fst-italic">Chưa có tài liệu</div>
+                        }
+                    </div>
+
+                    <form asp-action="UploadDocument" method="post" enctype="multipart/form-data" class="mt-auto">
+                        <input type="hidden" name="shipmentId" value="@Model.Id" />
+                        <input type="hidden" name="step" value="@step" />
+                        <div class="input-group input-group-sm">
+                            <input type="file" name="file" class="form-control" required style="font-size: 0.7rem;" />
+                            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-upload"></i></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="modal fade" id="stepModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-3">
+                <h6 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square me-2"></i>Cập nhật: <span id="lblStepName"></span></h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="hdnStepVal" />
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted">Trạng thái hiện tại</label>
+                    <select id="cboStatus" class="form-select fw-bold">
+                        <option value="Pending">🕒 Đang chờ (Pending)</option>
+                        <option value="Active">🚀 Đang xử lý (Active)</option>
+                        <option value="Done">✅ Đã hoàn thành (Done)</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label fw-bold small text-muted">Ghi chú (Tùy chọn)</label>
+                    <textarea id="txtNote" class="form-control" rows="2" placeholder="Nhập lưu ý..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer bg-light p-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-success btn-sm fw-bold px-4" onclick="saveStepStatus()">Lưu Trạng Thái</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        function openStepModal(stepVal, stepName, currentStatus) {
+            $('#hdnStepVal').val(stepVal);
+            $('#lblStepName').text(stepName);
+            $('#cboStatus').val(currentStatus);
+            $('#txtNote').val('');
+            var modal = new bootstrap.Modal(document.getElementById('stepModal'));
+            modal.show();
+        }
+
+        function saveStepStatus() {
+            var step = $('#hdnStepVal').val();
+            var status = $('#cboStatus').val();
+            var note = $('#txtNote').val();
+            var shipmentId = @Model.Id;
+
+            $.post('/Export/UpdateStepStatus', { shipmentId: shipmentId, step: step, status: status, note: note }, function(res) {
+                if(res.success) {
+                    $('#stepModal').modal('hide');
+                    Swal.fire({
+                        title: 'Đã cập nhật!',
+                        text: 'Tiến độ hiện tại: ' + res.percent + '%',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire('Lỗi', res.message, 'error');
+                }
+            });
+        }
+    </script>
+}

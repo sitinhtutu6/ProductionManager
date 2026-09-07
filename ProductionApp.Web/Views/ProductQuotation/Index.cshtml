@@ -1,0 +1,218 @@
+﻿@model IEnumerable<ProductionManager.Data.Product>
+@{
+    ViewData["Title"] = "Quản lý Báo Giá Sản Phẩm";
+    var company = ViewBag.CompanyInfo as ProductionManager.Data.CompanyConfig ?? new ProductionManager.Data.CompanyConfig();
+    var quotedProducts = Model.Where(p => p.DefaultPrice > 0).ToList();
+    var unquotedProducts = Model.Where(p => p.DefaultPrice == 0).ToList();
+}
+
+<style>
+    /* CSS cho Nút Switch */
+    .switch-toggle { display: flex; background: #e2e8f0; border-radius: 30px; padding: 4px; width: fit-content; }
+    .switch-btn { padding: 8px 20px; border-radius: 25px; border: none; background: transparent; font-weight: 600; color: #64748b; transition: all 0.3s; }
+    .switch-btn.active { background: #0d6efd; color: white; box-shadow: 0 4px 10px rgba(13, 110, 253, 0.3); }
+
+    /* CSS bảng In PDF chuẩn Form báo giá KODA */
+    .table-quotation th { text-align: center; vertical-align: middle; background-color: #f8f9fa !important; border-bottom: 2px solid #000; }
+    .table-quotation td { vertical-align: middle; }
+
+    @Html.Raw("@media print {")
+        @Html.Raw("@page { margin: 15mm 10mm; size: A4 portrait; }")
+        header, footer, nav, .sidebar, .no-print { display: none !important; }
+        body { background: white !important; margin: 0; padding: 0; }
+        .container, .container-fluid { padding: 0 !important; max-width: 100% !important; }
+        
+        /* Hiển thị Header In */
+        .print-only-header { display: block !important; margin-bottom: 20px; }
+        .print-signature { display: flex !important; justify-content: space-between; margin-top: 50px; text-align: center; font-weight: bold; page-break-inside: avoid; }
+        
+        /* Bảng in đen trắng rõ nét */
+        .table-quotation { border-collapse: collapse !important; width: 100% !important; }
+        .table-quotation th, .table-quotation td { border: 1px solid #000 !important; padding: 8px !important; color: #000 !important; }
+    @Html.Raw("}")
+    
+    .print-only-header, .print-signature { display: none; }
+</style>
+
+<div class="container-fluid py-4 bg-light min-vh-100">
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <div>
+            <h3 class="fw-bold text-dark mb-1"><i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i>QUẢN LÝ BÁO GIÁ</h3>
+            <span class="text-muted small">Cập nhật, In PDF và Xuất/Nhập danh sách báo giá.</span>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-warning fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#importModal">
+                <i class="fa-solid fa-file-import me-1"></i> Nhập giá (Excel)
+            </button>
+            
+            <form asp-action="ExportExcel" method="post" class="d-flex gap-2 m-0">
+                <input type="text" name="customerName" class="form-control form-control-sm border-secondary" placeholder="Nhập tên KH (Ghi chú)..." style="width: 200px;" />
+                <button type="submit" class="btn btn-success fw-bold shadow-sm">
+                    <i class="fa-solid fa-file-excel me-1"></i> Xuất Excel
+                </button>
+            </form>
+
+            <button onclick="window.print()" class="btn btn-danger fw-bold shadow-sm">
+                <i class="fa-solid fa-file-pdf me-1"></i> In PDF
+            </button>
+        </div>
+    </div>
+
+    <div class="switch-toggle mb-4 no-print mx-auto">
+        <button type="button" class="switch-btn active" id="btnQuoted" onclick="toggleMode('quoted')">
+            <i class="fa-solid fa-check-circle me-1"></i> ĐÃ CÓ BÁO GIÁ (@quotedProducts.Count)
+        </button>
+        <button type="button" class="switch-btn" id="btnUnquoted" onclick="toggleMode('unquoted')">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i> CHƯA CÓ GIÁ (@unquotedProducts.Count)
+        </button>
+    </div>
+
+    <div id="quoted-section">
+        
+        <div class="print-only-header text-center">
+            <h2 class="fw-bold mb-0" style="font-size: 22px; font-style: italic;">BẢNG BÁO GIÁ</h2>
+            <p class="fst-italic mb-3">@DateTime.Now.ToString("dd/MM/yyyy")</p>
+            
+            <div class="text-start ms-4 mb-3">
+                <span class="fw-bold text-decoration-underline">KÍNH GỬI:</span> 
+                <span class="fw-bold ms-2">......................................................................</span>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <table class="table table-quotation table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th width="5%">STT</th>
+                            <th width="10%">Ngày tháng</th>
+                            <th width="12%">Số đơn hàng</th>
+                            <th width="33%">Tên sản phẩm</th>
+                            <th width="8%">ĐVT</th>
+                            <th width="12%">Đơn giá (VNĐ)</th>
+                            <th width="10%">Loại gỗ</th>
+                            <th width="10%">Ghi chú</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ int stt = 1; decimal total = 0; }
+                        @foreach (var item in quotedProducts)
+                        {
+                            <tr>
+                                <td class="text-center">@(stt++)</td>
+                                <td class="text-center">@DateTime.Now.ToString("dd/MM/yyyy")</td>
+                                <td></td> <td class="fw-bold">@item.ProductName</td>
+                                <td class="text-center">@(item.Unit ?? "Cái")</td>
+                                <td class="text-end fw-bold text-danger">@item.DefaultPrice.ToString("N0")</td>
+                                <td class="text-center">@item.MaterialType</td>
+                                <td>@item.Note</td>
+                            </tr>
+                            total += item.DefaultPrice;
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="bg-light">
+                            <td colspan="5" class="text-center fw-bold fs-5">CỘNG:</td>
+                            <td class="text-end fw-bold fs-5 text-danger">@total.ToString("N0")</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="print-only-header mt-3">
+            <p class="mb-1"><span class="fw-bold">* Ghi chú:</span></p>
+            <p class="mb-1 ms-3 fw-bold">- Giá chưa bao gồm thuế GTGT</p>
+            <p class="mb-1 ms-3 fw-bold">- Khách hàng cấp vật tư</p>
+        </div>
+
+        <div class="print-signature">
+            <div style="width: 30%;">
+                <p>NGƯỜI LẬP BIỂU</p>
+                <p style="margin-top: 80px; font-weight: normal;">(Ký, ghi rõ họ tên)</p>
+            </div>
+            <div style="width: 30%;">
+                <p>GIÁM ĐỐC</p>
+                <p style="margin-top: 80px; font-weight: normal;">(Ký, đóng dấu)</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="unquoted-section" class="no-print" style="display: none;">
+        <div class="alert alert-warning fw-bold">
+            <i class="fa-solid fa-circle-info me-2"></i> Danh sách các sản phẩm đang có giá = 0. Bạn cần cập nhật giá hoặc Import file Excel để đưa vào báo giá.
+        </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Mã SP</th>
+                            <th>Tên sản phẩm</th>
+                            <th>Loại gỗ</th>
+                            <th>Quy cách (Dày x Rộng x Dài)</th>
+                            <th class="text-end">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in unquotedProducts)
+                        {
+                            <tr>
+                                <td class="fw-bold text-secondary">@item.ProductCode</td>
+                                <td class="fw-bold">@item.ProductName</td>
+                                <td>@item.MaterialType</td>
+                                <td>@item.Thick x @item.Width x @item.Length</td>
+                                <td class="text-end">
+                                    <a href="/Product/Edit/@item.Id" target="_blank" class="btn btn-sm btn-outline-primary">Cập nhật giá</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form asp-action="ImportExcel" method="post" enctype="multipart/form-data" class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-file-import me-2"></i>Nhập Báo Giá Từ Excel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Vui lòng chọn file Excel có cấu trúc giống hệt bảng báo giá xuất ra (Cột D là Tên Sản Phẩm, Cột F là Đơn Giá).</p>
+                <input type="file" name="file" class="form-control" accept=".xlsx, .xls" required />
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
+                <button type="submit" class="btn btn-warning fw-bold">Bắt đầu Import</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function toggleMode(mode) {
+        var btnQuoted = document.getElementById('btnQuoted');
+        var btnUnquoted = document.getElementById('btnUnquoted');
+        var secQuoted = document.getElementById('quoted-section');
+        var secUnquoted = document.getElementById('unquoted-section');
+
+        if (mode === 'quoted') {
+            btnQuoted.classList.add('active');
+            btnUnquoted.classList.remove('active');
+            secQuoted.style.display = 'block';
+            secUnquoted.style.display = 'none';
+        } else {
+            btnUnquoted.classList.add('active');
+            btnQuoted.classList.remove('active');
+            secQuoted.style.display = 'none';
+            secUnquoted.style.display = 'block';
+        }
+    }
+</script>

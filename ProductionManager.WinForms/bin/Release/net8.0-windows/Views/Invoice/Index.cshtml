@@ -1,0 +1,244 @@
+﻿@model IEnumerable<ProductionManager.Data.Invoice>
+@{
+    ViewData["Title"] = "Tra cứu & Theo dõi Hóa đơn";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)> {
+        ("Kinh doanh & Bán hàng", Url.Action("Index", "Order")), ("Sổ Hóa Đơn Đỏ", "") 
+    };
+    var customerList = ViewBag.CustomerList as IEnumerable<SelectListItem>;
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+    .table-erp thead th { background: #f8fafc; color: #475569; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; padding: 12px 15px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+    .table-erp tbody td { padding: 12px 15px; vertical-align: middle; }
+    .main-row { cursor: pointer; transition: background-color 0.2s; }
+    .main-row:hover { background-color: #f1f5f9; }
+    .detail-row td { background-color: #f8fafc; padding: 15px 25px !important; border-bottom: 2px solid #cbd5e1 !important; }
+    .chevron-icon { transition: transform 0.3s ease; color: #94a3b8; }
+    .row-expanded .chevron-icon { transform: rotate(90deg); color: #3b82f6; }
+</style>
+
+<div class="container-fluid py-4" style="max-width: 1400px;">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="text-primary fw-bold mb-1"><i class="fa-solid fa-file-invoice-dollar me-2"></i>Tra Cứu Hóa Đơn</h3>
+            <p class="text-muted small mb-0">Quản lý sổ hóa đơn đầu ra và lịch sử xuất hóa đơn lô.</p>
+        </div>
+        <a href="/Order/BatchInvoice" class="btn btn-info btn-lg fw-bold shadow-sm rounded-pill px-4 text-white">
+            <i class="fa-solid fa-plus me-2"></i> Lập Hóa Đơn Mới
+        </a>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4 p-3 mb-4">
+        <form id="filterForm" method="get" class="row g-2 align-items-center">
+            <div class="col-md-3">
+                <input type="text" name="invoiceNo" class="form-control fw-bold" placeholder="🔍 Mã Đơn / Số HĐ" value="@ViewBag.InvoiceNo" />
+            </div>
+            <div class="col-md-3">
+                <select name="customerId" class="form-select fw-bold text-secondary">
+                    <option value="">-- Tất cả Khách hàng --</option>
+                    @if (customerList != null) { foreach (var item in customerList) { <option value="@item.Value" selected="@(ViewBag.CustomerId?.ToString() == item.Value ? "selected" : null)">@item.Text</option> } }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text bg-light text-muted border-end-0"><i class="fa-solid fa-calendar"></i></span>
+                    <input type="text" name="fromDate" class="form-control border-start-0 ps-0 datepicker" placeholder="Từ ngày" value="@(ViewBag.FromDate != null ? ((DateTime)ViewBag.FromDate).ToString("yyyy-MM-dd") : "")" />
+                    <span class="input-group-text bg-light text-muted border-start-0 border-end-0"><i class="fa-solid fa-arrow-right"></i></span>
+                    <input type="text" name="toDate" class="form-control border-start-0 ps-0 datepicker" placeholder="Đến ngày" value="@(ViewBag.ToDate != null ? ((DateTime)ViewBag.ToDate).ToString("yyyy-MM-dd") : "")" />
+                </div>
+            </div>
+            <div class="col-md-2 d-flex gap-1">
+                <button type="submit" class="btn btn-dark fw-bold w-100"><i class="fa-solid fa-filter me-1"></i> Lọc</button>
+                <a href="/Invoice/Index" class="btn btn-light border fw-bold px-3"><i class="fa-solid fa-rotate-left"></i></a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-erp">
+                <thead>
+                    <tr>
+                        <th width="40" class="text-center"><i class="fa-solid fa-expand"></i></th>
+                        <th>Số Hóa Đơn</th>
+                        <th>Ngày Xuất</th>
+                        <th class="text-center">Số Đơn Gom</th>
+                        <th class="text-end">Tổng Tiền Thuế</th>
+                        <th class="text-center">File Đính Kèm</th>
+                        <th class="text-end pe-4">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        foreach (var inv in Model)
+                        {
+                            <tr class="main-row" onclick="toggleDetail(@inv.Id, this)">
+                                <td class="text-center"><i class="fa-solid fa-chevron-right chevron-icon"></i></td>
+                                <td class="fw-bold text-primary font-monospace fs-6"><i class="fa-solid fa-hashtag text-muted me-1 small"></i> @inv.InvoiceNumber</td>
+                                <td class="fw-bold text-dark">@inv.InvoiceDate.ToString("dd/MM/yyyy")</td>
+                                <td class="text-center"><span class="badge bg-secondary rounded-pill px-3">@(inv.InvoiceDetails?.Count() ?? 0) Đơn Hàng</span></td>
+                                <td class="text-end fw-bold text-success fs-6">@inv.TotalAmount.ToString("N0")</td>
+                                <td class="text-center align-middle" onclick="event.stopPropagation()">
+                                    @if (!string.IsNullOrEmpty(inv.InvoiceFile)) {
+                                        <a href="~/invoices/@inv.InvoiceFile" target="_blank" class="btn btn-sm btn-outline-danger fw-bold py-1 px-3 rounded-pill"><i class="fa-solid fa-file-pdf me-1"></i> Mở File PDF</a>
+                                    } else {
+                                        <span class="text-muted small fst-italic"><i class="fa-solid fa-unlink opacity-50 me-1"></i>Không có file</span>
+                                    }
+                                </td>
+                                <td class="text-end pe-4" onclick="event.stopPropagation()">
+                                    <div class="btn-group shadow-sm rounded-pill">
+                                        <button onclick="openEditModal(@inv.Id, '@inv.InvoiceNumber', '@inv.InvoiceDate.ToString("yyyy-MM-dd")')" class="btn btn-sm btn-light text-warning" title="Sửa Hóa Đơn"><i class="fa-solid fa-pen"></i></button>
+                                        <button onclick="deleteInvoice(@inv.Id)" class="btn btn-sm btn-light text-danger" title="Xóa Hóa Đơn"><i class="fa-solid fa-trash-can"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <tr id="detail-@inv.Id" class="detail-row" style="display: none;">
+                                <td colspan="7">
+                                    <div class="p-3 bg-white rounded-4 border shadow-sm mx-4">
+                                        <h6 class="fw-bold text-primary mb-3"><i class="fa-solid fa-list-check me-2"></i>Bảng kê Đơn hàng thuộc Hóa đơn: @inv.InvoiceNumber</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-borderless align-middle mb-0">
+                                                <thead class="bg-light text-muted border-bottom">
+                                                    <tr>
+                                                        <th class="ps-3">Khách Hàng</th>
+                                                        <th>Mã Đơn</th>
+                                                        <th>Ngày Đặt</th>
+                                                        <th class="text-end">Giá Trị Đơn</th>
+                                                        <th class="text-end text-success pe-3">Phân bổ HĐ này</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @if (inv.InvoiceDetails != null) {
+                                                        foreach (var d in inv.InvoiceDetails) {
+                                                            <tr class="border-bottom border-light">
+                                                                <td class="fw-bold text-dark ps-3">@d.Order.Customer?.CompanyName</td>
+                                                                <td class="text-primary font-monospace fw-bold">@d.Order.OrderCode</td>
+                                                                <td class="text-muted small">@d.Order.OrderDate.ToString("dd/MM/yyyy")</td>
+                                                                <td class="text-end fw-bold text-secondary">@d.Order.TotalAmount.ToString("N0")</td>
+                                                                <td class="text-end fw-bold text-success pe-3 bg-success bg-opacity-10">@d.BilledAmount.ToString("N0")</td>
+                                                            </tr>
+                                                        }
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr><td colspan="7" class="text-center py-5 text-muted fst-italic">Không tìm thấy dữ liệu hóa đơn nào.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editInvoiceModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-light">
+                <h6 class="modal-title fw-bold text-warning"><i class="fa-solid fa-pen-to-square me-2"></i>Sửa Thông Tin Hóa Đơn</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="frmEditInvoice" enctype="multipart/form-data">
+                    <input type="hidden" id="editInvoiceId" name="id" />
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Số hóa đơn (*)</label>
+                        <input type="text" name="invoiceNumber" id="editInvoiceNumber" class="form-control fw-bold border-warning" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Ngày xuất HĐ (*)</label>
+                        <input type="text" name="invoiceDate" id="editInvoiceDate" class="form-control datepicker bg-white" required />
+                    </div>
+                    <div class="mb-4">
+                        <label class="small fw-bold text-muted mb-1">Up đè File mới (Để trống nếu giữ cũ)</label>
+                        <input type="file" name="invoiceFile" class="form-control form-control-sm" accept=".pdf,.xml,.zip" />
+                    </div>
+                    <div class="alert alert-info border-0 p-2 small text-center mb-3">
+                        <i class="fa-solid fa-circle-info"></i> Để sửa tiền, vui lòng xóa và xuất lại HĐ Lô.
+                    </div>
+                    <button type="button" onclick="submitEditInvoice()" class="btn btn-warning text-dark w-100 fw-bold shadow-sm py-2">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> CẬP NHẬT
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn" });
+    });
+
+    function toggleDetail(id, row) {
+        var d = document.getElementById('detail-' + id);
+        if (d.style.display === 'none') {
+            d.style.display = 'table-row';
+            row.classList.add('row-expanded');
+        } else {
+            d.style.display = 'none';
+            row.classList.remove('row-expanded');
+        }
+    }
+
+    let editInvoiceDatePickr = null;
+    function openEditModal(id, num, date) {
+        var modalEl = document.getElementById('editInvoiceModal');
+        document.getElementById('frmEditInvoice').reset();
+        $('#editInvoiceId').val(id);
+        $('#editInvoiceNumber').val(num);
+        
+        if (editInvoiceDatePickr) editInvoiceDatePickr.destroy();
+        editInvoiceDatePickr = flatpickr("#editInvoiceDate", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn", defaultDate: date });
+        
+        new bootstrap.Modal(modalEl).show();
+    }
+
+    function submitEditInvoice() {
+        var form = document.getElementById('frmEditInvoice');
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+
+        Swal.fire({ title: 'Đang lưu...', didOpen: () => Swal.showLoading() });
+        var formData = new FormData(form);
+        
+        fetch('/Invoice/Edit', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(res => {
+                if(res.success) { Swal.fire('Thành công', res.message, 'success').then(() => location.reload()); }
+                else { Swal.fire('Lỗi', res.message, 'error'); }
+            });
+    }
+
+    function deleteInvoice(id) {
+        Swal.fire({
+            title: 'Chắc chắn xóa Hóa Đơn này?', 
+            text: "Toàn bộ đơn hàng được gom trong lô sẽ tự động lùi trạng thái về Chưa xuất hóa đơn!", 
+            icon: 'warning',
+            showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6', confirmButtonText: 'Đồng ý, Xóa!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({ title: 'Đang xóa và lùi trạng thái...', didOpen: () => Swal.showLoading() });
+                fetch('/Invoice/Delete/' + id, { method: 'POST' })
+                    .then(res => res.json())
+                    .then(res => {
+                        if (res.success) { Swal.fire('Đã xóa!', res.message, 'success').then(() => location.reload()); }
+                        else { Swal.fire('Lỗi', res.message, 'error'); }
+                    });
+            }
+        });
+    }
+</script>

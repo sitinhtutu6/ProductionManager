@@ -1,0 +1,411 @@
+﻿@using ProductionApp.Web.Controllers
+@using ProductionManager.Data
+@model IEnumerable<CashEntry>
+
+@{
+    ViewData["Title"] = "Sổ Thu Chi";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Tài chính & Kế toán", "#"),
+        ("Sổ quỹ Tiền mặt", "")
+    };
+    var monthlyStats = ViewBag.MonthlyStats as List<CashBookStat> ?? new List<CashBookStat>();
+
+    decimal openBalance = ViewBag.OpenBalance != null ? (decimal)ViewBag.OpenBalance : 0;
+    decimal runningBalance = openBalance;
+    decimal realBalance = ViewBag.RealCurrentBalance != null ? (decimal)ViewBag.RealCurrentBalance : 0;
+
+    PaymentMethod? currentMethod = ViewBag.CurrentMethod as PaymentMethod?;
+    string modeTitle = "TỔNG QUỸ";
+    string modeIcon = "fa-vault";
+    string modeColor = "linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%)";
+    if (currentMethod == PaymentMethod.Cash)
+    {
+        modeTitle = "QUỸ TIỀN MẶT";
+        modeIcon = "fa-money-bill-wave";
+        modeColor = "linear-gradient(135deg, #198754 0%, #20c997 100%)";
+    }
+    else if (currentMethod == PaymentMethod.Transfer)
+    {
+        modeTitle = "QUỸ NGÂN HÀNG";
+        modeIcon = "fa-building-columns";
+        modeColor = "linear-gradient(135deg, #6610f2 0%, #6f42c1 100%)";
+    }
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<style>
+    .mode-switch-container {
+        background: #e9ecef;
+        border-radius: 50px;
+        padding: 4px;
+        display: inline-flex;
+        position: relative;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+        margin-top: 10px;
+    }
+
+    .mode-btn {
+        border: none;
+        background: transparent;
+        padding: 8px 20px;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #6c757d;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+        .mode-btn:hover {
+            color: #495057;
+        }
+
+        .mode-btn.active {
+            background: white;
+            color: #0d6efd;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .mode-btn[data-type="cash"].active {
+            color: #198754;
+        }
+
+        .mode-btn[data-type="bank"].active {
+            color: #6610f2;
+        }
+
+    /* MENU CHUỘT PHẢI ĐƯỢC BỌC THÉP Z-INDEX VÀ FIXED */
+    #customContextMenu {
+        display: none;
+        position: fixed;
+        z-index: 999999;
+        width: 180px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        border: 1px solid #cbd5e1;
+        overflow: hidden;
+    }
+
+        #customContextMenu .dropdown-item {
+            padding: 12px 16px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            color: #334155;
+            font-weight: 600;
+            transition: background 0.1s;
+        }
+
+            #customContextMenu .dropdown-item:hover {
+                background-color: #f1f5f9;
+                color: #0d6efd;
+            }
+
+    /* Highlight dòng khi hover */
+    #cashbook-list-container tbody tr:hover td {
+        background-color: #f0fdf4 !important;
+        cursor: context-menu;
+    }
+
+    .balance-display {
+        color: white;
+        border-radius: 12px;
+        padding: 20px;
+        transition: background 0.3s;
+    }
+
+    .stat-card {
+        transition: all 0.2s;
+        border-left: 4px solid transparent;
+    }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1) !important;
+        }
+
+    .stat-month-active {
+        border-left-color: #0d6efd;
+        background-color: #f8f9fa;
+    }
+
+    .table-responsive {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background-color: #f8f9fa !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+</style>
+
+<div class="container-fluid p-4 bg-light min-vh-100">
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-5">
+            <h3 class="fw-bold text-dark mb-1"><i class="fa-solid fa-book-journal-whills text-primary me-2"></i>SỔ QUỸ TIỀN MẶT</h3>
+            <p class="text-muted small mb-1 ms-1">Quản lý dòng tiền & tài chính doanh nghiệp</p>
+            <div class="mode-switch-container">
+                <a href="@Url.Action("Index", new { method = "" })" class="mode-btn @(currentMethod == null ? "active" : "")">
+                    <i class="fa-solid fa-layer-group"></i> Tổng hợp
+                </a>
+                <a href="@Url.Action("Index", new { method = (int)PaymentMethod.Cash })" class="mode-btn @(currentMethod == PaymentMethod.Cash ? "active" : "")" data-type="cash">
+                    <i class="fa-solid fa-money-bill-wave"></i> Tiền mặt
+                </a>
+                <a href="@Url.Action("Index", new { method = (int)PaymentMethod.Transfer })" class="mode-btn @(currentMethod == PaymentMethod.Transfer ? "active" : "")" data-type="bank">
+                    <i class="fa-solid fa-building-columns"></i> Ngân hàng
+                </a>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="balance-display shadow-sm d-flex justify-content-between align-items-center" style="background: @modeColor">
+                <div>
+                    <div class="text-uppercase opacity-75 small fw-bold">💰 Số dư: @modeTitle</div>
+                    <div class="fs-3 fw-bold">@realBalance.ToString("N0") ₫</div>
+                </div>
+                <div class="fs-1 opacity-50"><i class="fa-solid @modeIcon"></i></div>
+            </div>
+        </div>
+
+        <div class="col-md-4 text-end align-self-center">
+            <div class="d-flex gap-2 justify-content-end flex-wrap">
+                <a asp-action="Create" asp-route-type="Receipt" class="btn btn-success shadow-sm fw-bold"><i class="fa-solid fa-circle-plus me-1"></i> THU TIỀN</a>
+                <a asp-action="Create" asp-route-type="Payment" class="btn btn-danger shadow-sm fw-bold"><i class="fa-solid fa-circle-minus me-1"></i> CHI TIỀN</a>
+
+                <div class="btn-group shadow-sm">
+                    <button type="button" class="btn btn-white bg-white dropdown-toggle fw-bold text-dark" data-bs-toggle="dropdown">
+                        <i class="fa-solid fa-bars-staggered me-1"></i> Tiện ích
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" asp-controller="Loan" asp-action="Index"><i class="fa-solid fa-scale-balanced me-2 text-warning"></i>Sổ Vay Nợ</a></li>
+                        <li><a class="dropdown-item" asp-controller="SupplierDebt" asp-action="Index"><i class="fa-solid fa-truck-fast me-2 text-danger"></i>Công Nợ Mua Hàng</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form asp-action="ExportExcel" method="get" id="formExport">
+                                <input type="hidden" name="fromDate" value="@(ViewBag.FromDate?.ToString("yyyy-MM-dd"))" />
+                                <input type="hidden" name="toDate" value="@(ViewBag.ToDate?.ToString("yyyy-MM-dd"))" />
+                                <input type="hidden" name="method" value="@ViewBag.CurrentMethod" />
+                                <a class="dropdown-item" href="javascript:void(0)" onclick="document.getElementById('formExport').submit()">
+                                    <i class="fa-solid fa-file-excel me-2 text-success"></i>Xuất Excel (@(currentMethod == null ? "Tổng" : (currentMethod == PaymentMethod.Cash ? "TM" : "CK")))
+                                </a>
+                            </form>
+                        </li>
+                        <li><a class="dropdown-item" asp-action="Import"><i class="fa-solid fa-file-import me-2 text-primary"></i>Nhập Excel</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-2 fw-bold text-muted small text-uppercase">
+            <i class="fa-solid fa-chart-line me-2"></i>Biến động @modeTitle.ToLower() theo tháng
+        </div>
+        <div class="card-body bg-light p-2">
+            <div class="row g-2">
+                @for (int i = 1; i <= 12; i++)
+                {
+                    var stat = monthlyStats.FirstOrDefault(x => x.Month == i);
+                    decimal inAmt = stat != null ? stat.In : 0;
+                    decimal outAmt = stat != null ? stat.Out : 0;
+                    bool isCurrentMonth = i == DateTime.Now.Month;
+
+                    <div class="col-6 col-md-4 col-lg-1">
+                        <div class="card border-0 shadow-sm text-center h-100 stat-card @(isCurrentMonth ? "stat-month-active" : "")" style="font-size: 0.7rem;">
+                            <div class="py-1 fw-bold text-secondary border-bottom bg-white">T @i</div>
+                            <div class="p-1">
+                                <div class="text-success fw-bold">+@((inAmt / 1000000).ToString("0.##"))M</div>
+                                <div class="text-danger fw-bold">-@((outAmt / 1000000).ToString("0.##"))M</div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body py-2">
+            <form id="liveSearchForm" class="row g-2 align-items-center">
+                <input type="hidden" name="method" value="@ViewBag.CurrentMethod" />
+
+                <div class="col-auto"><span class="badge bg-primary rounded-pill p-2"><i class="fa-solid fa-filter"></i> BỘ LỌC</span></div>
+                <div class="col-md-4">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-regular fa-calendar"></i></span>
+                        <input type="text" name="fromDate" class="form-control border-start-0 ps-0 datepicker" value="@(ViewBag.FromDate?.ToString("yyyy-MM-dd"))" placeholder="Từ ngày">
+                        <span class="input-group-text bg-white border-0">-</span>
+                        <input type="text" name="toDate" class="form-control datepicker" value="@(ViewBag.ToDate?.ToString("yyyy-MM-dd"))" placeholder="Đến ngày">
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <input type="text" name="keyword" class="form-control" placeholder="Mã phiếu, tên, nội dung..." value="@ViewBag.Keyword">
+                    </div>
+                </div>
+                <div class="col-md-1"><button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">Xem</button></div>
+                <div class="col text-end"><a asp-action="Index" class="btn btn-outline-secondary btn-sm border-0" title="Làm mới"><i class="fa-solid fa-rotate-right"></i></a></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow border-0 overflow-hidden">
+        <div class="table-responsive" id="cashbook-list-container">
+            <partial name="_CashEntryList" model="Model" />
+        </div>
+    </div>
+</div>
+
+<div id="customContextMenu">
+    <a class="dropdown-item" href="javascript:void(0)" id="menuPrint"><i class="fa-solid fa-print text-secondary me-2"></i> In Phiếu</a>
+    <a class="dropdown-item" href="javascript:void(0)" id="menuEdit"><i class="fa-solid fa-pen text-primary me-2"></i> Chỉnh Sửa</a>
+    <div class="dropdown-divider my-1"></div>
+    <a class="dropdown-item text-danger" href="javascript:void(0)" id="menuDelete"><i class="fa-solid fa-trash me-2"></i> Xóa Phiếu</a>
+</div>
+
+<form id="globalDeleteForm" method="post" action="">@Html.AntiForgeryToken()</form>
+
+<script>
+    // 1. HÀM KHỞI TẠO CƠ BẢN (Chạy cho cả Load thường lẫn Turbo)
+    function initCashbookUI() {
+        if (typeof flatpickr !== 'undefined') {
+            flatpickr(".datepicker", {
+                altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", allowInput: true, locale: "vn",
+                onChange: function () { triggerSearch(); }
+            });
+        }
+
+        // Nhấc Menu ra khỏi mọi thứ để chống kẹt Z-Index
+        const menu = document.getElementById("customContextMenu");
+        if (menu && menu.parentNode !== document.body) {
+            document.body.appendChild(menu);
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", initCashbookUI);
+    document.addEventListener("turbo:load", initCashbookUI);
+
+    // ========================================================================
+    // 2. BẮT SỰ KIỆN CHUỘT PHẢI (Global Event Delegation) - BẤT TỬ VỚI AJAX
+    // ========================================================================
+    document.addEventListener("contextmenu", function (e) {
+
+        // Cố gắng tìm thẻ <tr> mà người dùng vừa click vào
+        const row = e.target.closest("tr");
+        if (!row) return;
+
+        // Chỉ mở menu nếu dòng đó nằm trong bảng Sổ quỹ
+        const container = row.closest("#cashbook-list-container");
+        if (!container) return;
+
+        // Lấy ID phiếu. (Chỉ chạy khi thẻ <tr> trong file PartialView có cài data-id="...")
+        const id = row.getAttribute("data-id");
+        if (!id) return;
+
+        e.preventDefault(); // Chặn menu mặc định của trình duyệt
+
+        const menu = document.getElementById("customContextMenu");
+        if (!menu) return;
+
+        // Gắn link cho các nút chức năng
+        const menuPrint = document.getElementById("menuPrint");
+        const menuEdit = document.getElementById("menuEdit");
+        const menuDelete = document.getElementById("menuDelete");
+        const deleteForm = document.getElementById("globalDeleteForm");
+
+        if (menuPrint) menuPrint.href = '/CashBook/Print/' + id;
+        if (menuEdit) menuEdit.href = '/CashBook/Edit/' + id;
+
+        if (menuDelete) {
+            menuDelete.onclick = function () {
+                if (confirm("⚠️ CẢNH BÁO: Xóa phiếu này không thể hoàn tác!")) {
+                    if (deleteForm) {
+                        deleteForm.action = '/CashBook/Delete/' + id;
+                        deleteForm.submit();
+                    }
+                }
+            };
+        }
+
+        // Bật menu lên để tính toán kích thước
+        menu.style.display = "block";
+
+        let menuWidth = menu.offsetWidth;
+        let menuHeight = menu.offsetHeight;
+        let posX = e.clientX;
+        let posY = e.clientY;
+
+        // Chống tràn màn hình
+        if (posX + menuWidth > window.innerWidth) posX = window.innerWidth - menuWidth - 5;
+        if (posY + menuHeight > window.innerHeight) posY = window.innerHeight - menuHeight - 5;
+
+        // Định vị menu chuẩn xác 100%
+        menu.style.left = posX + "px";
+        menu.style.top = posY + "px";
+    });
+
+    // 3. ẨN MENU KHI CLICK CHỖ KHÁC HOẶC CUỘN TRANG
+    document.addEventListener("click", function () {
+        const menu = document.getElementById("customContextMenu");
+        if (menu) menu.style.display = "none";
+    });
+    window.addEventListener("scroll", function () {
+        const menu = document.getElementById("customContextMenu");
+        if (menu) menu.style.display = "none";
+    }, true);
+
+    // ========================================================================
+    // 4. XỬ LÝ TÌM KIẾM LIVE SEARCH (Global Delegation)
+    // ========================================================================
+    let typingTimer;
+    const doneTypingInterval = 400;
+
+    document.addEventListener("keyup", function (e) {
+        if (e.target && e.target.name === "keyword") {
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(performAjaxSearch, doneTypingInterval);
+        }
+    });
+
+    document.addEventListener("submit", function (e) {
+        if (e.target && e.target.id === "liveSearchForm") {
+            e.preventDefault();
+            triggerSearch();
+        }
+    });
+
+    function triggerSearch() {
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(performAjaxSearch, doneTypingInterval);
+    }
+
+    function performAjaxSearch() {
+        const form = document.getElementById('liveSearchForm');
+        if (!form) return;
+        const url = new URL('@Url.Action("SearchLive", "CashBook")', window.location.origin);
+        url.search = new URLSearchParams(new FormData(form)).toString();
+
+        fetch(url)
+            .then(response => response.text())
+            .then(html => {
+                const container = document.getElementById('cashbook-list-container');
+                if (container) container.innerHTML = html;
+            })
+            .catch(error => console.error('Lỗi:', error));
+    }
+</script>

@@ -1,0 +1,286 @@
+﻿@model ProductionApp.Web.Controllers.MonthlyPnLViewModel
+@{
+    ViewData["Title"] = $"Báo cáo P&L Tháng {Model.Month}/{Model.Year}";
+}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    body {
+        background-color: #f4f6f9;
+        font-family: 'Segoe UI', sans-serif;
+        color: #2d3748;
+    }
+
+    .report-card {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        border: 1px solid #edf2f7;
+        margin-bottom: 24px;
+        overflow: hidden;
+    }
+
+    .card-header-custom {
+        background: #fff;
+        padding: 16px 24px;
+        border-bottom: 2px solid #edf2f7;
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: #1a202c;
+    }
+
+    .table-pnl {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .table-pnl th {
+            text-align: right;
+            padding: 12px 20px;
+            font-size: 0.85rem;
+            color: #718096;
+            text-transform: uppercase;
+            border-bottom: 1px solid #edf2f7;
+        }
+
+            .table-pnl th:first-child {
+                text-align: left;
+            }
+
+        .table-pnl td {
+            padding: 14px 20px;
+            border-bottom: 1px solid #edf2f7;
+            font-size: 0.95rem;
+        }
+
+    .row-level-1 {
+        font-weight: 700;
+        background-color: #f8fafc;
+        color: #2d3748;
+    }
+
+    .row-level-2 {
+        padding-left: 40px !important;
+        color: #4a5568;
+    }
+
+    .row-total {
+        font-weight: 800;
+        font-size: 1.1rem;
+        background-color: #ebf8ff;
+        color: #2b6cb0;
+    }
+
+    .row-net-profit {
+        font-weight: 800;
+        font-size: 1.2rem;
+        background-color: #2b6cb0;
+        color: #fff !important;
+    }
+
+        .row-net-profit td {
+            color: #fff !important;
+        }
+
+    .text-money {
+        text-align: right;
+        font-family: 'Courier New', Courier, monospace;
+        letter-spacing: -0.5px;
+    }
+
+    .text-red {
+        color: #e53e3e;
+    }
+
+    .text-green {
+        color: #38a169;
+    }
+
+    @@media print {
+        body {
+            background: #fff !important;
+            color: #000;
+        }
+
+        .no-print {
+            display: none !important;
+        }
+
+        .report-card {
+            box-shadow: none;
+            border: none;
+        }
+
+        .table-pnl th {
+            color: #000;
+            border-bottom: 2px solid #000;
+        }
+
+        .table-pnl td {
+            border-bottom: 1px solid #ddd;
+        }
+
+        .row-level-1 {
+            background-color: #f0f0f0 !important;
+            -webkit-print-color-adjust: exact;
+        }
+
+        .row-total {
+            background-color: #e0e0e0 !important;
+            color: #000 !important;
+            -webkit-print-color-adjust: exact;
+        }
+
+        .row-net-profit {
+            background-color: #000 !important;
+            color: #fff !important;
+            -webkit-print-color-adjust: exact;
+        }
+
+        @@page {
+            margin: 1.5cm;
+            size: A4 portrait;
+        }
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="fa-solid fa-chart-pie text-primary me-2"></i>BÁO CÁO P&L (KẾT QUẢ KINH DOANH)</h3>
+            <p class="text-muted mb-0">Hệ thống phân tích lợi nhuận chuẩn quản trị</p>
+        </div>
+
+        <form method="get" class="d-flex gap-3 align-items-center bg-white p-2 rounded-pill shadow-sm border">
+            <select name="month" class="form-select border-0 fw-bold bg-transparent">
+                @for (int i = 1; i <= 12; i++)
+                {
+                    <option value="@i" selected="@(Model.Month == i)">Tháng @i</option>
+                }
+            </select>
+            <div class="vr"></div>
+            <select name="year" class="form-select border-0 fw-bold bg-transparent">
+                @for (int i = DateTime.Now.Year - 2; i <= DateTime.Now.Year; i++)
+                {
+                    <option value="@i" selected="@(Model.Year == i)">Năm @i</option>
+                }
+            </select>
+            <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold"><i class="fa-solid fa-filter me-1"></i> Lọc</button>
+        </form>
+
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-danger fw-bold rounded-pill shadow-sm px-4">
+                <i class="fa-solid fa-file-pdf me-2"></i>Xuất PDF
+            </button>
+            <a href="@Url.Action("ExportExcel", new { month = Model.Month, year = Model.Year })" class="btn btn-success fw-bold rounded-pill shadow-sm px-4">
+                <i class="fa-solid fa-file-excel me-2"></i>Xuất Excel
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="report-card p-4 border-bottom border-primary border-4 h-100">
+                <div class="text-muted small fw-bold text-uppercase mb-2">DOANH THU THUẦN</div>
+                <div class="fs-3 fw-bold text-primary text-money">@Model.NetRevenue.ToString("N0") ₫</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="report-card p-4 border-bottom border-success border-4 h-100">
+                <div class="text-muted small fw-bold text-uppercase mb-2">LỢI NHUẬN GỘP</div>
+                <div class="fs-3 fw-bold text-success text-money">@Model.GrossProfit.ToString("N0") ₫</div>
+                <div class="small text-muted text-end mt-1">Biên LN: <span class="fw-bold text-dark">@Model.GrossMargin.ToString("0.0")%</span></div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="report-card p-4 border-bottom border-warning border-4 h-100">
+                <div class="text-muted small fw-bold text-uppercase mb-2">CHI PHÍ VẬN HÀNH (OPEX)</div>
+                <div class="fs-3 fw-bold text-warning text-money">@Model.TotalOpex.ToString("N0") ₫</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="report-card p-4 border-bottom border-dark border-4 h-100 bg-dark text-white">
+                <div class="text-gray-300 small fw-bold text-uppercase mb-2">LỢI NHUẬN RÒNG (NET PROFIT)</div>
+                <div class="fs-3 fw-bold text-white text-money">@Model.NetProfit.ToString("N0") ₫</div>
+                <div class="small text-gray-400 text-end mt-1">Biên LN Ròng: <span class="fw-bold text-white">@Model.NetMargin.ToString("0.0")%</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="report-card">
+        <div class="card-header-custom d-flex justify-content-between">
+            <span>BẢNG KẾT QUẢ HOẠT ĐỘNG KINH DOANH CHI TIẾT</span>
+            <span class="text-muted fw-normal">Đơn vị tính: VNĐ</span>
+        </div>
+        <div class="card-body p-0">
+            <table class="table-pnl">
+                <thead>
+                    <tr>
+                        <th width="50%">CÁC CHỈ TIÊU TÀI CHÍNH</th>
+                        <th width="25%">SỐ TIỀN THỰC TẾ</th>
+                        <th width="25%">% DOANH THU</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="row-level-1">
+                        <td>I. DOANH THU KINH DOANH</td>
+                        <td class="text-money">@Model.TotalGrossRevenue.ToString("N0")</td>
+                        <td class="text-money">-</td>
+                    </tr>
+                    <tr>
+                        <td class="row-level-2"><i class="fa-solid fa-minus text-muted me-2"></i>Thuế VAT phải nộp</td>
+                        <td class="text-money text-red">(@Model.VatPayable.ToString("N0"))</td>
+                        <td class="text-money">-</td>
+                    </tr>
+                    <tr class="row-total">
+                        <td>DOANH THU THUẦN (NET REVENUE)</td>
+                        <td class="text-money">@Model.NetRevenue.ToString("N0")</td>
+                        <td class="text-money">100.0%</td>
+                    </tr>
+
+                    <tr class="row-level-1">
+                        <td>II. GIÁ VỐN HÀNG BÁN (VẬT TƯ)</td>
+                        <td class="text-money text-red">(@Model.MaterialConsumed.ToString("N0"))</td>
+                        <td class="text-money text-red">@((Model.NetRevenue > 0 ? (Model.MaterialConsumed / Model.NetRevenue * 100) : 0).ToString("0.0"))%</td>
+                    </tr>
+                    <tr>
+                        <td class="row-level-2"><i class="fa-solid fa-arrow-right text-muted me-2"></i>Tiền mua vật tư trong kỳ</td>
+                        <td class="text-money text-muted">@Model.TotalMaterialPurchased.ToString("N0")</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td class="row-level-2"><i class="fa-solid fa-box text-muted me-2"></i>Tồn kho cuối kỳ (Chưa dùng)</td>
+                        <td class="text-money text-green">@Model.MaterialRemaining.ToString("N0")</td>
+                        <td></td>
+                    </tr>
+
+                    <tr class="row-total">
+                        <td>LỢI NHUẬN GỘP (GROSS PROFIT)</td>
+                        <td class="text-money text-green">@Model.GrossProfit.ToString("N0")</td>
+                        <td class="text-money text-green">@Model.GrossMargin.ToString("0.0")%</td>
+                    </tr>
+
+                    <tr class="row-level-1">
+                        <td>III. CHI PHÍ VẬN HÀNH (OPEX)</td>
+                        <td class="text-money text-red">(@Model.TotalOpex.ToString("N0"))</td>
+                        <td class="text-money text-red">@((Model.NetRevenue > 0 ? (Model.TotalOpex / Model.NetRevenue * 100) : 0).ToString("0.0"))%</td>
+                    </tr>
+                    @foreach (var item in Model.OpexGroups)
+                    {
+                        <tr>
+                            <td class="row-level-2"><i class="fa-solid fa-money-bill-wave text-muted me-2"></i>@item.Key</td>
+                            <td class="text-money text-red">(@item.Value.ToString("N0"))</td>
+                            <td class="text-money">@((Model.NetRevenue > 0 ? (item.Value / Model.NetRevenue * 100) : 0).ToString("0.0"))%</td>
+                        </tr>
+                    }
+
+                    <tr class="row-net-profit mt-4">
+                        <td class="py-4">LỢI NHUẬN RÒNG (NET PROFIT)</td>
+                        <td class="text-money py-4">@Model.NetProfit.ToString("N0")</td>
+                        <td class="text-money py-4">@Model.NetMargin.ToString("0.0")%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

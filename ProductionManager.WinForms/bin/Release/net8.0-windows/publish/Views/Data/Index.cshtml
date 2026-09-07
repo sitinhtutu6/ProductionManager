@@ -1,0 +1,191 @@
+﻿@model IEnumerable<ProductionManager.Data.Order>
+@using Microsoft.AspNetCore.Authorization
+@using ProductionManager.Data
+@using ProductionApp.Web.Constants
+@using System.Security.Claims
+
+@{
+    ViewData["Title"] = "Quản lý Dữ liệu";
+
+    bool canCreate = User.IsInRole("Admin") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Create);
+    bool canEdit = User.IsInRole("Admin") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Edit);
+    bool canDelete = User.IsInRole("Admin") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Delete);
+}
+
+<div class="container py-4">
+    <h3 class="fw-bold mb-4 text-primary"><i class="fa-solid fa-database"></i> Quản trị Dữ liệu & Sao lưu</h3>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            <i class="fa-solid fa-check-circle"></i> @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="fa-solid fa-triangle-exclamation"></i> @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-success text-white fw-bold">
+                    <i class="fa-solid fa-file-export"></i> 1. Xuất Excel
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">Xuất dữ liệu hiện tại ra Excel để lưu trữ hoặc chỉnh sửa.</p>
+                    <div class="d-grid gap-2">
+                        <a asp-action="Export" asp-route-type="Customer" class="btn btn-outline-success btn-sm text-start"><i class="fa-solid fa-users"></i> Khách hàng</a>
+                        <a asp-action="Export" asp-route-type="Product" class="btn btn-outline-success btn-sm text-start"><i class="fa-solid fa-cube"></i> Sản phẩm</a>
+                        <a asp-action="Export" asp-route-type="Order" class="btn btn-outline-success btn-sm text-start"><i class="fa-solid fa-file-invoice"></i> Đơn hàng</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-warning text-dark fw-bold">
+                    <i class="fa-solid fa-file-import"></i> 2. Nhập Excel
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">Thêm dữ liệu mới từ file Excel.</p>
+                    <form asp-action="Import" method="post" enctype="multipart/form-data" class="mb-4 border-bottom pb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="fw-bold small">Nhập Khách hàng</label>
+                            <a asp-action="DownloadTemplate" asp-route-type="Customer" class="text-decoration-none small fw-bold text-primary">
+                                <i class="fa-solid fa-download"></i> Tải file mẫu
+                            </a>
+                        </div>
+                        <input type="hidden" name="type" value="Customer" />
+                        <div class="input-group input-group-sm">
+                            <input type="file" name="file" class="form-control" required accept=".xlsx" />
+                            <button class="btn btn-warning" type="submit">Upload</button>
+                        </div>
+                    </form>
+
+                    <form asp-action="Import" method="post" enctype="multipart/form-data">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="fw-bold small">Nhập Sản phẩm</label>
+                            <a asp-action="DownloadTemplate" asp-route-type="Product" class="text-decoration-none small fw-bold text-primary">
+                                <i class="fa-solid fa-download"></i> Tải file mẫu
+                            </a>
+                        </div>
+                        <input type="hidden" name="type" value="Product" />
+                        <div class="input-group input-group-sm">
+                            <input type="file" name="file" class="form-control" required accept=".xlsx" />
+                            <button class="btn btn-warning" type="submit">Upload</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100 border-primary">
+                <div class="card-header bg-primary text-white fw-bold">
+                    <i class="fa-solid fa-shield-halved"></i> 3. Quản lý Sao lưu
+                </div>
+                <div class="card-body">
+                    <h6 class="fw-bold text-primary">A. Tạo bản sao lưu mới</h6>
+                    <p class="small text-muted mb-2">Hệ thống sẽ lưu 1 bản snapshot dữ liệu ngay thời điểm này vào Server.</p>
+                    @if (canCreate)
+                    {
+                        <a asp-action="Backup" class="btn btn-primary w-100 fw-bold mb-4 shadow-sm" onclick="return confirm('Tiến hành sao lưu hệ thống?');">
+                            <i class="fa-solid fa-database me-1"></i> BẮT ĐẦU SAO LƯU NGAY
+                        </a>
+                    }
+
+                    <hr />
+
+                    <h6 class="fw-bold text-danger">B. Phục hồi từ file bên ngoài</h6>
+                    <p class="small text-muted mb-2">Nếu bạn có file <code>.sql</code> từ máy tính khác, hãy tải lên đây.</p>
+                    @if (canEdit)
+                    {
+                        <form asp-action="Restore" method="post" enctype="multipart/form-data" onsubmit="return confirm('CẢNH BÁO: Dữ liệu hiện tại sẽ bị xóa sạch. Tiếp tục?');">
+                            <div class="input-group input-group-sm mb-2">
+                                <input type="file" name="file" class="form-control border-danger" required accept=".sql" />
+                                <button type="submit" class="btn btn-danger fw-bold"><i class="fa-solid fa-upload"></i> Upload</button>
+                            </div>
+                        </form>
+                    }
+                </div>
+            </div>
+        </div>
+    </div> 
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-dark">
+                <div class="card-header bg-dark text-white fw-bold">
+                    <i class="fa-solid fa-clock-rotate-left me-2"></i> Lịch sử Sao lưu
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light text-muted small text-uppercase">
+                                <tr>
+                                    <th class="ps-4">Tên File Backup</th>
+                                    <th>Thời gian tạo</th>
+                                    <th>Dung lượng</th>
+                                    <th class="text-end pe-4">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    var history = ViewBag.BackupHistory as IEnumerable<ProductionApp.Web.Controllers.BackupFileInfo>;
+                                }
+                                @if (history != null && history.Any())
+                                {
+                                    foreach (var item in history)
+                                    {
+                                        <tr>
+                                            <td class="ps-4 fw-bold text-primary"><i class="fa-solid fa-file-code text-secondary me-2"></i>@item.FileName</td>
+                                            <td>
+                                                <span class="d-block fw-bold">@item.CreatedDate.ToString("dd/MM/yyyy")</span>
+                                                <small class="text-muted">@item.CreatedDate.ToString("HH:mm:ss")</small>
+                                            </td>
+                                            <td><span class="badge bg-secondary">@item.SizeMB MB</span></td>
+                                            <td class="text-end pe-4">
+                                                <a asp-action="DownloadBackup" asp-route-fileName="@item.FileName" class="btn btn-sm btn-light border text-dark me-1" title="Tải về máy">
+                                                    <i class="fa-solid fa-download"></i>
+                                                </a>
+
+                                                <form asp-action="RestoreFromHistory" method="post" class="d-inline" onsubmit="return confirm('⚠️ CẢNH BÁO: Khôi phục hệ thống về mốc [@item.CreatedDate.ToString("dd/MM/yyyy HH:mm")]. Toàn bộ dữ liệu sau thời điểm này sẽ MẤT VĨNH VIỄN. Bạn có chắc chắn?');">
+                                                    <input type="hidden" name="fileName" value="@item.FileName" />
+                                                    <button type="submit" class="btn btn-sm btn-warning fw-bold text-dark me-1 shadow-sm" title="Khôi phục mốc này">
+                                                        <i class="fa-solid fa-rotate-left me-1"></i> Phục hồi
+                                                    </button>
+                                                </form>
+
+                                                <form asp-action="DeleteBackup" method="post" class="d-inline" onsubmit="return confirm('Xóa vĩnh viễn file backup này khỏi hệ thống?');">
+                                                    <input type="hidden" name="fileName" value="@item.FileName" />
+                                                    <button type="submit" class="btn btn-sm btn-danger" title="Xóa file dọn rác ổ cứng">
+                                                        <i class="fa-solid fa-trash-can"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center py-5 text-muted fst-italic">
+                                            <i class="fa-solid fa-folder-open fa-2x mb-3 opacity-25 d-block"></i>
+                                            Chưa có bản sao lưu nào được lưu trữ trên Server. Hãy bấm "Bắt đầu sao lưu ngay" để tạo bản đầu tiên.
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

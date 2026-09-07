@@ -1,0 +1,451 @@
+is_global = true
+build_property.TargetFramework = net8.0
+build_property.TargetPlatformMinVersion = 
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.ProjectTypeGuids = 
+build_property.InvariantGlobalization = 
+build_property.PlatformNeutralAssembly = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property.RootNamespace = ProductionApp.Web
+build_property.RootNamespace = ProductionApp.Web
+build_property.ProjectDir = C:\Users\OWNER\OneDrive\ASPNET\ProductionApp.Web\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.RazorLangVersion = 8.0
+build_property.SupportLocalizedComponentNames = 
+build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+build_property.MSBuildProjectDirectory = C:\Users\OWNER\OneDrive\ASPNET\ProductionApp.Web
+build_property._RazorSourceGeneratorDebug = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Account/AccessDenied.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxBY2Nlc3NEZW5pZWQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Account/ChangePassword.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxDaGFuZ2VQYXNzd29yZC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Account/ForgotPassword.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxGb3Jnb3RQYXNzd29yZC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Account/ForgotPasswordConfirmation.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxGb3Jnb3RQYXNzd29yZENvbmZpcm1hdGlvbi5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Account/Login.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxMb2dpbi5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Account/Profile.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxQcm9maWxlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Account/Register.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxSZWdpc3Rlci5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Account/RegisterConfirmation.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxSZWdpc3RlckNvbmZpcm1hdGlvbi5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Account/RegisterSuccess.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxSZWdpc3RlclN1Y2Nlc3MuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Account/ResetPassword.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxSZXNldFBhc3N3b3JkLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Account/ResetPasswordConfirmation.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxSZXNldFBhc3N3b3JkQ29uZmlybWF0aW9uLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/AI/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQUlcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/APInvoice/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQVBJbnZvaWNlXENyZWF0ZS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/AuditLog/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQXVkaXRMb2dcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Bom/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQm9tXENyZWF0ZS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Bom/Details.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQm9tXERldGFpbHMuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Bom/ExportOptions.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQm9tXEV4cG9ydE9wdGlvbnMuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Bom/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQm9tXEluZGV4LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Bom/MasterPlan.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQm9tXE1hc3RlclBsYW4uY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Bom/Print.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQm9tXFByaW50LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/CashBook/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ2FzaEJvb2tcQ3JlYXRlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/CashBook/Edit.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ2FzaEJvb2tcRWRpdC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/CashBook/Import.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ2FzaEJvb2tcSW1wb3J0LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/CashBook/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ2FzaEJvb2tcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/CashBook/Print.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ2FzaEJvb2tcUHJpbnQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/CashBook/_CashEntryList.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ2FzaEJvb2tcX0Nhc2hFbnRyeUxpc3QuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/CostCategory/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ29zdENhdGVnb3J5XENyZWF0ZS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/CostCategory/Edit.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ29zdENhdGVnb3J5XEVkaXQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/CostCategory/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ29zdENhdGVnb3J5XEluZGV4LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Customer/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ3VzdG9tZXJcQ3JlYXRlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Customer/Edit.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ3VzdG9tZXJcRWRpdC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Customer/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ3VzdG9tZXJcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Data/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRGF0YVxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Data/Report.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRGF0YVxSZXBvcnQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Debt/BatchPayment.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRGVidFxCYXRjaFBheW1lbnQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Debt/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRGVidFxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Document/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRG9jdW1lbnRcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Export/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRXhwb3J0XENyZWF0ZS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Export/Details.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRXhwb3J0XERldGFpbHMuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Export/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRXhwb3J0XEluZGV4LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Export/Print.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRXhwb3J0XFByaW50LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Export/Workflow.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRXhwb3J0XFdvcmtmbG93LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/FinancialPeriod/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRmluYW5jaWFsUGVyaW9kXEluZGV4LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Home/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Home/Privacy.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxQcml2YWN5LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Invoice/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSW52b2ljZVxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Loan/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTG9hblxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Order/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcT3JkZXJcQ3JlYXRlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Order/CreateShipment.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcT3JkZXJcQ3JlYXRlU2hpcG1lbnQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Order/DeliveryProgressReport.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcT3JkZXJcRGVsaXZlcnlQcm9ncmVzc1JlcG9ydC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Order/Details.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcT3JkZXJcRGV0YWlscy5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Order/Edit.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcT3JkZXJcRWRpdC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Order/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcT3JkZXJcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Partner/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUGFydG5lclxDcmVhdGUuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Partner/Index-MAYCHU.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUGFydG5lclxJbmRleC1NQVlDSFUuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Partner/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUGFydG5lclxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Partner/_ContactList.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUGFydG5lclxfQ29udGFjdExpc3QuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/ProductionPlan/History.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHJvZHVjdGlvblBsYW5cSGlzdG9yeS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/ProductionPlan/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHJvZHVjdGlvblBsYW5cSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/ProductionPlan/PrintSchedule.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHJvZHVjdGlvblBsYW5cUHJpbnRTY2hlZHVsZS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/ProductQuotation/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHJvZHVjdFF1b3RhdGlvblxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Product/AddMaterial.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHJvZHVjdFxBZGRNYXRlcmlhbC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Product/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHJvZHVjdFxDcmVhdGUuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Product/CreateMaterial.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHJvZHVjdFxDcmVhdGVNYXRlcmlhbC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Product/Edit.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHJvZHVjdFxFZGl0LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Product/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHJvZHVjdFxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Product/Profile.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHJvZHVjdFxQcm9maWxlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/PurchaseOrder/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHVyY2hhc2VPcmRlclxDcmVhdGUuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/PurchaseOrder/DebtFinalization.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHVyY2hhc2VPcmRlclxEZWJ0RmluYWxpemF0aW9uLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/PurchaseOrder/Details.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHVyY2hhc2VPcmRlclxEZXRhaWxzLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/PurchaseOrder/Edit.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHVyY2hhc2VPcmRlclxFZGl0LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/PurchaseOrder/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUHVyY2hhc2VPcmRlclxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/ReportControllerMonth/FinancialStatement.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUmVwb3J0Q29udHJvbGxlck1vbnRoXEZpbmFuY2lhbFN0YXRlbWVudC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/ReportControllerMonth/RealizedReport.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUmVwb3J0Q29udHJvbGxlck1vbnRoXFJlYWxpemVkUmVwb3J0LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Report/AllocatedAnalysis.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUmVwb3J0XEFsbG9jYXRlZEFuYWx5c2lzLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Report/CashFlow.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUmVwb3J0XENhc2hGbG93LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Report/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUmVwb3J0XEluZGV4LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Role/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUm9sZVxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Role/Permission.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUm9sZVxQZXJtaXNzaW9uLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Setting/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2V0dGluZ1xJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Shared/Error.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXEVycm9yLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Shared/_Notification.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9Ob3RpZmljYXRpb24uY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Shared/_ValidationScriptsPartial.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Shipment/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hpcG1lbnRcQ3JlYXRlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Shipment/CreateReturn.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hpcG1lbnRcQ3JlYXRlUmV0dXJuLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Shipment/Details.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hpcG1lbnRcRGV0YWlscy5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Shipment/Edit.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hpcG1lbnRcRWRpdC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Shipment/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hpcG1lbnRcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Shipment/Print.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hpcG1lbnRcUHJpbnQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Shipment/ReturnHistory.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hpcG1lbnRcUmV0dXJuSGlzdG9yeS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/SupplierDebt/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU3VwcGxpZXJEZWJ0XENyZWF0ZS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/SupplierDebt/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU3VwcGxpZXJEZWJ0XEluZGV4LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/User/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVXNlclxDcmVhdGUuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/User/Edit.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVXNlclxFZGl0LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/User/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVXNlclxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/User/ManageRoles.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVXNlclxNYW5hZ2VSb2xlcy5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Warehouse/CustomerMaterialReport.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcV2FyZWhvdXNlXEN1c3RvbWVyTWF0ZXJpYWxSZXBvcnQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Warehouse/Export.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcV2FyZWhvdXNlXEV4cG9ydC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Warehouse/History.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcV2FyZWhvdXNlXEhpc3RvcnkuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Warehouse/Import.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcV2FyZWhvdXNlXEltcG9ydC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Warehouse/ImportExport.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcV2FyZWhvdXNlXEltcG9ydEV4cG9ydC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Warehouse/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcV2FyZWhvdXNlXEluZGV4LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Warehouse/Report.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcV2FyZWhvdXNlXFJlcG9ydC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Warehouse/StockTake.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcV2FyZWhvdXNlXFN0b2NrVGFrZS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/_Layout.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcX0xheW91dC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/_ViewImports.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcX1ZpZXdJbXBvcnRzLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/_ViewStart.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcX1ZpZXdTdGFydC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/OWNER/OneDrive/ASPNET/ProductionApp.Web/Views/Shared/_Layout.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9MYXlvdXQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = b-fqsncrd79s

@@ -1,0 +1,122 @@
+﻿@model IEnumerable<ProductionApp.Web.Models.ViewModels.PartnerGroupVM>
+@using ProductionManager.Data
+
+@{
+    ViewData["Title"] = "Danh bạ & Công việc";
+    // Kiểm tra xem có đang áp dụng bộ lọc nào không để tự động mở khung tìm kiếm
+    bool hasFilter = !string.IsNullOrEmpty(ViewBag.FilterDate) ||
+                     !string.IsNullOrEmpty(ViewBag.Company) ||
+                     !string.IsNullOrEmpty(ViewBag.Department) ||
+                     !string.IsNullOrEmpty(ViewBag.ContactName) ||
+                     !string.IsNullOrEmpty(ViewBag.JobDesc);
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/airbnb.css">
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="fw-bold text-primary mb-1"><i class="fa-solid fa-address-book me-2"></i>DANH BẠ ĐỐI TÁC</h4>
+            <p class="text-muted mb-0">Quản lý người liên hệ, mảng phụ trách và bàn giao công việc</p>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary fw-bold shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+                <i class="fa-solid fa-filter me-1"></i> Bộ lọc
+            </button>
+
+            <a asp-action="Create" class="btn btn-primary fw-bold shadow-sm">
+                <i class="fa-solid fa-plus me-2"></i>Thêm Liên Hệ
+            </a>
+        </div>
+    </div>
+
+    <div class="collapse @(hasFilter ? "show" : "") mb-4" id="filterCollapse">
+        <div class="card card-body bg-light border-0 shadow-sm">
+            <form id="liveSearchForm" onsubmit="event.preventDefault();" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted">Thời gian làm việc</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="fa-regular fa-calendar"></i></span>
+                        <input type="text" name="filterDate" class="form-control flatpickr-range" placeholder="Từ ngày - Đến ngày..." value="@ViewBag.FilterDate" />
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted">Công ty</label>
+                    <input type="text" name="company" class="form-control" placeholder="Tên công ty..." value="@ViewBag.Company" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted">Bộ phận</label>
+                    <input type="text" name="department" class="form-control" placeholder="Tên phòng ban..." value="@ViewBag.Department" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted">Người liên hệ</label>
+                    <input type="text" name="contactName" class="form-control" placeholder="Tên đối tác..." value="@ViewBag.ContactName" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted">Phụ trách / Công việc</label>
+                    <div class="d-flex gap-2">
+                        <input type="text" name="jobDesc" class="form-control" placeholder="Từ khóa công việc..." value="@ViewBag.JobDesc" />
+                        <a asp-action="Index" class="btn btn-outline-danger" title="Xóa toàn bộ bộ lọc"><i class="fa-solid fa-xmark"></i></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="contact-list-container">
+        <partial name="_ContactList" model="Model" />
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // 1. Cấu hình chọn ngày xong thì tự động Search
+            flatpickr(".flatpickr-range", {
+                mode: "range",      
+                dateFormat: "d/m/Y", 
+                locale: "vn",        
+                allowInput: true,
+                onChange: function(selectedDates, dateStr, instance) {
+                    triggerSearch(); 
+                }
+            });
+
+            // 2. Lắng nghe người dùng gõ phím trên tất cả các ô Input
+            const inputs = document.querySelectorAll('#liveSearchForm input');
+            inputs.forEach(input => {
+                input.addEventListener('keyup', triggerSearch);
+            });
+        });
+
+        // 3. Logic xử lý Search ngầm (Có độ trễ 400ms để không bị lag web)
+        let typingTimer;
+        const doneTypingInterval = 400; 
+
+        function triggerSearch() {
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(performAjaxSearch, doneTypingInterval);
+        }
+
+        function performAjaxSearch() {
+            const form = document.getElementById('liveSearchForm');
+            // Tạo đường dẫn gọi xuống hàm SearchLive vừa thêm ở Controller
+            const url = new URL('@Url.Action("SearchLive", "Partner")', window.location.origin);
+            url.search = new URLSearchParams(new FormData(form)).toString();
+
+            // Gọi AJAX ngầm
+            fetch(url)
+                .then(response => response.text())
+                .then(html => {
+                    // Dán kết quả đè vào khung hiển thị
+                    document.getElementById('contact-list-container').innerHTML = html;
+                })
+                .catch(error => console.error('Lỗi tìm kiếm:', error));
+        }
+    </script>
+}

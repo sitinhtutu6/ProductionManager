@@ -1,0 +1,230 @@
+﻿@model IEnumerable<ProductionApp.Web.Models.ViewModels.BomProductStatsVM>
+@{
+    ViewData["Title"] = "Danh sách Định mức (BOM)";
+}
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+<style>
+    body {
+        background-color: #f4f5f8;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    /* Khung Panel bo góc 8px mềm mại hơn */
+    .erp-panel {
+        background: #fff;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 16px;
+    }
+
+    .erp-toolbar {
+        padding: 12px 16px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #fff;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    /* Bảng dữ liệu */
+    .erp-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+    }
+
+        .erp-table th {
+            background: #f9fafb;
+            font-size: 12px;
+            font-weight: 600;
+            color: #374151;
+            padding: 10px 12px;
+            border-bottom: 1px solid #d1d5db;
+            white-space: nowrap;
+            text-transform: uppercase;
+        }
+
+        .erp-table td {
+            padding: 6px 12px;
+            vertical-align: middle;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 13px;
+            color: #111827;
+        }
+
+        .erp-table tr:hover td {
+            background-color: #f3f4f6;
+        }
+
+    /* Search Box bo góc 6px */
+    .search-box {
+        display: flex;
+        align-items: center;
+        background: #fff;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 2px 8px;
+        width: 320px;
+        transition: 0.2s;
+    }
+
+        .search-box:focus-within {
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.1);
+        }
+
+        .search-box input {
+            border: none;
+            outline: none;
+            width: 100%;
+            font-size: 13px;
+            padding: 6px;
+        }
+
+            .search-box input::placeholder {
+                color: #9ca3af;
+            }
+
+    /* Hình ảnh Thumbnail bo góc 6px */
+    .product-thumb {
+        width: 36px;
+        height: 36px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid #d1d5db;
+    }
+
+    .product-fallback {
+        width: 36px;
+        height: 36px;
+        border-radius: 6px;
+        background: #f3f4f6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #9ca3af;
+        border: 1px dashed #d1d5db;
+        font-size: 14px;
+    }
+
+    /* Button Tác vụ bo góc 6px */
+    .btn-action {
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: #6b7280;
+        transition: 0.2s;
+        font-size: 13px;
+    }
+
+        .btn-action:hover {
+            background: #f3f4f6;
+            color: #111827;
+            border-color: #d1d5db;
+        }
+
+        .btn-action.text-danger:hover {
+            background: #fef2f2;
+            color: #dc2626;
+            border-color: #fecaca;
+        }
+</style>
+
+<div class="container-fluid py-3 px-2 px-lg-3">
+    <!-- Tiêu đề & Nút thao tác -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <h5 class="fw-bold mb-0 text-dark fs-5">Quản lý Định mức (BOM)</h5>
+        <div class="d-flex gap-2">
+            <!-- Đổi sang rounded-2 để nút có độ bo tương đồng -->
+            <a asp-action="RecalculateAllQuantities"
+               class="btn btn-sm btn-outline-danger bg-white rounded-2 px-3 fw-bold"
+               onclick="return confirm('Hệ thống sẽ tính toán lại toàn bộ tiêu hao dựa trên kích thước và ĐVT hiện tại. Bạn chắc chắn chứ?')">
+                <i class="fa-solid fa-sync me-1"></i> Đồng bộ công thức
+            </a>
+            <a asp-action="Create" class="btn btn-sm btn-primary rounded-2 px-3 fw-bold">
+                <i class="fa-solid fa-plus me-1"></i> Thiết lập BOM mới
+            </a>
+        </div>
+    </div>
+
+    <div class="erp-panel">
+        <!-- Thanh công cụ nội bộ -->
+        <div class="erp-toolbar">
+            <form asp-action="Index" method="get" class="search-box mb-0">
+                <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                <input type="text" name="keyword" placeholder="Tìm kiếm theo mã hoặc tên sản phẩm..." value="@ViewBag.Keyword" autocomplete="off">
+                <button type="submit" class="d-none">Tìm</button>
+            </form>
+            <div class="text-muted small">
+                Tổng số: <strong class="text-dark">@(Model?.Count() ?? 0)</strong>
+            </div>
+        </div>
+
+        <!-- Bảng Dữ Liệu -->
+        <div class="table-responsive">
+            <table class="erp-table">
+                <thead>
+                    <tr>
+                        <th width="50" class="text-center">Ảnh</th>
+                        <th width="15%">Mã SP</th>
+                        <th width="30%">Tên Sản Phẩm</th>
+                        <th width="8%" class="text-center">ĐVT</th>
+                        <th width="12%" class="text-center">Cấu Thành</th>
+                        <th width="15%" class="text-end pe-4">Giá vốn (Est)</th>
+                        <th width="100" class="text-center">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td class="text-center py-1">
+                                    @if (!string.IsNullOrEmpty(item.ImagePath))
+                                    {
+                                        <img src="/product-images/@item.ImagePath" alt="Img" class="product-thumb" />
+                                    }
+                                    else
+                                    {
+                                        <div class="product-fallback" title="Chưa có ảnh"><i class="fa-solid fa-box-open"></i></div>
+                                    }
+                                </td>
+                                <td><span class="text-primary fw-bold">@item.ProductCode</span></td>
+                                <td class="fw-bold">@item.ProductName</td>
+                                <td class="text-center text-muted">@item.Unit</td>
+                                <td class="text-center"><span class="badge bg-light text-dark border fw-bold px-2 py-1 rounded-2">@item.MaterialCount vật tư</span></td>
+                                <td class="text-end pe-4 fw-bold text-success">@item.EstimatedCost.ToString("N0") ₫</td>
+                                <td class="text-center">
+                                    <div class="d-flex justify-content-center gap-1">
+                                        <a asp-action="Details" asp-route-id="@item.ProductId" class="btn-action" title="Xem chi tiết"><i class="fa-solid fa-eye text-primary"></i></a>
+                                        <a asp-action="Create" asp-route-productId="@item.ProductId" class="btn-action" title="Sửa (Ghi đè)"><i class="fa-solid fa-pen text-warning"></i></a>
+                                        <a asp-action="ExportOptions" asp-route-id="@item.ProductId" class="btn-action" title="Xuất Excel/In"><i class="fa-solid fa-print text-success"></i></a>
+                                        <form asp-action="Delete" asp-route-id="@item.ProductId" method="post" onsubmit="return confirm('CẢNH BÁO: Xóa toàn bộ định mức của sản phẩm này?');" class="m-0">
+                                            <button type="submit" class="btn-action text-danger" title="Xóa"><i class="fa-solid fa-trash"></i></button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted fst-italic">
+                                <i class="fa-solid fa-folder-open fa-2x mb-2 text-secondary opacity-50 d-block"></i>
+                                Chưa có dữ liệu định mức. Hãy bấm "Thiết lập BOM mới" để tạo.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

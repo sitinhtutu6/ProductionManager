@@ -1,0 +1,236 @@
+﻿@model ProductionManager.Data.ExportShipment
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>Lệnh Vận Chuyển: @Model.ShipmentCode</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" />
+    <style>
+            body {
+                background: #525659;
+                font-family: 'Times New Roman', serif;
+            }
+
+            .page {
+                background: white;
+                width: 210mm;
+                min-height: 297mm;
+                display: block;
+                margin: 20px auto;
+                padding: 15mm;
+                box-shadow: 0 0 10px rgba(0,0,0,0.3);
+                position: relative;
+            }
+
+            .header-title {
+                text-transform: uppercase;
+                font-weight: bold;
+                font-size: 26px;
+                text-align: center;
+                margin-bottom: 5px;
+            }
+
+            .section-header {
+                background: #e2e8f0;
+                padding: 6px 12px;
+                font-weight: bold;
+                border-left: 6px solid #000;
+                margin: 25px 0 15px 0;
+                text-transform: uppercase;
+                font-size: 15px;
+            }
+
+            .table-print {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+                border: 2px solid #000;
+            }
+
+                .table-print th, .table-print td {
+                    border: 1px solid #000;
+                    padding: 8px 10px;
+                    font-size: 14px;
+                }
+
+                .table-print th {
+                    background-color: #f8fafc;
+                    text-align: left;
+                    font-weight: bold;
+                    width: 20%;
+                    color: #333;
+                }
+
+            .val-td {
+                width: 30%;
+                font-weight: bold;
+                font-size: 15px;
+            }
+
+            @@media print {
+                body {
+                    background: white;
+                    margin: 0;
+                }
+
+                .page {
+                    margin: 0;
+                    box-shadow: none;
+                    width: 100%;
+                    border: none;
+                    padding: 0;
+                }
+
+                .no-print {
+                    display: none !important;
+                }
+
+                .section-header {
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+
+                .table-print th {
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+
+                @@page {
+                    margin: 15mm;
+                    size: A4 portrait;
+                }
+            }
+    </style>
+</head>
+<body>
+
+    <div class="text-center py-3 no-print fixed-top bg-dark border-bottom border-secondary border-3">
+        <button onclick="window.print()" class="btn btn-primary fw-bold px-4 rounded-pill">🖨️ IN LỆNH VẬN CHUYỂN</button>
+        <button onclick="window.close()" class="btn btn-light ms-2 rounded-pill px-4 fw-bold text-dark">Đóng</button>
+    </div>
+    <div style="height: 60px;" class="no-print"></div>
+
+    <div class="page">
+        <!-- HEADER CÔNG TY -->
+        <div class="d-flex justify-content-between border-bottom border-2 border-dark pb-3 mb-4">
+            <div>
+                <h5 class="fw-bold text-uppercase mb-1">Công Ty TNHH Sản Xuất ABC</h5>
+                <div class="small">📍 Địa chỉ: KCN ABC, TP. Hồ Chí Minh</div>
+                <div class="small">📞 Điện thoại: 0909 123 456</div>
+            </div>
+            <div class="text-end">
+                <div class="border border-2 border-dark px-3 py-2 fw-bold fs-5 d-inline-block mb-1">MÃ CHUYẾN: @Model.ShipmentCode</div>
+                <div class="small fst-italic">Ngày in biểu: @DateTime.Now.ToString("dd/MM/yyyy HH:mm")</div>
+            </div>
+        </div>
+
+        <div class="header-title">LỆNH ĐIỀU ĐỘNG VẬN TẢI</div>
+        <div class="text-center fst-italic mb-4">(Logistics & Transportation Order)</div>
+
+        <!-- PHẦN I: THÔNG TIN LỘ TRÌNH -->
+        <div class="section-header">I. THÔNG TIN LỘ TRÌNH & ĐỐI TÁC</div>
+        <table class="table-print">
+            <tr>
+                <th>Khách Hàng (Người nhận)</th>
+                <td colspan="3" class="val-td text-uppercase fs-5">@Model.Customer?.CompanyName</td>
+            </tr>
+            <tr>
+                <th>Nơi Đi (Departure)</th>
+                <td class="val-td">@(Model.Departure ?? "Kho Nội Bộ")</td>
+                <th>Nơi Đến (Destination)</th>
+                <td class="val-td">@(Model.Destination ?? "Kho Khách Hàng")</td>
+            </tr>
+            <tr>
+                <th>Ngày Khởi Hành (ETD)</th>
+                <td class="val-td">@(Model.ETD?.ToString("dd/MM/yyyy") ?? "---")</td>
+                <th>Ngày Tới (ETA)</th>
+                <td class="val-td">@(Model.ETA?.ToString("dd/MM/yyyy") ?? "---")</td>
+            </tr>
+        </table>
+
+        <!-- PHẦN II: THÔNG TIN PHƯƠNG TIỆN -->
+        <div class="section-header">II. PHƯƠNG TIỆN & CHỨNG TỪ</div>
+        <table class="table-print">
+            <tr>
+                <th>Nhà Xe / Hãng Tàu</th>
+                <td class="val-td">@(Model.CarrierName ?? "---")</td>
+                <th>Biển Số Xe / Số Cont</th>
+                <td class="val-td">@(Model.LicensePlate ?? "---")</td>
+            </tr>
+            <tr>
+                <th>Loại Vận Tải</th>
+                <td class="val-td">@(Model.TransportType == ProductionManager.Data.TransportType.Truck ? "Xe Tải Nội Địa" : "Cont / Tàu Biển")</td>
+                <th>Số Seal kẹp chì</th>
+                <td class="val-td">@(Model.SealNumber ?? "---")</td>
+            </tr>
+            <tr>
+                <th>Số Booking / Lệnh</th>
+                <td class="val-td">@(Model.BookingNumber ?? "---")</td>
+                <th>Tên Tàu (Vessel)</th>
+                <td class="val-td">@(Model.VesselName ?? "---")</td>
+            </tr>
+        </table>
+
+        <!-- PHẦN III: THÔNG TIN ĐƠN HÀNG (KẾ HOẠCH LÊN XE) -->
+        <div class="section-header">III. DANH SÁCH ĐƠN HÀNG GIAO TƯƠNG ỨNG</div>
+        <table class="table-print">
+            <thead>
+                <tr>
+                    <th style="width: 50px; text-align: center;">STT</th>
+                    <th style="text-align: center;">Mã Đơn Hàng / PO</th>
+                    <th style="text-align: center;">Xác nhận (Thực tế)</th>
+                    <th style="text-align: center;">Ghi Chú Vận Tải</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    int stt = 1;
+                }
+                @foreach (var item in Model.ShipmentOrders)
+                {
+                    <tr>
+                        <td style="text-align: center; font-weight: bold;">@(stt++)</td>
+                        <td style="text-align: center; font-weight: bold; font-size: 16px;">@item.Order.OrderCode</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                }
+                @if (!Model.ShipmentOrders.Any())
+                {
+                    <tr><td colspan="4" style="text-align: center; font-style: italic; padding: 15px;">Chưa có đơn hàng nào được gắn vào chuyến xe này.</td></tr>
+                }
+            </tbody>
+        </table>
+
+        <!-- PHẦN CHỮ KÝ -->
+        <table style="width: 100%; margin-top: 40px; text-align: center; page-break-inside: avoid; border: none;">
+            <tr>
+                <td style="border: none; width: 25%;">
+                    <strong>NGƯỜI ĐIỀU PHỐI</strong><br>
+                    <small style="font-style: italic;">(Ký & ghi rõ họ tên)</small>
+                </td>
+                <td style="border: none; width: 25%;">
+                    <strong>THỦ KHO XUẤT HÀNG</strong><br>
+                    <small style="font-style: italic;">(Ký & ghi rõ họ tên)</small>
+                </td>
+                <td style="border: none; width: 25%;">
+                    <strong>TÀI XẾ NHẬN HÀNG</strong><br>
+                    <small style="font-style: italic;">(Ký & ghi rõ họ tên)</small>
+                </td>
+                <td style="border: none; width: 25%;">
+                    <strong>KHÁCH HÀNG / BẢO VỆ</strong><br>
+                    <small style="font-style: italic;">(Xác nhận xe ra cổng)</small>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <script>
+            window.onload = function() { setTimeout(function(){ window.print(); }, 500); }
+    </script>
+</body>
+</html>

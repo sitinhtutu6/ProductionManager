@@ -1,0 +1,117 @@
+﻿@{
+    ViewData["Title"] = "Gom Hóa Đơn Đầu Vào";
+    var docList = ViewBag.DocList as List<dynamic>;
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<style>
+    body {
+        background-color: #f1f5f9;
+    }
+
+    .invoice-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+</style>
+
+<div class="container py-4" style="max-width: 900px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-dark mb-0"><i class="fa-solid fa-file-invoice-dollar text-info me-2"></i> KÊ KHAI HÓA ĐƠN VAT ĐẦU VÀO</h3>
+        <a href="/Debt/Index?type=2" class="btn btn-outline-secondary fw-bold"><i class="fa-solid fa-arrow-left me-1"></i> Quay lại</a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Bảng danh sách chứng từ gom -->
+        <div class="col-md-5">
+            <div class="invoice-card p-4 h-100">
+                <h6 class="fw-bold text-uppercase text-muted mb-3"><i class="fa-solid fa-link me-1"></i> Chứng từ liên kết</h6>
+
+                <div class="list-group list-group-flush mb-3">
+                    @foreach (var doc in docList)
+                    {
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center bg-transparent">
+                            <div>
+                                <div class="fw-bold text-dark font-monospace">@doc.Code</div>
+                                <div class="small text-muted">@doc.Type</div>
+                            </div>
+                            <span class="fw-bold text-danger">@doc.Amount.ToString("N0") đ</span>
+                        </div>
+                    }
+                </div>
+
+                <div class="p-3 bg-light rounded-3 text-center border">
+                    <div class="text-muted small fw-bold text-uppercase mb-1">TỔNG GIÁ TRỊ GOM</div>
+                    <h3 class="fw-black text-danger mb-0">@ViewBag.TotalAmount.ToString("N0") đ</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form nhập Hóa đơn mới -->
+        <div class="col-md-7">
+            <div class="invoice-card p-4 border-top border-info border-4">
+                <form id="frmInvoice">
+                    <input type="hidden" name="partnerName" value="@ViewBag.PartnerName" />
+                    <input type="hidden" name="docCodes" value="@ViewBag.DocCodes" />
+                    <input type="hidden" name="totalAmount" value="@ViewBag.TotalAmount" />
+
+                    <div class="mb-4">
+                        <label class="small fw-bold text-muted mb-1 text-uppercase">Tên Đối Tác (NCC)</label>
+                        <input type="text" class="form-control fw-bold bg-light text-dark fs-5" value="@ViewBag.PartnerName" readonly>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-sm-6">
+                            <label class="small fw-bold text-dark mb-1">Số Hóa Đơn VAT <span class="text-danger">*</span></label>
+                            <input type="text" name="invoiceNumber" class="form-control form-control-lg fw-bold text-primary border-primary shadow-sm" placeholder="VD: 0001234" required autofocus>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="small fw-bold text-dark mb-1">Ngày Xuất HĐ <span class="text-danger">*</span></label>
+                            <input type="text" name="invoiceDate" class="form-control form-control-lg datepicker fw-bold shadow-sm" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="small fw-bold text-dark mb-1">Diễn giải / Ghi chú</label>
+                        <textarea name="note" class="form-control shadow-sm" rows="3" placeholder="Nhập diễn giải cho Hóa đơn (VD: Chi phí vật tư quý 3)..."></textarea>
+                    </div>
+
+                    <button type="button" class="btn btn-info w-100 fw-bold fs-5 py-3 shadow text-dark" onclick="submitInvoice()">
+                        <i class="fa-solid fa-check-double me-2"></i> CHỐT GOM HÓA ĐƠN
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn", defaultDate: "today" });
+    });
+
+    function submitInvoice() {
+        let form = document.getElementById('frmInvoice');
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+
+        Swal.fire({ title: 'Đang xử lý...', didOpen: () => Swal.showLoading() });
+
+        let formData = new FormData(form);
+        fetch('/APInvoice/SubmitBatch', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    Swal.fire("Thành công!", res.message, "success").then(() => {
+                        window.location.href = '/Debt/Index?type=2'; // Xong quay về Sổ Công Nợ
+                    });
+                }
+                else Swal.fire("Lỗi", res.message, "error");
+            })
+            .catch(err => Swal.fire("Lỗi hệ thống", err.message, "error"));
+    }
+</script>

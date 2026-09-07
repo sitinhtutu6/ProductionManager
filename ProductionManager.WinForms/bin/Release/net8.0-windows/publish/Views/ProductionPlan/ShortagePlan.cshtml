@@ -1,0 +1,303 @@
+﻿@model IEnumerable<ProductionManager.Data.Entities.WorkOrder>
+@using ProductionManager.Data.Entities
+
+@{
+    ViewData["Title"] = "Quản Lý Hàng Thiếu (Nợ SP)";
+    
+    int totalShortageItems = Model.Count(x => x.ShortageQuantity < 0);
+    int totalItems = Model.Count();
+
+    // Sắp xếp ưu tiên: Khách có nợ lên đầu
+    var groupedData = Model
+        .GroupBy(x => x.Order?.Customer?.CompanyName ?? "Khách lẻ")
+        .OrderByDescending(g => g.Any(x => x.ShortageQuantity < 0)) 
+        .ThenBy(g => g.Key)
+        .Select(g => new {
+            CustomerName = g.Key,
+            HasShortage = g.Any(x => x.ShortageQuantity < 0),
+            Items = g.OrderBy(x => x.ShortageQuantity).ThenBy(x => x.ProductName).ToList() 
+        }).ToList();
+}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+    :root { --danger: #e11d48; --danger-soft: #fff1f2; --primary: #0284c7; --border: #e2e8f0; --text-main: #1e293b; }
+    body { background-color: #f1f5f9; font-family: 'Inter', sans-serif; color: var(--text-main); }
+
+    /* TOOLBAR */
+    .erp-header { background: #fff; padding: 16px 24px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 24px; border-left: 5px solid var(--danger); }
+    
+    /* KPI CARDS (Mới) */
+    .kpi-card { background: #fff; padding: 16px 20px; border-radius: 12px; border: 1px solid var(--border); display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    .kpi-icon { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    .kpi-value { font-weight: 800; font-size: 1.5rem; line-height: 1; margin-bottom: 4px; }
+    .kpi-label { font-size: 13px; color: #64748b; font-weight: 600; text-transform: uppercase; margin: 0; }
+
+    /* TABLE */
+    .table-container { background: #fff; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .table-modern { width: 100%; border-collapse: collapse; }
+    .table-modern th { background: #f8fafc; padding: 14px 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #475569; border-bottom: 2px solid var(--border); border-right: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+    .table-modern td { padding: 12px 16px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); vertical-align: middle; }
+    
+    .customer-group td { background: #f8fafc !important; font-weight: 800; color: #0f172a; position: sticky; top: 46px; z-index: 9; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; }
+    .row-shortage { background-color: var(--danger-soft) !important; border-left: 4px solid var(--danger) !important; }
+    .row-hidden { display: none !important; } /* Class dùng để ẩn dòng */
+    
+    /* INPUTS */
+    .shortage-input { 
+        width: 90px; border: 2px solid #cbd5e1; border-radius: 6px; padding: 6px; 
+        font-weight: 800; font-size: 14px; text-align: center; color: #0f172a; transition: 0.2s;
+    }
+    .shortage-input.is-negative { border-color: var(--danger); color: var(--danger); background: #ffffff; }
+    .shortage-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1); }
+    .note-input { border: 1px solid transparent; background: transparent; transition: 0.2s; font-size: 13px; }
+    .note-input:focus, .note-input:hover { background: #f1f5f9; border: 1px solid #cbd5e1; }
+
+    .btn-log { background: #ffffff; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; transition: 0.2s; }
+    .btn-log:hover { background: #f1f5f9; color: #0f172a; }
+    .badge-wo { background: #eff6ff; color: #1e40af; padding: 4px 8px; border-radius: 6px; font-family: 'Consolas', monospace; font-weight: 700; border: 1px solid #bfdbfe; font-size: 12px; }
+
+    /* Custom Toggle Switch */
+    .filter-switch { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; color: #334155; }
+    .form-switch .form-check-input { width: 2.5em; height: 1.25em; cursor: pointer; }
+    .form-switch .form-check-input:checked { background-color: var(--danger); border-color: var(--danger); }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="erp-header d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="h4 fw-800 mb-1 text-uppercase"><i class="fa-solid fa-boxes-packing text-danger me-2"></i>THEO DÕI ĐƠN HÀNG ĐANG GIAO</h1>
+            <p class="text-muted small mb-0 fw-500">Đối chiếu và quản lý các sản phẩm còn thiếu số lượng cần giao cho khách hàng</p>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <div class="filter-switch bg-light px-3 py-2 rounded-3 border">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input shadow-sm" type="checkbox" id="filterShortageOnly" onchange="toggleZeroRows(this.checked)">
+                    <label class="form-check-label pt-1" for="filterShortageOnly" style="cursor:pointer;">Chỉ hiện đơn chưa giao</label>
+                </div>
+            </div>
+            
+            <a href="/ProductionPlan/TablePlan" class="btn btn-outline-secondary fw-bold shadow-sm"><i class="fa-solid fa-arrow-left me-1"></i> Bảng Kế Hoạch</a>
+            <a href="/ProductionPlan/ExportShortageExcel" class="btn btn-success fw-bold shadow-sm">
+                <i class="fa-solid fa-file-excel me-1"></i> Xuất File Excel
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="kpi-card">
+                <div class="kpi-icon bg-danger bg-opacity-10 text-danger"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div>
+                    <div class="kpi-value text-danger">@totalShortageItems</div>
+                    <p class="kpi-label">Đơn Hàng Chưa Giao Hoàn Tất</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="kpi-card">
+                <div class="kpi-icon bg-primary bg-opacity-10 text-primary"><i class="fa-solid fa-box"></i></div>
+                <div>
+                    <div class="kpi-value text-primary">@totalItems</div>
+                    <p class="kpi-label">Tổng Số Đơn Hàng</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <div class="table-responsive" style="max-height: calc(100vh - 320px);">
+            <table class="table-modern" id="shortageTable">
+                <thead>
+                    <tr>
+                        <th class="text-center" style="width: 50px;">#</th>
+                        <th style="width: 150px;">📋 ĐƠN GỐC</th>
+                        <th class="text-start">🛠️ TÊN SẢN PHẨM</th>
+                        <th class="text-center" style="width: 130px;">❌ SL THIẾU</th>
+                        <th class="text-start" style="width: 30%;">📝 GHI CHÚ LÝ DO</th>
+                        <th class="text-center" style="width: 120px;">🕒 LỊCH SỬ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!groupedData.Any())
+                    {
+                        <tr><td colspan="6" class="text-center py-5 text-muted fw-bold">Không có đơn hàng nào cần theo dõi.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var group in groupedData)
+                        {
+                            <tr class="customer-group data-group">
+                                <td colspan="6">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span><i class="fa-solid fa-building text-primary me-2"></i> KHÁCH HÀNG: @group.CustomerName.ToUpper()</span>
+                                        @if(group.HasShortage){ <span class="badge bg-danger rounded-pill px-3 shadow-sm">Đang có nợ</span> }
+                                    </div>
+                                </td>
+                            </tr>
+                            int stt = 1;
+                            foreach (var item in group.Items)
+                            {
+                                bool isShort = item.ShortageQuantity < 0;
+                                <tr id="row-@item.Id" class="data-row @(isShort ? "row-shortage" : "")" data-qty="@item.ShortageQuantity">
+                                    <td class="text-center fw-bold text-muted">@stt</td>
+                                    <td><span class="badge-wo">@item.Order?.OrderCode</span></td>
+                                    <td class="text-start fw-bold text-dark">@item.ProductName</td>
+                                    <td class="text-center">
+                                        <input type="number" class="shortage-input @(isShort ? "is-negative" : "")" 
+                                               value="@item.ShortageQuantity" max="0" 
+                                               onchange="saveData(@item.Id)" 
+                                               onkeypress="handleEnter(event, this)">
+                                    </td>
+                                    <td class="text-start">
+                                        <input type="text" class="form-control fw-bold note-input w-100" 
+                                               id="note-@item.Id" value="@item.Notes" placeholder="Nhập lý do thiếu (nếu có)..." 
+                                               onblur="saveData(@item.Id)"
+                                               onkeypress="handleEnter(event, this)">
+                                    </td>
+                                    <td class="text-center">
+                                        <button class="btn-log shadow-sm" onclick="showHistory(@item.Id, '@item.ProductName')">
+                                            <i class="fa-solid fa-list-ul"></i> Log
+                                        </button>
+                                    </td>
+                                </tr>
+                                stt++;
+                            }
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-dark text-white rounded-top-4 border-0">
+                <h6 class="modal-title fw-bold" id="modalTitle">Nhật ký thay đổi</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0 bg-light">
+                <div id="historyList" class="list-group list-group-flush"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    // Xử lý phím Enter: Gõ xong bấm Enter là tự động lưu và thoát khỏi ô input
+    function handleEnter(e, inputElement) {
+        if (e.key === 'Enter') {
+            inputElement.blur(); // Gọi sự kiện onblur -> Kích hoạt saveData
+        }
+    }
+
+    // Logic Ẩn/Hiện dòng có số lượng = 0
+    function toggleZeroRows(showOnlyShortage) {
+        const rows = document.querySelectorAll('.data-row');
+        rows.forEach(row => {
+            let qty = parseInt(row.getAttribute('data-qty'));
+            if (showOnlyShortage && qty === 0) {
+                row.classList.add('row-hidden');
+            } else {
+                row.classList.remove('row-hidden');
+            }
+        });
+
+        // Ẩn luôn các Group header nếu bên trong không có dòng nào hiển thị (Nâng cao)
+        document.querySelectorAll('.data-group').forEach(group => {
+            let nextRow = group.nextElementSibling;
+            let hasVisibleRows = false;
+            while (nextRow && nextRow.classList.contains('data-row')) {
+                if (!nextRow.classList.contains('row-hidden')) { hasVisibleRows = true; break; }
+                nextRow = nextRow.nextElementSibling;
+            }
+            if (showOnlyShortage && !hasVisibleRows) group.classList.add('row-hidden');
+            else group.classList.remove('row-hidden');
+        });
+    }
+
+    function saveData(id) {
+        let row = document.getElementById(`row-${id}`);
+        let inputQty = row.querySelector('.shortage-input');
+        let inputNote = document.getElementById(`note-${id}`);
+
+        let finalQty = parseInt(inputQty.value) || 0;
+        if(finalQty > 0) finalQty = -finalQty;
+        inputQty.value = finalQty; 
+        let finalNote = inputNote.value || "";
+
+        row.setAttribute('data-qty', finalQty); // Cập nhật lại data attribute cho bộ lọc
+
+        fetch('/ProductionPlan/UpdateShortage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `id=${id}&newQuantity=${finalQty}&note=${encodeURIComponent(finalNote)}`
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                if(finalQty < 0) {
+                    row.classList.add('row-shortage');
+                    inputQty.classList.add('is-negative');
+                } else {
+                    row.classList.remove('row-shortage');
+                    inputQty.classList.remove('is-negative');
+                }
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Đã lưu hệ thống', showConfirmButton: false, timer: 1000 });
+                
+                // Cập nhật lại KPI Nợ (Logic nhỏ nhưng làm UI rất pro)
+                setTimeout(() => location.reload(), 1500); // Reload nhẹ để sắp xếp lại các dòng lên đầu
+            }
+        });
+    }
+
+    function showHistory(id, name) {
+        document.getElementById('modalTitle').innerText = 'Nhật ký mã: ' + name;
+        const list = document.getElementById('historyList');
+        list.innerHTML = '<div class="text-center p-5"><i class="fa-solid fa-spinner fa-spin fa-2x text-muted"></i></div>';
+        
+        new bootstrap.Modal(document.getElementById('historyModal')).show();
+
+        fetch(`/ProductionPlan/GetShortageHistory?id=${id}`)
+            .then(res => res.json())
+            .then(data => {
+                let html = '';
+                data.forEach(log => {
+                    html += `
+                    <div class="list-group-item p-3 border-0 border-bottom bg-transparent">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-primary small"><i class="fa-solid fa-user me-1"></i>${log.user}</span>
+                            <span class="text-muted small">${log.time}</span>
+                        </div>
+                        <div class="fw-bold text-danger mb-1">${log.change}</div>
+                        <div class="small text-muted italic">"${log.reason}"</div>
+                    </div>`;
+                });
+                list.innerHTML = html || '<div class="p-4 text-center text-muted fw-bold">Chưa có lịch sử thay đổi.</div>';
+            });
+    }
+
+    function exportExcel() {
+        if (typeof XLSX === 'undefined') { Swal.fire('Lỗi', 'Không tải được thư viện SheetJS', 'error'); return; }
+        
+        let originalTable = document.getElementById('shortageTable');
+        let tableClone = originalTable.cloneNode(true);
+        
+        // Dọn dẹp các dòng ẩn (nếu đang bật filter) và các nút bấm
+        tableClone.querySelectorAll('.row-hidden, button').forEach(el => el.remove());
+        
+        tableClone.querySelectorAll('.shortage-input, input[type="text"]').forEach(input => {
+            input.parentElement.innerHTML = input.value;
+        });
+
+        let wb = XLSX.utils.table_to_book(tableClone, { sheet: "BaoCao_NoHang" });
+        XLSX.writeFile(wb, "BaoCao_NoHang.xlsx");
+    }
+</script>

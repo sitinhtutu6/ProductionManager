@@ -1,0 +1,821 @@
+﻿@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@using ProductionManager.Data
+@using ProductionApp.Web.Constants
+@using ProductionApp.Web.Resources
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<SharedResource> Localizer
+@inject SignInManager<AppUser> SignInManager
+@inject UserManager<AppUser> UserManager
+@inject IAuthorizationService AuthorizationService
+@{
+    int pendingOrders = ViewBag.PendingOrders ?? 0;
+    int lowStockItems = ViewBag.LowStockItems ?? 0;
+    bool showNotify = ViewBag.ShowNotify ?? false;
+    string notifyMsg = ViewBag.NotifyMsg ?? "";
+    string topPosition = showNotify ? "95px" : "60px";
+
+    bool canViewFinance = User.IsInRole("Admin") || User.IsInRole("Accountant") || User.IsInRole("Manager");
+    bool canViewReport = User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Accountant");
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] Hệ Thống Quản Lý</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.css">
+
+    <link rel="stylesheet" href="/css/site.css" />
+
+    <script type="module">
+            import * as Turbo from 'https://cdn.jsdelivr.net/npm/@@hotwired/turbo@8.0.23/+esm';
+            window.Turbo = Turbo;
+    </script>
+
+    <script>
+        const savedTheme = localStorage.getItem('app-theme') || 'light';
+        document.documentElement.setAttribute('data-bs-theme', savedTheme);
+        const savedColor = localStorage.getItem('app-color');
+        if (savedColor) {
+            document.documentElement.style.setProperty('--bs-primary', savedColor);
+            document.documentElement.style.setProperty('--bs-primary-rgb', hexToRgb(savedColor));
+        }
+        function hexToRgb(hex) {
+            let c;
+            if (/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)) {
+                c = hex.substring(1).split('');
+                if (c.length == 3) { c = [c[0], c[0], c[1], c[1], c[2], c[2]]; }
+                c = '0x' + c.join('');
+                return [(c >> 16) & 255, (c >> 8) & 255, c & 255].join(',');
+            }
+            return "13, 110, 253";
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bs-secondary-bg, #f1f5f9);
+            color: var(--bs-body-color);
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        .fixed-header-wrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1050;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .news-ticker-container {
+            width: 100%;
+            height: 35px;
+            background: linear-gradient(90deg, #1e293b, #0f172a);
+            border-bottom: 2px solid #f59e0b;
+            color: #fcd34d;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .ticker-move {
+            display: inline-block;
+            white-space: nowrap;
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding-left: 100%;
+            animation: tickerAnim 30s linear infinite;
+        }
+
+            .ticker-move:hover {
+                animation-play-state: paused;
+                cursor: pointer;
+            }
+
+        @@keyframes tickerAnim {
+            0% {
+                transform: translate3d(0, 0, 0);
+            }
+
+            100% {
+                transform: translate3d(-100%, 0, 0);
+            }
+        }
+
+        .top-toolbar {
+            height: 60px;
+            background: var(--bs-body-bg, white);
+            border-bottom: 1px solid var(--bs-border-color, #e2e8f0);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+        }
+
+        .brand-icon {
+            font-size: 1.5rem;
+            color: var(--bs-primary, #2563eb);
+            transition: 0.2s;
+            text-decoration: none;
+        }
+
+            .brand-icon:hover {
+                transform: scale(1.1);
+            }
+
+        .dropdown-menu {
+            border: 1px solid var(--bs-border-color);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-radius: 12px;
+        }
+
+        .dropdown-item {
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: 0.2s;
+        }
+
+            .dropdown-item:hover {
+                background-color: var(--bs-secondary-bg, #f1f5f9);
+                color: var(--bs-primary, #2563eb);
+                transform: translateX(3px);
+            }
+
+        /* SIDEBAR */
+        .sidebar {
+            position: fixed;
+            top: @topPosition;
+            left: 0;
+            bottom: 0;
+            width: 270px;
+            background: var(--bs-body-bg, #ffffff);
+            border-right: 1px solid var(--bs-border-color, #e5e7eb);
+            display: flex;
+            flex-direction: column;
+            transition: left 0.3s ease, top 0.3s ease;
+            z-index: 1000;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.01);
+        }
+
+            .sidebar.collapsed {
+                left: -270px;
+            }
+
+            .sidebar::-webkit-scrollbar {
+                width: 5px;
+            }
+
+            .sidebar::-webkit-scrollbar-thumb {
+                background: #cbd5e1;
+                border-radius: 5px;
+            }
+
+        .nav-group {
+            margin: 15px 12px;
+        }
+        .nav-label {
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            letter-spacing: 0.8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: 0.2s;
+        }
+
+            .nav-label:hover {
+                background-color: var(--bs-secondary-bg, #f8fafc);
+                color: var(--bs-primary, #2563eb);
+            }
+
+            .nav-label .label-text {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+        .chevron-icon {
+            transition: transform 0.3s ease;
+            font-size: 0.8rem;
+        }
+
+        .nav-label.collapsed .chevron-icon {
+            transform: rotate(-90deg);
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            color: var(--bs-body-color, #475569);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            margin-bottom: 2px;
+            border-radius: 8px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+            .nav-link i {
+                width: 24px;
+                text-align: center;
+                margin-right: 12px;
+                font-size: 1.1rem;
+                opacity: 0.8;
+                transition: 0.2s;
+            }
+
+            .nav-link:hover {
+                background-color: var(--bs-secondary-bg, #f8fafc);
+                color: var(--bs-primary, #2563eb);
+                transform: translateX(4px);
+            }
+
+                .nav-link:hover i {
+                    opacity: 1;
+                    transform: scale(1.1);
+                }
+
+            .nav-link.active {
+                background-color: rgba(var(--bs-primary-rgb), 0.1);
+                color: var(--bs-primary, #2563eb);
+                font-weight: 600;
+                border-left: 3px solid var(--bs-primary, #2563eb);
+                border-radius: 0 8px 8px 0;
+            }
+
+                .nav-link.active i {
+                    opacity: 1;
+                }
+
+        .ic-sales {
+            color: #3b82f6;
+        }
+
+        .ic-prod {
+            color: #059669;
+        }
+
+        .ic-wh {
+            color: #ea580c;
+        }
+
+        .ic-log {
+            color: #8b5cf6;
+        }
+
+        .ic-fin {
+            color: #e11d48;
+        }
+
+        .ic-sys {
+            color: #475569;
+        }
+
+        .main-content {
+            margin-top: @topPosition;
+            margin-left: 270px;
+            padding: 20px;
+            transition: margin-left 0.3s ease, margin-top 0.3s ease;
+            min-height: calc(100vh - @topPosition);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.collapsed ~ .main-content {
+            margin-left: 0;
+        }
+
+        @@media (max-width: 991.98px) {
+            .sidebar {
+                left: -270px;
+            }
+
+                .sidebar.show {
+                    left: 0;
+                }
+
+            .main-content {
+                margin-left: 0;
+            }
+        }
+
+        .arrow-breadcrumb {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            padding: 5px;
+            margin: 0 0 1.5rem 0;
+            background-color: var(--bs-body-bg, #ffffff);
+            border-radius: 10px;
+            border: 1px solid var(--bs-border-color, #e2e8f0);
+            filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.05));
+        }
+
+            .arrow-breadcrumb .item {
+                position: relative;
+                background: var(--bs-body-bg, #ffffff);
+                color: #475569;
+                padding: 9px 20px 9px 34px;
+                margin-right: 0px;
+                font-size: 0.8rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                display: flex;
+                align-items: center;
+                clip-path: polygon(0% 0%, calc(100% - 16px) 0%, 100% 50%, calc(100% - 16px) 100%, 0% 100%, 16px 50%);
+                transition: all 0.2s ease-in-out;
+            }
+
+                .arrow-breadcrumb .item:first-child {
+                    padding-left: 18px;
+                    clip-path: polygon(0% 0%, calc(100% - 16px) 0%, 100% 50%, calc(100% - 16px) 100%, 0% 100%);
+                    border-radius: 6px 0 0 6px;
+                }
+
+                .arrow-breadcrumb .item.active {
+                    background: linear-gradient(135deg, var(--bs-primary, #0d6efd) 0%, #0dcaf0 100%);
+                    color: #ffffff;
+                    padding-right: 22px;
+                    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 16px 50%);
+                    border-radius: 0 6px 6px 0;
+                }
+
+                .arrow-breadcrumb .item a {
+                    color: inherit;
+                    text-decoration: none;
+                    transition: color 0.2s;
+                }
+
+                .arrow-breadcrumb .item:not(.active):hover {
+                    background: var(--bs-secondary-bg, #f1f5f9);
+                    color: var(--bs-primary, #0f172a);
+                }
+
+        .turbo-load-fade {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        @@keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="fixed-header-wrapper" id="header-wrapper" data-turbo-permanent>
+        @if (showNotify)
+        {
+            <div class="news-ticker-container" id="ticker-bar" title="Nhấp đúp chuột để đóng" ondblclick="closeTicker()">
+                <div class="ticker-move"><i class="fa-solid fa-bullhorn me-2 text-warning fa-beat"></i> @notifyMsg</div>
+            </div>
+        }
+
+        <header class="top-toolbar">
+            <div class="d-flex align-items-center">
+                <a href="/" class="brand-icon me-4" title="Trang chủ"><i class="fa-solid fa-layer-group"></i></a>
+                <button class="btn btn-light border shadow-sm me-3" onclick="toggleSidebar()"><i class="fa-solid fa-bars-staggered"></i></button>
+                <h5 class="fw-bold mb-0 border-start border-2 ps-3" id="page-title">@Localizer["SystemOverview"]</h5>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <div class="dropdown me-2">
+                    <a href="#" class="d-flex align-items-center bg-light px-3 py-1.5 rounded-pill border shadow-sm text-decoration-none text-dark" data-bs-toggle="dropdown" title="Giao diện">
+                        <i class="fa-solid fa-palette text-primary" id="theme-icon"></i>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2" style="min-width: 200px;">
+                        <li><span class="dropdown-header">Chế độ nền</span></li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center justify-content-between" href="javascript:void(0)" onclick="setTheme('light')">
+                                <span><i class="fa-solid fa-sun text-warning me-2"></i>Sáng (Light)</span>
+                                <i class="fa-solid fa-check text-success d-none check-mark" id="check-light"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center justify-content-between" href="javascript:void(0)" onclick="setTheme('dark')">
+                                <span><i class="fa-solid fa-moon text-secondary me-2"></i>Tối (Dark)</span>
+                                <i class="fa-solid fa-check text-success d-none check-mark" id="check-dark"></i>
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><span class="dropdown-header">Màu chủ đạo</span></li>
+                        <li class="px-3 py-1 d-flex gap-2 justify-content-between">
+                            <button class="btn btn-sm rounded-circle p-3" style="background-color: #0d6efd;" onclick="setColor('#0d6efd')" title="Xanh dương"></button>
+                            <button class="btn btn-sm rounded-circle p-3" style="background-color: #198754;" onclick="setColor('#198754')" title="Xanh lá"></button>
+                            <button class="btn btn-sm rounded-circle p-3" style="background-color: #dc3545;" onclick="setColor('#dc3545')" title="Đỏ"></button>
+                            <button class="btn btn-sm rounded-circle p-3" style="background-color: #6f42c1;" onclick="setColor('#6f42c1')" title="Tím"></button>
+                            <input type="color" class="form-control form-control-color p-0 border-0 rounded-circle" id="customColorPicker" style="width: 32px; height: 32px;" title="Tự chọn màu" onchange="setColor(this.value)">
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="dropdown me-2" data-turbo="false">
+                    <a href="#" class="d-flex align-items-center bg-light px-3 py-1.5 rounded-pill border shadow-sm text-decoration-none text-dark" data-bs-toggle="dropdown">
+                        <i class="fa-solid fa-earth-asia me-2 text-primary"></i><span class="small fw-bold">Language</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2">
+                        <li><a asp-controller="Language" asp-action="SetLanguage" asp-route-culture="vi-VN" asp-route-returnUrl="/" class="dropdown-item fw-bold"><img src="https://flagcdn.com/w20/vn.png" class="me-2"> Tiếng Việt</a></li>
+                        <li><a asp-controller="Language" asp-action="SetLanguage" asp-route-culture="en-US" asp-route-returnUrl="/" class="dropdown-item fw-bold"><img src="https://flagcdn.com/w20/us.png" class="me-2"> English</a></li>
+                        <li><a asp-controller="Language" asp-action="SetLanguage" asp-route-culture="zh-CN" asp-route-returnUrl="/" class="dropdown-item fw-bold"><img src="https://flagcdn.com/w20/cn.png" class="me-2"> 中文</a></li>
+                    </ul>
+                </div>
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <button id="btnDebugTele" class="btn btn-danger btn-sm shadow-sm fw-bold rounded-pill px-3 me-2" onclick="sendDebugInfo()">
+                        <i class="fa-brands fa-telegram me-2"></i>@Localizer["SendConfig"]
+                    </button>
+                    <script>
+                        function sendDebugInfo() {
+                            if (!confirm('⚠️ CẢNH BÁO BẢO MẬT\n\nBạn có chắc muốn gửi CHUỖI KẾT NỐI qua Telegram?')) return;
+                            let btn = document.getElementById('btnDebugTele'); let originalHtml = btn.innerHTML;
+                            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...';
+                            fetch('/System/SendDebugInfo', { method: 'POST' }).then(res => res.json()).then(data => { alert(data.success ? '✅ ' + data.message : '❌ ' + data.message); }).catch(err => { alert('❌ Lỗi kết nối'); }).finally(() => { btn.disabled = false; btn.innerHTML = originalHtml; });
+                        }
+                    </script>
+                }
+
+                <a href="/" class="btn btn-light border btn-sm shadow-sm me-2" title="Trang chủ"><i class="fa-solid fa-house"></i></a>
+
+                @if (SignInManager.IsSignedIn(User))
+                {
+                    <div class="dropdown" data-turbo="false">
+                        <a href="#" class="d-flex align-items-center bg-body px-3 py-1 rounded-pill border shadow-sm text-decoration-none text-body" data-bs-toggle="dropdown">
+                            <img src="https://ui-avatars.com/api/?name=@UserManager.GetUserName(User)&background=ebf4ff&color=2563eb" alt="Avatar" class="rounded-circle me-2" style="width: 24px; height: 24px;">
+                            <span class="fw-bold small text-truncate" style="max-width: 120px;">@UserManager.GetUserName(User)</span>
+                            <i class="fa-solid fa-chevron-down ms-2 small text-muted"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end mt-2 border-0 shadow-sm">
+                            <li><span class="dropdown-header text-uppercase fw-bold text-muted small">@Localizer["Account"]</span></li>
+                            <li><a class="dropdown-item" asp-controller="Account" asp-action="Profile"><i class="fa-solid fa-id-card me-2 text-primary"></i> @Localizer["UserProfile"]</a></li>
+                            <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword"><i class="fa-solid fa-key me-2 text-warning"></i> @Localizer["ChangePassword"]</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form class="form-inline m-0 p-0" asp-controller="Account" asp-action="Logout" method="post">
+                                    <button type="submit" class="dropdown-item text-danger fw-bold"><i class="fa-solid fa-right-from-bracket me-2"></i> @Localizer["Logout"]</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                }
+                else
+                {
+                    <a class="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm" asp-controller="Account" asp-action="Login" data-turbo="false">
+                        <i class="fa-solid fa-arrow-right-to-bracket me-1"></i> @Localizer["Login"]
+                    </a>
+                }
+            </div>
+        </header>
+    </div>
+
+    <aside class="sidebar" id="sidebar" data-turbo-permanent>
+        <div class="sidebar-menu pb-4">
+
+            <div class="nav-group">
+                <div class="nav-label" data-bs-toggle="collapse" data-bs-target="#menuSales" aria-expanded="true">
+                    <span class="label-text"><i class="fa-solid fa-handshake"></i> @Localizer["BusinessAndSales"]</span>
+                    <i class="fa-solid fa-chevron-down chevron-icon"></i>
+                </div>
+
+                <div class="collapse show" id="menuSales">
+                    <a href="@Url.Action("Index", "Order")" class="nav-link">
+                        <i class="fa-solid fa-file-invoice-dollar ic-sales"></i> @Localizer["OrderManagement"]
+                        @if (pendingOrders > 0)
+                        {
+                            <span class="badge bg-danger ms-auto rounded-pill shadow-sm">@pendingOrders</span>
+                        }
+                    </a>
+                    <a href="@Url.Action("Index", "Customer")" class="nav-link"><i class="fa-solid fa-users ic-sales"></i> @Localizer["CustomersPartners"]</a>
+                    <a href="@Url.Action("Index", "Product")" class="nav-link"><i class="fa-solid fa-box-open ic-sales"></i> @Localizer["ProductsCatalog"]</a>
+                    <a href="@Url.Action("Create", "Order")" class="nav-link"><i class="fa-solid fa-cart-plus ic-sales"></i> @Localizer["CreateNewOrder"]</a>
+                    <a href="@Url.Action("DeliveryProgressReport", "Order")" class="nav-link"><i class="fa-solid fa-chart-gantt ic-sales"></i> @Localizer["OrderProgressReport"]</a>
+                    <a href="@Url.Action("Index", "Invoice")" class="nav-link"><i class="fa-solid fa-chart-gantt ic-sales"></i> @Localizer["InvoiceManagerInput"]</a>
+                </div>
+            </div>
+
+            <div class="nav-group border-top pt-2">
+                <div class="nav-label" data-bs-toggle="collapse" data-bs-target="#menuLog" aria-expanded="true">
+                    <span class="label-text"><i class="fa-solid fa-truck-fast"></i> @Localizer["TransportAndLogistics"]</span>
+                    <i class="fa-solid fa-chevron-down chevron-icon"></i>
+                </div>
+
+                <div class="collapse show" id="menuLog">
+                    <a href="@Url.Action("Index", "Export")" class="nav-link"><i class="fa-solid fa-truck-ramp-box ic-log"></i> @Localizer["ShipmentCoordination"]</a>
+                </div>
+            </div>
+
+            <div class="nav-group border-top pt-2">
+                <div class="nav-label" data-bs-toggle="collapse" data-bs-target="#menuProd" aria-expanded="true">
+                    <span class="label-text"><i class="fa-solid fa-industry"></i> @Localizer["PlanningAndProduction"]</span>
+                    <i class="fa-solid fa-chevron-down chevron-icon"></i>
+                </div>
+
+                <div class="collapse show" id="menuProd">
+                    <a href="@Url.Action("Index", "Bom")" class="nav-link"><i class="fa-solid fa-sitemap ic-prod"></i> @Localizer["BillOfMaterials"]</a>
+                    <a href="@Url.Action("MasterPlan", "Bom")" class="nav-link"><i class="fa-solid fa-calculator ic-prod"></i> @Localizer["MaterialRequirementPlanning"]</a>
+                    <a href="@Url.Action("Index", "ProductionPlan")" class="nav-link"><i class="fa-solid fa-calendar-days ic-prod"></i> @Localizer["ProductionPlan"]</a>
+                    <a href="@Url.Action("TablePlan", "ProductionPlan")" class="nav-link"><i class="fa-solid fa-calendar-days ic-prod"></i> @Localizer["TablePlan"]</a>
+                    <a href="@Url.Action("ShortagePlan", "ProductionPlan")" class="nav-link"><i class="fa-solid fa-calendar-days ic-prod"></i> @Localizer["ShortagePlan"]</a>
+                </div>
+            </div>
+
+            <div class="nav-group border-top pt-2">
+                <div class="nav-label" data-bs-toggle="collapse" data-bs-target="#menuInv" aria-expanded="true">
+                    <span class="label-text"><i class="fa-solid fa-boxes-stacked"></i> @Localizer["PurchasingAndInventory"]</span>
+                    <i class="fa-solid fa-chevron-down chevron-icon"></i>
+                </div>
+
+                <div class="collapse show" id="menuInv">
+                    <a href="@Url.Action("Index", "Warehouse")" class="nav-link">
+                        <i class="fa-solid fa-warehouse ic-wh"></i> @Localizer["InventoryManagement"]
+                        @if (lowStockItems > 0)
+                        {
+                            <span class="badge bg-warning text-dark ms-auto rounded-pill shadow-sm">@lowStockItems</span>
+                        }
+                    </a>
+                    <a href="@Url.Action("History", "Warehouse")" class="nav-link"><i class="fa-solid fa-clock-rotate-left ic-wh"></i> @Localizer["InventoryHistory"]</a>
+                    <a href="@Url.Action("Index", "PurchaseOrder")" class="nav-link"><i class="fa-solid fa-cart-shopping ic-wh"></i> @Localizer["PurchaseOrders"]</a>
+                    <a href="@Url.Action("CustomerMaterialReport", "Warehouse")" class="nav-link"><i class="fa-solid fa-people-arrows ic-wh"></i> @Localizer["CustomerMaterials"]</a>
+                    <a href="@Url.Action("Index", "InvoiceManager")" class="nav-link"><i class="fa-solid fa-people-arrows ic-wh"></i> @Localizer["InvoiceManager"]</a>
+                </div>
+            </div>
+
+            @if (canViewFinance || canViewReport)
+            {
+                <div class="nav-group border-top pt-2">
+                    <div class="nav-label" data-bs-toggle="collapse" data-bs-target="#menuFin" aria-expanded="true">
+                        <span class="label-text"><i class="fa-solid fa-sack-dollar"></i> @Localizer["FinanceAndAccounting"]</span>
+                        <i class="fa-solid fa-chevron-down chevron-icon"></i>
+                    </div>
+
+                    <div class="collapse show" id="menuFin">
+                        @if (canViewFinance)
+                        {
+                            <a href="@Url.Action("Index", "CashBook")" class="nav-link"><i class="fa-solid fa-wallet ic-fin"></i> @Localizer["CashBook"]</a>
+                            <a href="@Url.Action("Index", "Debt")" class="nav-link"><i class="fa-solid fa-scale-balanced ic-fin"></i> @Localizer["DebtLedger"]</a>
+                        }
+                        @if (canViewReport)
+                        {
+                            <a href="@Url.Action("Index", "Report")" class="nav-link"><i class="fa-solid fa-chart-pie ic-fin"></i> @Localizer["SalesReport"] (SXKD)</a>
+                            <a href="@Url.Action("Index", "Analytics")" class="nav-link"><i class="fa-solid fa-tags ic-fin"></i>Report test</a>
+                            <a href="@Url.Action("PnLReport", "ReportControllerMonth")" class="nav-link"><i class="fa-solid fa-chart-line ic-fin"></i> @Localizer["InvoiceReport"]</a>
+                            <a href="@Url.Action("Index", "CostCategory")" class="nav-link"><i class="fa-solid fa-tags ic-fin"></i> @Localizer["PnLCategories"]</a>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="nav-group border-top pt-2">
+                <div class="nav-label collapsed" data-bs-toggle="collapse" data-bs-target="#menuSys" aria-expanded="false">
+                    <span class="label-text"><i class="fa-solid fa-shield-halved"></i> @Localizer["SystemAndConfig"]</span>
+                    <i class="fa-solid fa-chevron-down chevron-icon"></i>
+                </div>
+
+                <div class="collapse" id="menuSys">
+                    @if (User.Identity.IsAuthenticated)
+                    {
+                        <a href="@Url.Action("Index", "Document")" class="nav-link"><i class="fa-regular fa-folder-open ic-sys"></i> @Localizer["DocumentRepository"]</a>
+                    }
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <a href="@Url.Action("Index", "Setting")" class="nav-link"><i class="fa-solid fa-building ic-sys"></i> @Localizer["CompanySettings"]</a>
+                        <a href="@Url.Action("Index", "Partner")" class="nav-link"><i class="fa-solid fa-building ic-sys"></i> @Localizer["Partner"]</a>
+                        <a href="@Url.Action("Index", "FinancialPeriod")" class="nav-link"><i class="fa-solid fa-lock ic-sys"></i> @Localizer["FinancialPeriods"]</a>
+                        <a href="@Url.Action("Index", "Role")" class="nav-link"><i class="fa-solid fa-user-shield ic-sys"></i> @Localizer["RoleManagement"]</a>
+                        <a href="@Url.Action("Index", "User")" class="nav-link"><i class="fa-solid fa-users-gear ic-sys"></i> @Localizer["UserManagement"]</a>
+                        <a href="@Url.Action("Index", "Data")" class="nav-link"><i class="fa-solid fa-database ic-sys"></i> @Localizer["DataManagement"]</a>
+                        <a href="@Url.Action("Index", "AI")" class="nav-link"><i class="fa-solid fa-robot ic-sys"></i> @Localizer["AIConfiguration"]</a>
+                        <a href="@Url.Action("Index", "AuditLog")" class="nav-link"><i class="fa-solid fa-shoe-prints ic-sys"></i> @Localizer["SystemLogs"]</a>
+                    }
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content turbo-load-fade" id="main-content">
+        @{
+            var breadcrumbs = ViewData["Breadcrumbs"] as List<(string Title, string Url)>;
+        }
+        @if (breadcrumbs != null && breadcrumbs.Any())
+        {
+            <ul class="arrow-breadcrumb mt-1">
+                <li class="item"><a href="/"><i class="fa-solid fa-house me-1"></i>Trang chủ</a></li>
+                @for (int i = 0; i < breadcrumbs.Count; i++)
+                {
+                    if (i == breadcrumbs.Count - 1)
+                    {
+                        <li class="item active" aria-current="page">@breadcrumbs[i].Title</li>
+                    }
+                    else
+                    {
+                        <li class="item"><a href="@breadcrumbs[i].Url">@breadcrumbs[i].Title</a></li>
+                    }
+                }
+            </ul>
+        }
+
+        <partial name="_Notification" />
+
+        @RenderBody()
+
+    </main>
+
+    <footer class="text-center text-muted py-3 mt-auto w-100" style="font-size: 0.85rem; background-color: var(--bs-body-bg); z-index: 999; border-top: 1px solid var(--bs-border-color);" data-turbo-permanent id="permanent-footer">
+        &copy; 2026 - <strong>Production Manager System</strong>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/l10n/vn.js"></script>
+    <script src="/js/site.js"></script>
+
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+            if (window.innerWidth < 992) { document.getElementById('sidebar').classList.toggle('show'); }
+        }
+
+        function closeTicker() {
+            var ticker = document.getElementById('ticker-bar');
+            if (ticker) ticker.style.display = 'none';
+            document.getElementById('sidebar').style.top = '60px';
+            document.getElementById('main-content').style.marginTop = '60px';
+        }
+
+        document.addEventListener('show.bs.modal', function (event) {
+            var modal = event.target;
+            if (modal && modal.classList.contains('modal') && modal.parentNode !== document.body) {
+                document.body.appendChild(modal);
+            }
+        });
+
+        function restoreMenuState() {
+            let openMenus = JSON.parse(localStorage.getItem('openNavGroups') || '[]');
+            openMenus.forEach(function (menuId) {
+                if (!menuId) return;
+                let menuEl = document.getElementById(menuId);
+                if (menuEl) {
+                    menuEl.classList.add('show');
+                    menuEl.style.display = 'block';
+
+                    let triggers = document.querySelectorAll(`[data-bs-target="#${menuId}"], [href="#${menuId}"]`);
+                    triggers.forEach(t => {
+                        t.classList.remove('collapsed');
+                        t.setAttribute('aria-expanded', 'true');
+                    });
+                }
+            });
+
+            let currentUrl = window.location.pathname.toLowerCase();
+            let navLinks = document.querySelectorAll('.sidebar a');
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                let href = link.getAttribute('href');
+                if (!href) return;
+                href = href.toLowerCase();
+
+                if (href !== '/' && currentUrl.includes(href)) {
+                    link.classList.add('active');
+
+                    let parent = link.parentElement;
+                    while (parent && parent.id !== 'sidebar' && parent.tagName !== 'BODY') {
+                        if (parent.classList.contains('collapse') || parent.classList.contains('nav-group') || parent.tagName === 'UL') {
+                            parent.classList.add('show');
+
+                            if (parent.id) {
+                                let currentOpen = JSON.parse(localStorage.getItem('openNavGroups') || '[]');
+                                if (!currentOpen.includes(parent.id)) {
+                                    currentOpen.push(parent.id);
+                                    localStorage.setItem('openNavGroups', JSON.stringify(currentOpen));
+                                }
+                                
+                                let triggers = document.querySelectorAll(`[data-bs-target="#${parent.id}"], [href="#${parent.id}"]`);
+                                triggers.forEach(t => { t.classList.remove('collapsed'); t.setAttribute('aria-expanded', 'true'); });
+                            }
+                        }
+                        parent = parent.parentElement; 
+                    }
+                } else if (href === '/' && currentUrl === '/') {
+                    link.classList.add('active');
+                }
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", restoreMenuState);
+        document.addEventListener("turbo:load", restoreMenuState);
+
+        document.addEventListener("click", function (e) {
+            let toggleBtn = e.target.closest('[data-bs-toggle="collapse"]');
+            if (toggleBtn && toggleBtn.closest('.sidebar')) {
+                let targetSelector = toggleBtn.getAttribute('data-bs-target') || toggleBtn.getAttribute('href');
+                if (targetSelector && targetSelector.startsWith('#')) {
+                    let targetId = targetSelector.substring(1); 
+
+                    setTimeout(() => {
+                        let targetEl = document.getElementById(targetId);
+                        if (targetEl) {
+                            let currentOpen = JSON.parse(localStorage.getItem('openNavGroups') || '[]');
+                            if (targetEl.classList.contains('show')) {
+
+                                if (!currentOpen.includes(targetId)) currentOpen.push(targetId);
+                            } else {
+             
+                                currentOpen = currentOpen.filter(id => id !== targetId);
+                            }
+                            localStorage.setItem('openNavGroups', JSON.stringify(currentOpen));
+                        }
+                    }, 350);
+                }
+            }
+        });
+
+        // ==============================================================
+
+        document.addEventListener("turbo:load", function () {
+            let pageTitleEl = document.getElementById("page-title");
+            if (pageTitleEl) pageTitleEl.innerText = document.title.split('-')[0].trim();
+
+            if (typeof flatpickr !== 'undefined') {
+                flatpickr(".date-picker", { dateFormat: "d/m/Y", allowInput: true, locale: "vn" });
+            }
+
+            let currentTheme = localStorage.getItem('app-theme') || 'light';
+            updateThemeUI(currentTheme);
+            let currentColor = localStorage.getItem('app-color');
+            let colorPicker = document.getElementById('customColorPicker');
+            if (currentColor && colorPicker) { colorPicker.value = currentColor; }
+        });
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-bs-theme', theme);
+            localStorage.setItem('app-theme', theme);
+            updateThemeUI(theme);
+        }
+
+        function setColor(colorHex) {
+            document.documentElement.style.setProperty('--bs-primary', colorHex);
+            document.documentElement.style.setProperty('--bs-primary-rgb', hexToRgb(colorHex));
+            localStorage.setItem('app-color', colorHex);
+            let colorPicker = document.getElementById('customColorPicker');
+            if (colorPicker) colorPicker.value = colorHex;
+        }
+
+        function hexToRgb(hex) {
+            var c;
+            if (/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)) {
+                c = hex.substring(1).split('');
+                if (c.length == 3) { c = [c[0], c[0], c[1], c[1], c[2], c[2]]; }
+                c = '0x' + c.join('');
+                return [(c >> 16) & 255, (c >> 8) & 255, c & 255].join(',');
+            }
+            return '13, 110, 253';
+        }
+
+        function updateThemeUI(theme) {
+            document.querySelectorAll('.check-mark').forEach(el => el.classList.add('d-none'));
+            let checkDark = document.getElementById('check-dark');
+            let checkLight = document.getElementById('check-light');
+            let themeIcon = document.getElementById('theme-icon');
+            if (theme === 'dark') {
+                if (checkDark) checkDark.classList.remove('d-none');
+                if (themeIcon) themeIcon.className = "fa-solid fa-moon text-secondary";
+            } else {
+                if (checkLight) checkLight.classList.remove('d-none');
+                if (themeIcon) themeIcon.className = "fa-solid fa-sun text-warning";
+            }
+        }
+    </script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

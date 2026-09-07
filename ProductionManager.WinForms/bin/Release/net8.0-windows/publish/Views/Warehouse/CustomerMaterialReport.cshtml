@@ -1,0 +1,244 @@
+﻿@model IEnumerable<ProductionApp.Web.Models.ViewModels.CustomerMaterialReportViewModel>
+@{
+    ViewData["Title"] = "Đối chiếu Vật tư Khách hàng";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Kho Vật Tư", Url.Action("Index", "Warehouse")), 
+        ("Vật Tư Khách Giao", "") 
+    };
+}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<style>
+    /* BỘ CSS CHUẨN ERP HIỆN ĐẠI */
+    body { background-color: #f8fafc; font-family: 'Inter', 'Segoe UI', sans-serif; }
+    
+    .erp-card { 
+        background: #fff; border: 1px solid #e2e8f0; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-radius: 12px; 
+    }
+    
+    /* Giao diện bộ lọc */
+    .filter-label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 6px; display: block; }
+    .filter-control { border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: #334155; }
+    .filter-control:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+    
+    /* Tùy chỉnh Select2 để khớp với Bootstrap */
+    .select2-container .select2-selection--single { height: 38px !important; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; }
+    .select2-container--default .select2-selection--single .select2-selection__arrow { height: 36px !important; right: 8px; }
+    
+    /* Bảng dữ liệu */
+    .table-erp { border-collapse: separate; border-spacing: 0; width: 100%; margin-bottom: 0; }
+    .table-erp thead th { 
+        background: #f1f5f9; color: #475569; font-size: 0.75rem; 
+        text-transform: uppercase; padding: 14px 12px; 
+        border-bottom: 2px solid #e2e8f0; border-top: none; font-weight: 700; vertical-align: middle;
+    }
+    .table-erp tbody td { padding: 12px; border-bottom: 1px dashed #e2e8f0; vertical-align: middle; font-size: 0.9rem; color: #334155; }
+    
+    /* Phân cách giữa các đơn hàng */
+    .order-start-row td { border-top: 2px solid #cbd5e1 !important; }
+    
+    /* Các thẻ số liệu */
+    .num-cell { font-family: 'Consolas', monospace; font-size: 1rem; letter-spacing: 0.5px; }
+    .badge-soft { padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; display: inline-block; width: 100%; text-align: center; }
+    
+    .bg-req { background-color: #f0fdfa; color: #0284c7; border: 1px solid #bae6fd; }
+    .bg-rec { background-color: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+    .bg-use { background-color: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+</style>
+
+<div class="container-fluid pt-4 px-4 pb-5">
+    
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <h4 class="fw-bold text-dark mb-1"><i class="fa-solid fa-handshake-angle text-primary me-2"></i>ĐỐI CHIẾU VẬT TƯ KHÁCH GIAO</h4>
+            <div class="text-muted small">Kiểm soát chặt chẽ lượng hàng khách cung cấp so với định mức (BOM)</div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="@Url.Action("ExportCustomerMaterialExcel", new { fromDate = ViewBag.FromDate, toDate = ViewBag.ToDate, orderId = Context.Request.Query["orderId"] })" 
+               class="btn btn-success fw-bold shadow-sm d-flex align-items-center gap-2 rounded-pill px-4">
+                <i class="fa-solid fa-file-excel"></i> Xuất Excel
+            </a>
+            
+            <button onclick="exportToPDF()" class="btn btn-danger fw-bold shadow-sm d-flex align-items-center gap-2 rounded-pill px-4">
+                <i class="fa-solid fa-file-pdf"></i> Tải PDF
+            </button>
+        </div>
+    </div>
+
+    <div class="erp-card p-3 mb-4">
+        <form asp-action="CustomerMaterialReport" method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="filter-label"><i class="fa-regular fa-calendar text-primary me-1"></i> Từ ngày</label>
+                <input type="text" name="fromDate" class="form-control filter-control datepicker bg-white" 
+                       value="@(((DateTime)ViewBag.FromDate).ToString("yyyy-MM-dd"))" placeholder="dd/mm/yyyy" />
+            </div>
+            <div class="col-md-3">
+                <label class="filter-label"><i class="fa-regular fa-calendar-check text-primary me-1"></i> Đến ngày</label>
+                <input type="text" name="toDate" class="form-control filter-control datepicker bg-white" 
+                       value="@(((DateTime)ViewBag.ToDate).ToString("yyyy-MM-dd"))" placeholder="dd/mm/yyyy" />
+            </div>
+            <div class="col-md-4">
+                <label class="filter-label"><i class="fa-solid fa-magnifying-glass text-primary me-1"></i> Lọc theo Đơn hàng</label>
+                <select name="orderId" id="ddlOrderFilter" class="form-select filter-control" asp-items="ViewBag.OrderList">
+                    <option value="">-- Tất cả đơn hàng --</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm"><i class="fa-solid fa-filter me-1"></i> Xem Báo Cáo</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="erp-card" id="pdf-content">
+        
+        <div class="card-header bg-white py-4 border-bottom d-none d-print-block text-center" id="pdf-header" style="display:none !important;">
+            <h3 class="fw-bold mb-1">BÁO CÁO ĐỐI CHIẾU VẬT TƯ KHÁCH CUNG CẤP</h3>
+            <p class="mb-0 text-muted fst-italic">Kỳ báo cáo: @(((DateTime)ViewBag.FromDate).ToString("dd/MM/yyyy")) đến @(((DateTime)ViewBag.ToDate).ToString("dd/MM/yyyy"))</p>
+        </div>
+        
+        <div class="table-responsive" style="min-height: 400px;">
+            <table class="table table-erp">
+                <thead>
+                    <tr>
+                        <th width="12%">Mã Đơn 🏷️</th>
+                        <th width="15%">Khách Hàng 🏢</th>
+                        <th>Tên Vật Tư 📦</th>
+                        <th width="6%" class="text-center">ĐVT</th>
+                        <th width="12%" class="text-center text-primary">Định Mức 🎯</th>
+                        <th width="12%" class="text-center text-success">Khách Giao 📥</th>
+                        <th width="12%" class="text-center text-secondary">Đã Xuất 📤</th>
+                        <th width="12%" class="text-center text-danger">Tồn/Thiếu ⚖️</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted fst-italic">
+                                <div class="opacity-25 mb-3"><i class="fa-solid fa-box-open fa-3x"></i></div>
+                                Chưa có phát sinh vật tư do khách hàng cung cấp trong kỳ này.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        string currentOrder = "";
+                        foreach (var item in Model)
+                        {
+                            bool isNewOrder = currentOrder != item.OrderCode;
+                            currentOrder = item.OrderCode;
+                            
+                            // Gắn class tạo đường kẻ phân cách giữa các đơn hàng
+                            string rowClass = isNewOrder ? "order-start-row" : "";
+                            
+                            <tr class="@rowClass">
+                                @if(isNewOrder)
+                                {
+                                    <td class="fw-bold text-primary align-top border-bottom-0">
+                                        <i class="fa-solid fa-hashtag text-muted me-1 small"></i>@item.OrderCode
+                                    </td>
+                                    <td class="fw-bold text-dark align-top border-bottom-0 text-wrap">@item.CustomerName</td>
+                                }
+                                else
+                                {
+                                    // Bỏ trống ô để gộp trực quan
+                                    <td class="border-top-0 border-bottom-0"></td>
+                                    <td class="border-top-0 border-bottom-0"></td>
+                                }
+                                
+                                <td>
+                                    <span class="badge bg-light text-secondary border me-1">@item.ItemCode</span>
+                                    <span class="fw-bold text-dark">@item.ItemName</span>
+                                </td>
+                                
+                                <td class="text-center text-muted small fw-bold">@item.Unit</td>
+                                
+                                <td class="text-center">
+                                    <div class="badge-soft bg-req num-cell">@item.TotalRequired.ToString("N1")</div>
+                                </td>
+                                
+                                <td class="text-center">
+                                    <div class="badge-soft bg-rec num-cell">@item.TotalReceived.ToString("N1")</div>
+                                </td>
+                                
+                                <td class="text-center">
+                                    <div class="badge-soft bg-use num-cell">@item.TotalUsed.ToString("N1")</div>
+                                </td>
+                                
+                                <td class="text-center">
+                                    @if(item.Balance < 0)
+                                    {
+                                        <div class="badge-soft bg-danger text-white num-cell shadow-sm" title="Khách giao thiếu so với định mức!">
+                                            <i class="fa-solid fa-arrow-down small me-1"></i> @Math.Abs(item.Balance).ToString("N1")
+                                        </div>
+                                    }
+                                    else if(item.Balance == 0 && item.TotalRequired > 0)
+                                    {
+                                        <div class="badge-soft bg-success text-white num-cell opacity-75">
+                                            <i class="fa-solid fa-check me-1"></i> Đủ
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="badge-soft bg-warning text-dark num-cell shadow-sm" title="Khách giao dư so với định mức">
+                                            <i class="fa-solid fa-arrow-up small me-1"></i> @item.Balance.ToString("N1")
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // 1. Khởi tạo Flatpickr chuẩn xác
+        flatpickr(".datepicker", {
+            altInput: true,         // Hiện một ô input phụ đẹp mắt cho người dùng
+            altFormat: "d/m/Y",     // Định dạng hiển thị cho người dùng (VN)
+            dateFormat: "Y-m-d",    // Định dạng giá trị thật ẩn bên dưới để gửi về C#
+            locale: "vn"            // Ngôn ngữ Tiếng Việt
+        });
+
+        // 2. Khởi tạo Select2 cho Đơn hàng
+        $('#ddlOrderFilter').select2({
+            placeholder: "🔍 Gõ tìm mã đơn hàng...",
+            allowClear: true
+        });
+    });
+
+    // 3. Hàm xuất PDF cực nét (Giữ nguyên logic của bạn, nâng chất lượng ảnh)
+    function exportToPDF() {
+        // Hiện Header dành riêng cho PDF
+        document.getElementById('pdf-header').style.setProperty('display', 'block', 'important');
+        
+        var element = document.getElementById('pdf-content');
+        var opt = {
+            margin:       [0.5, 0.5, 0.5, 0.5], // Top, Left, Bottom, Right
+            filename:     'BaoCao_VatTuKhachGiao.pdf',
+            image:        { type: 'jpeg', quality: 1 },
+            html2canvas:  { scale: 2, useCORS: true }, // scale 2 giúp chữ k bị mờ
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+        };
+
+        // Tạo PDF
+        html2pdf().set(opt).from(element).save().then(() => {
+            // Ẩn Header sau khi in xong
+            document.getElementById('pdf-header').style.setProperty('display', 'none', 'important');
+        });
+    }
+</script>

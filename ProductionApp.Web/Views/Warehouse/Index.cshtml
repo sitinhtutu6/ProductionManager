@@ -1,0 +1,824 @@
+﻿@using Microsoft.AspNetCore.Authorization
+@using ProductionManager.Data
+@using ProductionApp.Web.Constants
+@using System.Security.Claims
+@model IEnumerable<ProductionManager.Data.WarehouseItem>
+
+@{
+    ViewData["Title"] = "Quản lý Kho Vật Tư";
+
+    bool canCreate = User.IsInRole("Admin") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Warehouse.Create);
+    bool canEdit = User.IsInRole("Admin") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Warehouse.Edit);
+
+    var totalItems = Model.Count();
+    var lowStock = Model.Count(x => x.StockQuantity <= 5);
+    var totalValue = Model.Sum(x => (decimal)x.StockQuantity * x.CostPrice);
+
+    var dbCategories = ViewBag.Categories as List<ProductionManager.Data.WarehouseCategory> ?? new List<ProductionManager.Data.WarehouseCategory>();
+}
+
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+    body {
+    background-color: #f8fafc;
+    font-family: 'Inter', sans-serif;
+    }
+
+    /* KPI Cards */
+    .stats-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+    transition: 0.2s;
+    height: 100%;
+    }
+
+    .stats-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+    }
+
+    /* Thumbnails & Avatars */
+    .item-img-box {
+    width: 45px;
+    height: 45px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #cbd5e1;
+    cursor: zoom-in;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+    }
+
+    .item-img-box:hover {
+    transform: scale(1.3);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2);
+    z-index: 10;
+    }
+
+    .item-img-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    }
+
+    /* CẢI TIẾN: Tags Navigation - Flex Wrap Show All */
+    .category-nav {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    }
+
+    .cat-tag {
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    user-select: none;
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    }
+
+    .cat-tag:hover {
+    background: #e2e8f0;
+    transform: translateY(-2px);
+    }
+
+    .cat-tag.active {
+    background: #0ea5e9 !important;
+    color: white !important;
+    border-color: #0284c7 !important;
+    box-shadow: 0 4px 10px -2px rgba(14, 165, 233, 0.4);
+    }
+
+    /* Table & Groups */
+    .table-custom {
+    margin-bottom: 0;
+    min-width: 900px;
+    }
+
+    .table-custom thead th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    padding: 14px 16px;
+    border-bottom: 2px solid #cbd5e1;
+    white-space: nowrap;
+    }
+
+    .table-custom tbody td {
+    padding: 12px 16px;
+    vertical-align: middle;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 0.875rem;
+    }
+
+    .table-custom tbody tr.item-row:hover {
+    background-color: #f8fafc;
+    cursor: context-menu;
+    }
+
+    .group-header td {
+    background-color: #f1f5f9 !important;
+    color: #334155;
+    border-bottom: 2px solid #cbd5e1;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+    }
+
+    /* Filters & Toolbars */
+    .table-filter-row th {
+    background: #fff !important;
+    padding: 8px 16px !important;
+    border-bottom: 2px solid #cbd5e1 !important;
+    }
+
+    .table-filter-row .form-control, .table-filter-row .form-select {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-color: #cbd5e1;
+    min-width: 120px;
+    border-radius: 6px;
+    }
+
+    .table-filter-row .form-control:focus, .table-filter-row .form-select:focus {
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 0.2rem rgba(14, 165, 233, 0.25);
+    }
+
+    .toolbar-btn {
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    }
+
+    /* Custom Form Modal UI */
+    .modal-blue-header {
+    background: #1a73e8;
+    color: white;
+    border-bottom: none;
+    }
+
+    .img-upload-box {
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.2s;
+    background-color: #f8fafc;
+    }
+
+    .img-upload-box:hover {
+    border-color: #1a73e8;
+    background-color: #f0f7ff;
+    }
+</style>
+
+<div class="container-fluid py-4" style="max-width: 1600px;">
+
+    <!-- 1. KPI DASHBOARD -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stats-card border-start border-4 border-primary">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div><div class="text-muted small fw-800 text-uppercase">TỔNG MÃ VẬT TƯ</div><h3 class="mb-0 fw-800 text-dark">@totalItems</h3></div>
+                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-3 fs-5"><i class="fa-solid fa-boxes-stacked"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stats-card border-start border-4 border-danger">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div><div class="text-muted small fw-800 text-uppercase">CẢNH BÁO TỒN KHO</div><h3 class="mb-0 fw-800 text-danger">@lowStock</h3></div>
+                    <div class="bg-danger bg-opacity-10 text-danger rounded-circle p-3 fs-5"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stats-card border-start border-4 border-success">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div><div class="text-muted small fw-800 text-uppercase">GIÁ TRỊ KHO TỔNG</div><h4 class="mb-0 fw-800 text-success">@totalValue.ToString("N0") <small class="fs-6 text-muted fw-600">₫</small></h4></div>
+                    <div class="bg-success bg-opacity-10 text-success rounded-circle p-3 fs-5"><i class="fa-solid fa-sack-dollar"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stats-card bg-primary border-0 text-white h-100 d-flex flex-row align-items-center justify-content-center gap-3" role="button" onclick="openModal(0)" style="cursor:pointer; box-shadow: 0 4px 10px rgba(26, 115, 232, 0.3);">
+                <div class="bg-white bg-opacity-25 rounded-circle p-2 fs-5"><i class="fa-solid fa-plus"></i></div>
+                <div class="fw-800 fs-5 text-uppercase">TẠO MÃ MỚI</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. BỘ LỌC VÀ CÔNG CỤ (TÁI CẤU TRÚC LAYOUT) -->
+    <div class="d-flex flex-column gap-3 mb-4">
+
+        <!-- Khối 1: Bảng điều khiển Nhóm Hàng (Hiển thị tất cả) -->
+        <div class="bg-white p-3 rounded-4 shadow-sm border border-light d-flex align-items-start justify-content-between gap-3">
+            <div class="category-nav flex-grow-1">
+                <div class="cat-tag active" id="tagAll" onclick="resetFilterTags(this)">
+                    <i class="fa-solid fa-layer-group me-2"></i> Tất cả
+                </div>
+                @foreach (var cat in dbCategories)
+                {
+                    <div class="cat-tag" data-cat-id="@cat.Id" onclick="toggleFilterTag(this)">@cat.Name</div>
+                }
+            </div>
+
+            @if (canEdit)
+            {
+                <button class="btn btn-light border rounded-3 shadow-sm flex-shrink-0" style="height: 40px; padding: 0 15px;" onclick="openCategoryManager()" title="Thiết lập nhóm hàng">
+                    <i class="fa-solid fa-gear text-secondary me-1"></i> <span class="fw-bold text-secondary d-none d-sm-inline">Quản lý nhóm</span>
+                </button>
+            }
+        </div>
+
+        <!-- Khối 2: Công cụ Tìm kiếm & Thao tác (Giàn hàng ngang) -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+
+            <!-- Tìm kiếm nhanh -->
+            <div class="input-group shadow-sm bg-white rounded-3" style="max-width: 320px; flex-grow: 1;">
+                <span class="input-group-text bg-white border-end-0 text-muted px-3"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" id="globalSearch" class="form-control border-start-0 border-end-0 fw-bold text-primary" placeholder="Tìm tên, mã vật tư..." onkeyup="filterTable()" style="height: 42px;">
+                <button type="button" class="btn btn-light border border-start-0 text-dark fw-bold px-3" onclick="startScanner()" title="Quét mã QR/Barcode"><i class="fa-solid fa-qrcode fs-5"></i></button>
+            </div>
+
+            <!-- Các nút thao tác -->
+            <div class="d-flex flex-wrap gap-2">
+                <div class="dropdown">
+                    <button class="btn btn-white bg-white border fw-bold shadow-sm dropdown-toggle rounded-3 toolbar-btn px-4" data-bs-toggle="dropdown">
+                        <i class="fa-solid fa-list-check me-2 text-primary"></i> Tiện ích
+                    </button>
+                    <ul class="dropdown-menu shadow-lg border-0 rounded-3 mt-2">
+                        <li><a class="dropdown-item py-2 fw-600" asp-action="History"><i class="fa-solid fa-clock-rotate-left me-2 text-info"></i> Sổ kho Lịch sử</a></li>
+                        <li><a class="dropdown-item py-2 fw-600" asp-action="Report"><i class="fa-solid fa-chart-pie me-2 text-warning"></i> Báo cáo NXT</a></li>
+                        <li><a class="dropdown-item py-2 fw-600" asp-action="StockTake"><i class="fa-solid fa-clipboard-check me-2 text-success"></i> Kiểm kê Tồn</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 fw-600" asp-action="ExportExcel"><i class="fa-solid fa-file-excel me-2 text-success"></i> Xuất File Excel</a></li>
+                    </ul>
+                </div>
+
+                <a asp-action="ImportExport" asp-route-type="Import" class="btn btn-success fw-bold shadow-sm rounded-3 px-4 toolbar-btn">
+                    <i class="fa-solid fa-arrow-down me-2"></i> Nhập kho
+                </a>
+
+                <a asp-action="ImportExport" asp-route-type="Export" class="btn btn-warning text-dark fw-bold shadow-sm rounded-3 px-4 toolbar-btn">
+                    <i class="fa-solid fa-arrow-up me-2"></i> Xuất kho
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. MAIN DATA TABLE -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-5">
+        <div class="table-responsive" style="max-height: 70vh;">
+            <table class="table table-custom mb-0" id="warehouseTable">
+                <thead class="sticky-top" style="z-index: 2;">
+                    <tr>
+                        <th class="ps-4 text-center" width="70">Ảnh</th>
+                        <th width="120" class="text-muted opacity-75">Mã VT</th>
+                        <th class="text-primary fs-6">Thông Tin Vật Tư</th>
+                        <th width="200">Nhóm Hàng</th>
+                        <th class="text-center" width="100">ĐVT (Base)</th>
+                        <th class="text-end" width="180">Tồn kho (Đa ĐVT)</th>
+                        <th class="text-end pe-4" width="150">Giá vốn / 1 ĐVT</th>
+                    </tr>
+                    <!-- Bộ lọc theo Cột -->
+                    <tr class="table-filter-row">
+                        <th class="bg-light"></th>
+                        <th class="bg-light"><input type="text" class="form-control col-search" data-col="code" placeholder="Lọc mã..."></th>
+                        <th class="bg-light"><input type="text" class="form-control col-search" data-col="name" placeholder="Lọc tên vật tư..."></th>
+                        <th class="bg-light">
+                            <select class="form-select col-search" data-col="category">
+                                <option value="">-- Tất cả nhóm --</option>
+                                @foreach (var cat in dbCategories)
+                                {
+                                    <option value="@cat.Id">@cat.Name</option>
+                                }
+                            </select>
+                        </th>
+                        <th class="bg-light"></th>
+                        <th class="bg-light"></th>
+                        <th class="bg-light"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        // Nhóm các item theo Category Name
+                        var groupedItems = Model.GroupBy(x => x.WarehouseCategory?.Name ?? "Chưa phân loại").OrderBy(g => g.Key);
+                    }
+                    @foreach (var group in groupedItems)
+                    {
+                        <tr class="group-header" data-group-name="@group.Key">
+                            <td colspan="7" class="fw-bold py-2 ps-4">
+                                <i class="fa-solid fa-layer-group me-2 text-primary"></i> @group.Key
+                                <span class="badge bg-secondary ms-2 rounded-pill">@group.Count()</span>
+                            </td>
+                        </tr>
+                        @foreach (var item in group)
+                        {
+                            <tr class="item-row" data-id="@item.Id" data-code="@item.Code.ToLower()" data-name="@item.Name.ToLower()" data-category-id="@item.CategoryId" data-group-name="@group.Key"
+                                oncontextmenu="showContextMenu(event, @item.Id, '@item.Code', '@item.Name')">
+
+                                <td class="ps-4">
+                                    <div class="item-img-box shadow-sm" onclick="showImage('@item.Image', '@item.Name')">
+                                        @if (!string.IsNullOrEmpty(item.Image))
+                                        {
+                                            <img src="/uploads/items/@item.Image" alt="img" loading="lazy">
+                                        }
+                                        else
+                                        {
+
+                                            <i class="fa-solid fa-box-open text-muted opacity-25 fs-4"></i>
+                                        }
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <span class="font-monospace text-muted fw-semibold small opacity-50 text-wrap text-break">@item.Code</span>
+                                </td>
+
+                                <td>
+                                    <div class="fw-bolder text-primary fs-5 text-wrap search-name" style="letter-spacing: -0.5px;">@item.Name</div>
+                                    @if (!string.IsNullOrEmpty(item.Note))
+                                    {
+                                        <div class="small text-muted fst-italic mt-1 text-wrap"><i class="fa-solid fa-info-circle me-1"></i> @item.Note</div>
+                                    }
+                                    @if (item.ConversionRate > 1 && !string.IsNullOrEmpty(item.ImportUnit))
+                                    {
+                                        <div class="mt-1 small text-info fw-bold"><i class="fa-solid fa-right-left me-1"></i> Quy đổi: 1 @item.ImportUnit = @item.ConversionRate @item.Unit</div>
+                                    }
+                                </td>
+
+                                <td><span class="badge bg-light text-secondary border fw-600 px-2 py-1 text-wrap">@item.WarehouseCategory?.Name</span></td>
+                                <td class="text-center text-muted fw-bold">@item.Unit</td>
+                                <td class="text-end">
+                                    @if (item.StockQuantity <= 0)
+                                    {
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1 text-nowrap">Hết hàng</span>
+                                    }
+                                    else
+                                    {
+                                        <div class="fw-800 text-dark fs-5">@item.StockQuantity.ToString("N2") <span class="fs-6 text-muted fw-normal">@item.Unit</span></div>
+                                        @if (item.ConversionRate > 1 && !string.IsNullOrEmpty(item.ImportUnit))
+                                        {
+                                            double stockInImportUnit = item.StockQuantity / item.ConversionRate;
+                                            <div class="small text-muted fw-bold mt-1">~ @stockInImportUnit.ToString("N2") @item.ImportUnit</div>
+                                        }
+                                    }
+                                </td>
+                                <td class="text-end fw-bold text-muted pe-4">@item.CostPrice.ToString("N0")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+
+            <div id="noDataFound" class="text-center py-5 d-none">
+                <i class="fa-solid fa-magnifying-glass fa-3x text-muted opacity-25 mb-3"></i>
+                <h5 class="text-dark fw-bold">Không tìm thấy vật tư nào</h5>
+                <p class="small text-muted">Kiểm tra lại bộ lọc theo cột hoặc từ khóa</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL TẠO/SỬA VẬT TƯ -->
+<!-- ========================================== -->
+<div class="modal fade" id="itemModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-lg-down">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="background-color: #f8fafc;">
+            <!-- Header Modal -->
+            <div class="modal-header modal-blue-header py-3 px-4">
+                <h5 class="modal-title fw-bold" id="modalTitle"><i class="fa-solid fa-box-open me-2"></i> Thêm vật tư mới</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <!-- Body Modal -->
+            <div class="modal-body bg-light p-4">
+                <form id="itemForm" enctype="multipart/form-data" class="needs-validation" novalidate>
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="ItemId" name="Id" value="0" />
+
+                    <div class="row g-4">
+
+                        <!-- Cột Trái: Upload Hình Ảnh -->
+                        <div class="col-lg-4 col-xl-3">
+                            <div class="bg-white p-3 rounded-4 shadow-sm border border-light h-100 d-flex flex-column">
+                                <label class="form-label fw-bold text-dark mb-3 text-center">Hình ảnh đại diện</label>
+                                <div class="img-upload-box flex-grow-1 mb-3" id="previewBox" onclick="document.getElementById('ImageFile').click()" style="background-size: cover; background-position: center; min-height: 200px;">
+                                    <div id="previewPlaceholder" class="text-center text-muted">
+                                        <i class="fa-solid fa-cloud-arrow-up fa-3x mb-2 text-primary opacity-75"></i>
+                                        <div class="fw-bold small text-primary">Click để tải ảnh lên</div>
+                                    </div>
+                                </div>
+                                <input type="file" id="ImageFile" name="ImageFile" class="d-none" accept="image/*" onchange="previewImage(this)">
+                                <button type="button" class="btn btn-outline-danger w-100 rounded-pill fw-bold" onclick="clearImage()" id="btnClearImg" style="display:none"><i class="fa-solid fa-trash me-1"></i> Xóa ảnh</button>
+                            </div>
+                        </div>
+
+                        <!-- Cột Phải: Form Nhập Liệu -->
+                        <div class="col-lg-8 col-xl-9">
+                            <div class="bg-white p-4 rounded-4 shadow-sm border border-light h-100">
+
+                                <!-- Section 1: Thông tin cơ bản -->
+                                <h6 class="fw-bold text-primary mb-3"><i class="fa-solid fa-circle-info me-2"></i>Thông tin cơ bản</h6>
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-5">
+                                        <label class="form-label small fw-bold text-muted mb-1">Mã Vật Tư <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control fw-bold text-primary border-primary" id="Code" name="Code" required placeholder="VD: VT-001">
+                                    </div>
+                                    <div class="col-md-7">
+                                        <label class="form-label small fw-bold text-muted mb-1">Tên Gọi Vật Tư <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control fw-bold text-dark" id="Name" name="Name" required placeholder="Tên sản phẩm...">
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label class="form-label small fw-bold text-muted mb-1">Nhóm Hàng / Phân loại <span class="text-danger">*</span></label>
+                                        <select class="form-select fw-bold" id="CategoryId" name="CategoryId" required>
+                                            <option value="">-- Chọn nhóm hàng --</option>
+                                            @foreach (var cat in dbCategories)
+                                            {
+                                                <option value="@cat.Id">@cat.Name</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row g-4">
+                                    <!-- Section 2: Cấu hình ĐVT -->
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-light rounded-3 border h-100">
+                                            <h6 class="fw-bold text-dark mb-3"><i class="fa-solid fa-scale-balanced me-2 text-info"></i>Cấu hình Quy đổi ĐVT</h6>
+                                            <div class="row g-3">
+                                                <div class="col-6">
+                                                    <label class="form-label small fw-bold text-muted mb-1">ĐVT (Base) <span class="text-danger">*</span></label>
+                                                    <input type="text" class="form-control fw-bold" id="Unit" name="Unit" required placeholder="Con, Kg...">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label small fw-bold text-muted mb-1">ĐV Nhập (Tùy chọn)</label>
+                                                    <input type="text" class="form-control fw-bold text-info" id="ImportUnit" name="ImportUnit" placeholder="Thùng, Bao...">
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label small fw-bold text-info mb-1">Quy đổi (1 ĐV Nhập = ? Base)</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text bg-white border-info text-info"><i class="fa-solid fa-xmark"></i></span>
+                                                        <input type="number" step="any" class="form-control border-info text-info fw-bold" id="ConversionRate" name="ConversionRate" value="1" min="1">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Section 3: Cấu hình Tồn kho & Giá -->
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-light rounded-3 border h-100">
+                                            <h6 class="fw-bold text-dark mb-3"><i class="fa-solid fa-vault me-2 text-success"></i>Tồn kho & Giá trị</h6>
+                                            <div class="row g-3">
+                                                <div class="col-12">
+                                                    <label class="form-label small fw-bold text-success mb-1">Tồn kho Đầu kỳ (Base)</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text bg-white border-success text-success"><i class="fa-solid fa-cubes"></i></span>
+                                                        <input type="number" step="0.01" class="form-control fw-bold text-success border-success" id="StockQuantity" name="StockQuantity" value="0">
+                                                    </div>
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label small fw-bold text-danger mb-1">Giá vốn (1 Base)</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control fw-bold text-danger border-danger border-end-0" id="CostPrice" name="CostPrice" value="0">
+                                                        <span class="input-group-text bg-white border-danger text-danger border-start-0">VNĐ</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Section 4: Ghi chú -->
+                                <div class="mt-4">
+                                    <label class="form-label small fw-bold text-muted mb-1">Ghi chú thêm</label>
+                                    <textarea class="form-control" id="Note" name="Note" rows="2" placeholder="Nhập ghi chú nội bộ..."></textarea>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Footer Form -->
+            <div class="modal-footer bg-white border-top py-3 px-4">
+                <button type="button" class="btn btn-light fw-bold rounded-pill px-4 border" data-bs-dismiss="modal">Hủy bỏ</button>
+                <button type="button" class="btn btn-primary fw-bold rounded-pill px-5 shadow-sm" onclick="saveItem()"><i class="fa-solid fa-save me-2"></i> Lưu Dữ Liệu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL QUẢN LÝ NHÓM HÀNG -->
+<div class="modal fade" id="categoryModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header bg-dark text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-tags me-2 text-info"></i> Thiết Lập Nhóm Hàng</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light p-4">
+                <label class="small fw-bold text-muted mb-2">Tạo nhóm hàng mới</label>
+                <div class="input-group mb-4 shadow-sm rounded-3">
+                    <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-layer-group text-primary"></i></span>
+                    <input type="text" id="newCategoryName" class="form-control fw-bold border-start-0 py-2" placeholder="Gõ tên nhóm mới...">
+                    <button class="btn btn-primary fw-bold px-3 px-sm-4" onclick="addCategory()"><i class="fa-solid fa-plus me-1"></i> TẠO</button>
+                </div>
+
+                <label class="small fw-bold text-muted mb-2">Danh sách các nhóm hiện tại</label>
+                <div class="bg-white rounded-3 border shadow-sm overflow-hidden" style="max-height: 350px; overflow-y: auto;">
+                    <table class="table table-hover mb-0 align-middle">
+                        <tbody id="categoryTableBody">
+                            @foreach (var cat in dbCategories)
+                            {
+                                <tr id="cat_row_@cat.Id">
+                                    <td class="fw-bold ps-4 text-dark"><i class="fa-solid fa-tag text-muted me-2 small"></i>@cat.Name</td>
+                                    <td class="text-end pe-3">
+                                        <button class="btn btn-sm btn-light text-danger rounded-circle shadow-sm" onclick="deleteCategory(@cat.Id, '@cat.Name')" title="Xóa nhóm"><i class="fa-solid fa-trash-can"></i></button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MENU CHUỘT PHẢI CỦA BẢNG VẬT TƯ -->
+<div id="contextMenu" style="display:none; position:absolute; z-index:9999;" class="bg-white shadow-lg rounded-3 border p-1">
+    <button class="dropdown-item py-2 px-3 rounded fw-600" onclick="triggerEdit()"><i class="fa-solid fa-pen text-primary me-2"></i> Sửa vật tư này</button>
+    <button class="dropdown-item py-2 px-3 rounded fw-600" onclick="triggerPrintLabel()"><i class="fa-solid fa-print text-dark me-2"></i> In Tem Barcode</button>
+    <div class="dropdown-divider my-1"></div>
+    <button class="dropdown-item py-2 px-3 rounded fw-600" onclick="copyCode()"><i class="fa-regular fa-copy text-secondary me-2"></i> Sao chép Mã VT</button>
+</div>
+
+<!-- CÁC MODAL KHÁC -->
+<div class="modal fade" id="imgModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content bg-transparent border-0"><div class="text-end mb-2"><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><img src="" id="zoomImg" class="img-fluid rounded shadow-lg"></div></div></div>
+<div class="modal fade" id="scannerModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg"><div class="modal-header bg-dark text-white"><h5 class="modal-title"><i class="fa-solid fa-camera me-2"></i>Quét Mã</h5><button type="button" class="btn-close btn-close-white" onclick="stopScanner()" data-bs-dismiss="modal"></button></div><div class="modal-body p-0"><div id="reader" style="width: 100%;"></div></div></div></div></div>
+<div class="modal fade" id="printLabelModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg rounded-4"><div class="modal-header bg-light"><h5 class="modal-title fw-bold"><i class="fa-solid fa-print me-2"></i>In Tem Mã Vạch</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body text-center bg-light" id="labelContent"><div class="border border-dark p-3 d-inline-block rounded-3 shadow-sm mx-auto" style="width: 100%; max-width: 350px; background: white;"><h5 class="fw-bold mb-1 text-uppercase text-truncate" id="lblItemName">TÊN VẬT TƯ</h5><div class="text-muted small fw-bold mb-2 font-monospace" id="lblItemCode">MÃ: VT-001</div><svg id="barcodeDisplay" style="width: 100%; max-width: 100%;"></svg></div></div><div class="modal-footer"><button type="button" class="btn btn-primary fw-bold rounded-pill px-5 shadow-sm w-100 w-sm-auto" onclick="printDiv('labelContent')"><i class="fa-solid fa-print me-2"></i>IN RA MÁY TEM</button></div></div></div></div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        let selectedId = 0; let selectedCode = ""; let selectedName = "";
+        let selectedCategories = [];
+
+        function toggleFilterTag(element) {
+        let catId = element.getAttribute("data-cat-id");
+        let tagAll = document.getElementById("tagAll");
+
+        if (element.classList.contains("active")) {
+        element.classList.remove("active");
+        selectedCategories = selectedCategories.filter(id => id !== catId);
+        } else {
+        element.classList.add("active");
+        selectedCategories.push(catId);
+        }
+
+        if (selectedCategories.length > 0) tagAll.classList.remove("active");
+        else tagAll.classList.add("active");
+
+        filterTable();
+        }
+
+        function resetFilterTags(tagAllElement) {
+        document.querySelectorAll('.cat-tag').forEach(el => el.classList.remove('active'));
+        tagAllElement.classList.add('active');
+        selectedCategories = [];
+        filterTable();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.col-search').forEach(el => {
+        if (el.tagName === 'SELECT') { el.addEventListener('change', filterTable); }
+        else { el.addEventListener('keyup', filterTable); }
+        });
+        });
+
+        function filterTable() {
+        let globalInput = document.getElementById("globalSearch").value.toLowerCase();
+        let colCode = document.querySelector('input[data-col="code"]').value.toLowerCase();
+        let colName = document.querySelector('input[data-col="name"]').value.toLowerCase();
+        let colCategory = document.querySelector('select[data-col="category"]').value;
+
+        let rows = document.querySelectorAll(".item-row");
+        let hasData = false;
+
+        rows.forEach(row => {
+        let name = row.getAttribute("data-name");
+        let code = row.getAttribute("data-code");
+        let catId = row.getAttribute("data-category-id");
+
+        let matchGlobal = name.includes(globalInput) || code.includes(globalInput);
+        let matchCode = code.includes(colCode);
+        let matchName = name.includes(colName);
+        let matchCatSelect = (colCategory === "" || catId === colCategory);
+        let matchCatTags = selectedCategories.length === 0 || selectedCategories.includes(catId);
+
+        if (matchGlobal && matchCode && matchName && matchCatSelect && matchCatTags) {
+        row.style.display = "";
+        hasData = true;
+        } else {
+        row.style.display = "none";
+        }
+        });
+
+        document.querySelectorAll('.group-header').forEach(header => {
+        let groupName = header.getAttribute('data-group-name');
+        let itemsInGroup = document.querySelectorAll(`.item-row[data-group-name="${groupName}"]`);
+        let isAnyVisible = Array.from(itemsInGroup).some(item => item.style.display !== "none");
+        header.style.display = isAnyVisible ? "" : "none";
+        });
+
+        document.getElementById("noDataFound").classList.toggle("d-none", hasData);
+        }
+
+        function saveItem() {
+        var formEl = $('#itemForm')[0];
+        if (!formEl.checkValidity()) {
+        formEl.classList.add('was-validated');
+        Swal.fire({ toast: true, position: 'top', icon: 'warning', title: 'Vui lòng điền đủ ô bắt buộc (*)', showConfirmButton: false, timer: 2500 });
+        return;
+        }
+
+        var formData = new FormData(formEl);
+        var id = $('#ItemId').val();
+        var url = id == 0 ? '/Warehouse/Create' : '/Warehouse/Edit';
+
+        Swal.fire({ title: 'Đang lưu...', didOpen: () => Swal.showLoading() });
+
+        $.ajax({
+        url: url, type: 'POST', data: formData, contentType: false, processData: false,
+        success: function (res) {
+        if (res.success) { Swal.fire("Thành công", res.message, "success").then(() => location.reload()); }
+        else { Swal.fire({ icon: "error", title: "Lỗi lưu dữ liệu", text: res.message }); }
+        },
+        error: function () { Swal.fire("Lỗi kết nối", "Lỗi đường truyền mạng", "error"); }
+        });
+        }
+
+        function openModal(id) {
+        $('#itemForm')[0].reset();
+        $('#itemForm').removeClass('was-validated');
+        clearImage(); $('#ItemId').val(id);
+
+        if (id > 0) {
+        $('#modalTitle').html('<i class="fa-solid fa-pen-to-square me-2"></i> Cập nhật vật tư');
+        $('#StockQuantity').prop('readonly', true).parent().addClass('bg-light');
+        $('#CostPrice').prop('readonly', true).parent().addClass('bg-light');
+
+        $.get('/Warehouse/GetJson/' + id, function (data) {
+        $('#Code').val(data.code); $('#Name').val(data.name); $('#Unit').val(data.unit);
+        $('#ImportUnit').val(data.importUnit); $('#ConversionRate').val(data.conversionRate || 1);
+        $('#CategoryId').val(data.categoryId); $('#Note').val(data.note);
+        $('#StockQuantity').val(data.stockQuantity); $('#CostPrice').val(data.costPrice);
+
+        if (data.image) {
+        $('#previewBox').css('background-image', 'url(/uploads/items/' + data.image + ')');
+        $('#previewPlaceholder').hide();
+        $('#btnClearImg').show();
+        }
+        $('#itemModal').modal('show');
+        });
+        } else {
+        $('#modalTitle').html('<i class="fa-solid fa-box-open me-2"></i> Thêm vật tư mới');
+        $('#StockQuantity').prop('readonly', false).parent().removeClass('bg-light');
+        $('#CostPrice').prop('readonly', false).parent().removeClass('bg-light');
+        $('#itemModal').modal('show');
+        }
+        }
+
+        function openCategoryManager() { $('#categoryModal').modal('show'); }
+        function addCategory() {
+        let name = $('#newCategoryName').val();
+        if (!name) { Swal.fire({ toast: true, position: 'top', icon: 'warning', title: 'Chưa nhập tên nhóm!' }); return; }
+        $.post('/Warehouse/AddCategory', { name: name }, function (res) {
+        if (res.success) {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Đã tạo nhóm', showConfirmButton: false, timer: 1000 });
+        setTimeout(() => location.reload(), 1000);
+        } else { Swal.fire('Lỗi', res.message, 'error'); }
+        });
+        }
+        function deleteCategory(id, name) {
+        Swal.fire({
+        title: 'Xóa nhóm [' + name + ']?',
+        text: "Hệ thống sẽ chặn xóa nếu nhóm đang chứa vật tư.",
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Đồng ý Xóa', cancelButtonText: 'Hủy'
+        }).then((result) => {
+        if (result.isConfirmed) {
+        $.post('/Warehouse/DeleteCategory', { id: id }, function (res) {
+        if (res.success) {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Xóa thành công', showConfirmButton: false, timer: 1000 });
+        setTimeout(() => location.reload(), 1000);
+        } else { Swal.fire('Cảnh báo an toàn', res.message, 'error'); }
+        });
+        }
+        });
+        }
+
+        function previewImage(input) {
+        if (input.files && input.files[0]) {
+        var r = new FileReader();
+        r.onload = function (e) {
+        $('#previewBox').css('background-image', 'url(' + e.target.result + ')');
+        $('#previewPlaceholder').hide();
+        $('#btnClearImg').show();
+        }
+        r.readAsDataURL(input.files[0]);
+        }
+        }
+        function clearImage() {
+        $('#ImageFile').val('');
+        $('#previewBox').css('background-image', 'none');
+        $('#previewPlaceholder').show();
+        $('#btnClearImg').hide();
+        }
+        function showImage(src, title) { if (!src) return; $('#zoomImg').attr('src', '/uploads/items/' + src); $('#imgModal').modal('show'); }
+
+        function showContextMenu(e, id, code, name) {
+        e.preventDefault();
+        selectedId = id; selectedCode = code; selectedName = name;
+
+        let menu = $('#contextMenu');
+        menu.show();
+
+        let menuWidth = menu.outerWidth();
+        let menuHeight = menu.outerHeight();
+        let windowWidth = window.innerWidth;
+        let windowHeight = window.innerHeight;
+
+        let x = e.clientX;
+        let y = e.clientY;
+
+        if (x + menuWidth > windowWidth) {
+        x = windowWidth - menuWidth - 5;
+        }
+        if (y + menuHeight > windowHeight) {
+        y = windowHeight - menuHeight - 5;
+        }
+
+        menu.css({ left: x + window.scrollX, top: y + window.scrollY });
+        }
+        $(document).on('click', function () { $('#contextMenu').hide(); });
+
+        function triggerEdit() { if (selectedId > 0) openModal(selectedId); }
+        function copyCode() { navigator.clipboard.writeText(selectedCode); Swal.fire({ icon: 'success', title: 'Đã copy: ' + selectedCode, toast: true, position: 'top-end', showConfirmButton: false, timer: 1000 }); }
+
+        function triggerPrintLabel() {
+        document.getElementById('lblItemName').innerText = selectedName;
+        document.getElementById('lblItemCode').innerText = "MÃ: " + selectedCode;
+        JsBarcode("#barcodeDisplay", selectedCode, { format: "CODE128", lineColor: "#000", width: 2, height: 50, displayValue: true, fontSize: 14 });
+        new bootstrap.Modal(document.getElementById('printLabelModal')).show();
+        }
+        function printDiv(divId) {
+        var content = document.getElementById(divId).innerHTML; var myWindow = window.open('', '', 'width=600,height=600');
+        myWindow.document.write('<html><head><title>Print Label</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css"></head><body class="text-center pt-5">' + content + '</body></html>');
+        myWindow.document.close(); myWindow.focus(); setTimeout(function () { myWindow.print(); myWindow.close(); }, 500);
+        }
+
+        let html5QrcodeScanner;
+        function startScanner() {
+        const modal = new bootstrap.Modal(document.getElementById('scannerModal')); modal.show();
+        html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+        html5QrcodeScanner.render(onScanSuccess, (err) => { });
+        }
+        function onScanSuccess(decodedText) {
+        stopScanner(); bootstrap.Modal.getInstance(document.getElementById('scannerModal')).hide();
+        document.getElementById("globalSearch").value = decodedText; filterTable();
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Đã quét mã!', timer: 1500, showConfirmButton: false });
+        }
+        function stopScanner() { if (html5QrcodeScanner) { html5QrcodeScanner.clear(); } }
+    </script>
+}

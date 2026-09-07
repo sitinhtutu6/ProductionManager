@@ -1,0 +1,304 @@
+﻿@model ProductionApp.Web.Models.ViewModels.CashFlowYearlyVM
+@{
+    ViewData["Title"] = "Báo cáo Dòng tiền Thực tế";
+    System.Globalization.CultureInfo viVN = new System.Globalization.CultureInfo("vi-VN");
+}
+
+<style>
+    .report-bg {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+        padding-bottom: 50px;
+        font-family: 'Segoe UI', sans-serif;
+    }
+
+    .glass-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        border-radius: 15px;
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+        transition: transform 0.2s;
+    }
+
+        .glass-card:hover {
+            transform: translateY(-3px);
+        }
+
+    .table-cash th {
+        background-color: #f8f9fa;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        color: #6c757d;
+        letter-spacing: 0.5px;
+    }
+
+    .table-cash td {
+        vertical-align: middle;
+        font-size: 0.95rem;
+    }
+
+    /* CSS THANH SWITCH 3 NÚT */
+    .nav-pill-switch {
+        background: #fff;
+        border-radius: 50px;
+        padding: 4px;
+        display: inline-flex;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        border: 1px solid #e9ecef;
+    }
+
+        .nav-pill-switch .btn {
+            border-radius: 50px;
+            padding: 6px 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            border: none;
+            color: #6c757d;
+            min-width: 160px;
+        }
+
+            .nav-pill-switch .btn:hover {
+                background: #f8f9fa;
+                color: #000;
+            }
+
+            /* Trạng thái Active cho Dòng Tiền (Màu Xanh Lá) */
+            .nav-pill-switch .btn.active {
+                background-color: #198754;
+                color: white;
+                box-shadow: 0 2px 4px rgba(25, 135, 84, 0.3);
+            }
+
+    @@media print {
+        .no-print {
+            display: none !important;
+        }
+
+        .report-bg {
+            background: white;
+        }
+
+        .glass-card {
+            box-shadow: none;
+            border: 1px solid #ddd;
+        }
+    }
+</style>
+
+<div class="report-bg">
+    <div class="container-fluid px-4 pt-4">
+
+        <div class="d-flex justify-content-center mb-5 no-print">
+            <div class="nav-pill-switch">
+                <a href="@Url.Action("Index", "Report")" class="btn">
+                    <i class="fa-solid fa-chart-pie me-2"></i>Hiệu quả SXKD
+                </a>
+
+                <a href="javascript:void(0)" class="btn active">
+                    <i class="fa-solid fa-money-bill-trend-up me-2"></i>Dòng tiền Thực tế
+                </a>
+
+                <a href="@Url.Action("AllocatedAnalysis", "Report")" class="btn">
+                    <i class="fa-solid fa-scale-balanced me-2"></i>Phân bổ Lợi nhuận
+                </a>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-end mb-4">
+            <div>
+                <h4 class="fw-bold text-dark mb-1">BÁO CÁO DÒNG TIỀN</h4>
+                <p class="text-muted small mb-0">Theo dõi biến động dòng tiền thực tế (Cash Flow) theo tháng</p>
+            </div>
+
+            <form asp-action="CashFlow" method="get" class="d-flex align-items-center gap-2 bg-white p-2 rounded-pill shadow-sm border no-print">
+                <label class="fw-bold text-secondary small ps-2 mb-0">Năm tài chính:</label>
+                <select name="year" class="form-select form-select-sm border-0 fw-bold bg-light rounded-pill text-primary" onchange="this.form.submit()" style="width: 100px;">
+                    @for (int i = DateTime.Now.Year; i >= DateTime.Now.Year - 5; i--)
+                    {
+                        <option value="@i" selected="@(Model.Year == i)">@i</option>
+                    }
+                </select>
+            </form>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-md-4">
+                <div class="glass-card p-4 d-flex align-items-center justify-content-between h-100 position-relative overflow-hidden">
+                    <div style="position: relative; z-index: 1;">
+                        <div class="text-secondary fw-bold text-uppercase small mb-1">Tồn quỹ đầu năm</div>
+                        <h3 class="fw-bold text-dark mb-0">@Model.YearOpeningBalance.ToString("N0") <small class="fs-6 text-muted">₫</small></h3>
+                    </div>
+                    <i class="fa-solid fa-hourglass-start position-absolute end-0 bottom-0 mb-n2 me-3 text-secondary opacity-10" style="font-size: 5rem;"></i>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="glass-card p-4 d-flex align-items-center justify-content-between h-100 position-relative overflow-hidden bg-white">
+                    <div style="position: relative; z-index: 1;">
+                        <div class="text-primary fw-bold text-uppercase small mb-1">Tồn quỹ hiện tại</div>
+                        <h3 class="fw-bold text-primary mb-0">@Model.YearClosingBalance.ToString("N0") <small class="fs-6 text-muted">₫</small></h3>
+                    </div>
+                    <i class="fa-solid fa-wallet position-absolute end-0 bottom-0 mb-n2 me-3 text-primary opacity-10" style="font-size: 5rem;"></i>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                @{
+                    var netYear = Model.YearClosingBalance - Model.YearOpeningBalance;
+                }
+                <div class="glass-card p-4 d-flex align-items-center justify-content-between h-100 position-relative overflow-hidden">
+                    <div style="position: relative; z-index: 1;">
+                        <div class="text-muted fw-bold text-uppercase small mb-1">Biến động ròng (Năm)</div>
+                        <h3 class="fw-bold @(netYear >= 0 ? "text-success" : "text-danger") mb-0">
+                            @(netYear >= 0 ? "+" : "")@netYear.ToString("N0") <small class="fs-6 text-muted">₫</small>
+                        </h3>
+                    </div>
+                    <i class="fa-solid fa-chart-line position-absolute end-0 bottom-0 mb-n2 me-3 text-success opacity-10" style="font-size: 5rem;"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="glass-card p-4 mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h6 class="fw-bold text-dark m-0"><i class="fa-solid fa-chart-area me-2 text-primary"></i>BIỂU ĐỒ SỐ DƯ CUỐI KỲ</h6>
+                        <span class="badge bg-light text-secondary border">Đơn vị: VNĐ</span>
+                    </div>
+                    <div style="height: 350px; width: 100%;">
+                        <canvas id="cashChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="glass-card overflow-hidden">
+                    <div class="p-3 border-bottom bg-light bg-opacity-50">
+                        <h6 class="fw-bold text-dark m-0"><i class="fa-solid fa-list-ol me-2 text-secondary"></i>CHI TIẾT DÒNG TIỀN THEO THÁNG</h6>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-cash table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4 py-3">Thời gian</th>
+                                    <th class="text-end py-3 text-muted">Số dư Đầu kỳ</th>
+                                    <th class="text-end py-3 text-success">Tổng Thu (+)</th>
+                                    <th class="text-end py-3 text-danger">Tổng Chi (-)</th>
+                                    <th class="text-end py-3 text-primary fw-bold" style="background-color: #f1f8ff;">Số dư Cuối kỳ (=)</th>
+                                    <th class="text-end py-3 pe-4">Biến động thuần</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.MonthlyStats.Any())
+                                {
+                                    foreach (var item in Model.MonthlyStats)
+                                    {
+                                        <tr>
+                                            <td class="ps-4 fw-bold text-secondary">Tháng @item.Month</td>
+                                            <td class="text-end text-muted">@item.Opening.ToString("N0")</td>
+                                            <td class="text-end text-success fw-bold">@item.In.ToString("N0")</td>
+                                            <td class="text-end text-danger fw-bold">@item.Out.ToString("N0")</td>
+                                            <td class="text-end fw-bold fs-6 text-primary border-start border-end" style="background-color: #f8fbff;">@item.Closing.ToString("N0")</td>
+                                            <td class="text-end pe-4">
+                                                @if (item.NetChange > 0)
+                                                {
+                                                    <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3">+@item.NetChange.ToString("N0")</span>
+                                                }
+                                                else if (item.NetChange < 0)
+                                                {
+                                                    <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3">@item.NetChange.ToString("N0")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr><td colspan="6" class="text-center py-5 text-muted">Chưa có dữ liệu cho năm @Model.Year</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('cashChart');
+    if (ctx) {
+        // Gradient cho biểu đồ đẹp hơn
+        const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(25, 135, 84, 0.2)'); // Màu xanh lá nhạt
+        gradient.addColorStop(1, 'rgba(25, 135, 84, 0.0)');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: @Html.Raw(Model.ChartLabels),
+                datasets: [{
+                    label: 'Số dư cuối kỳ',
+                    data: @Html.Raw(Model.ChartBalanceData),
+                    borderColor: '#198754', // Đổi sang màu xanh lá
+                    backgroundColor: gradient,
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#198754',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function (context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' },
+                        ticks: {
+                            callback: function (value, index, values) {
+                                return value.toLocaleString('vi-VN') + ' ₫';
+                            }
+                        }
+                    },
+                    x: { grid: { display: false } }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            }
+        });
+    }
+</script>

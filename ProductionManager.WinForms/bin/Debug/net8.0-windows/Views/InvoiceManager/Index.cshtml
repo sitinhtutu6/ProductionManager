@@ -1,0 +1,474 @@
+﻿@{
+    ViewData["Title"] = "Trung Tâm Hóa Đơn (Invoices)";
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<style>
+    body {
+        background-color: #f8fafc;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .nav-custom {
+        background: white;
+        padding: 10px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+        border: 1px solid #e2e8f0;
+    }
+
+        .nav-custom .nav-link {
+            font-weight: 800;
+            color: #64748b;
+            border-radius: 8px;
+            padding: 12px 20px;
+            transition: 0.2s;
+            border: 1px solid transparent;
+        }
+
+            .nav-custom .nav-link:hover:not(.active) {
+                background-color: #f1f5f9;
+                color: #0ea5e9;
+            }
+
+            .nav-custom .nav-link.active.outbound {
+                background-color: #e0f2fe;
+                color: #0284c7;
+                border-color: #bae6fd;
+            }
+
+            .nav-custom .nav-link.active.inbound {
+                background-color: #d1fae5;
+                color: #059669;
+                border-color: #a7f3d0;
+            }
+
+    /* Nút lọc nhanh đổi màu khi chọn */
+    .quick-filter-btn {
+        font-size: 0.85rem;
+        font-weight: 700;
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        color: #64748b;
+        background: white;
+        transition: 0.2s;
+    }
+
+        .quick-filter-btn:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+
+        .quick-filter-btn.active {
+            background: #0ea5e9;
+            border-color: #0ea5e9;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.3);
+        }
+
+    .table-custom {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+        border: 1px solid #e2e8f0;
+    }
+
+        .table-custom thead th {
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 800;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            border-bottom: 2px solid #e2e8f0;
+            padding: 16px 15px;
+        }
+
+        .table-custom tbody td {
+            vertical-align: middle;
+            padding: 14px 15px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+    /* Hover cho dòng Master */
+    .master-row {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+        .master-row:hover {
+            background-color: #f1f5f9 !important;
+        }
+
+    /* Style cho phần Detail (Nguồn chứng từ gốc) */
+    .sub-detail-row {
+        display: none;
+        background-color: #fafafa;
+    }
+
+        .sub-detail-row td {
+            padding: 0 !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+        }
+
+    .sub-content-box {
+        border-left: 4px solid #0ea5e9;
+        margin: 15px 15px 20px 60px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        padding: 20px;
+    }
+
+    .link-doc {
+        transition: 0.2s;
+        cursor: pointer;
+        text-decoration: none !important;
+        display: inline-block;
+    }
+
+        .link-doc:hover {
+            filter: brightness(0.85);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+    .icon-toggle {
+        transition: transform 0.3s ease;
+    }
+
+        .icon-toggle.expanded {
+            transform: rotate(90deg);
+            color: #0ea5e9 !important;
+        }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-primary mb-0"><i class="fa-solid fa-file-invoice-dollar me-2"></i> TRUNG TÂM HÓA ĐƠN TỔNG HỢP</h3>
+    </div>
+
+    <!-- Tabs Đầu vào / Đầu ra -->
+    <ul class="nav nav-pills nav-custom mb-4" id="invoiceTabs" role="tablist">
+        <li class="nav-item flex-grow-1 text-center" role="presentation">
+            <button class="nav-link w-100 active outbound" id="outbound-tab" data-type="1" onclick="switchType(1)" type="button"><i class="fa-solid fa-arrow-up-right-from-square me-2"></i>HÓA ĐƠN ĐẦU RA (BÁN HÀNG)</button>
+        </li>
+        <li class="nav-item flex-grow-1 text-center" role="presentation">
+            <button class="nav-link w-100 inbound" id="inbound-tab" data-type="2" onclick="switchType(2)" type="button"><i class="fa-solid fa-arrow-down-to-line me-2"></i>HÓA ĐƠN ĐẦU VÀO (MUA HÀNG)</button>
+        </li>
+    </ul>
+
+    <!-- Control Panel -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4 border">
+        <div class="card-body p-4">
+            <div class="row align-items-center g-3">
+                <!-- Chọn kỳ báo cáo (Dropdown Năm) -->
+                <div class="col-md-2 border-end">
+                    <label class="small fw-bold text-muted mb-2 text-uppercase">Năm Tài Chính</label>
+                    <select id="selYear" class="form-select form-select-lg fw-bold border-primary text-primary shadow-sm" onchange="applyQuickFilter('year', null)">
+                        <option value="2026" selected>Năm 2026</option>
+                        <option value="2025">Năm 2025</option>
+                        <option value="2024">Năm 2024</option>
+                    </select>
+                </div>
+
+                <!-- Các nút Chọn Nhanh -->
+                <div class="col-md-5 border-end">
+                    <label class="small fw-bold text-muted mb-2 d-block text-uppercase">Lọc Nhanh Kỳ Kế Toán</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="quick-filter-btn" onclick="applyQuickFilter('q1', this)">Quý 1</button>
+                        <button class="quick-filter-btn" onclick="applyQuickFilter('q2', this)">Quý 2</button>
+                        <button class="quick-filter-btn" onclick="applyQuickFilter('q3', this)">Quý 3</button>
+                        <button class="quick-filter-btn" onclick="applyQuickFilter('q4', this)">Quý 4</button>
+                        <button class="quick-filter-btn active" id="btnThisMonth" onclick="applyQuickFilter('thisMonth', this)">Tháng này</button>
+                    </div>
+                </div>
+
+                <!-- Chọn Ngày Tùy Chỉnh -->
+                <div class="col-md-5">
+                    <label class="small fw-bold text-muted mb-2 d-block text-uppercase">Tùy chọn Thời Gian</label>
+                    <div class="input-group input-group-lg shadow-sm">
+                        <span class="input-group-text bg-white border-primary text-primary"><i class="fa-solid fa-calendar"></i></span>
+                        <input type="text" id="dateFrom" class="form-control fw-bold datepicker border-primary text-primary" placeholder="Từ ngày">
+                        <span class="input-group-text bg-light border-primary">-</span>
+                        <input type="text" id="dateTo" class="form-control fw-bold datepicker border-primary text-primary" placeholder="Đến ngày">
+                        <button class="btn btn-primary fw-bold px-4" onclick="loadData()"><i class="fa-solid fa-magnifying-glass"></i> TÌM</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toolbar Chức năng -->
+            <div class="d-flex justify-content-between align-items-center mt-4 pt-4 border-top">
+                <div class="btn-group shadow-sm" role="group">
+                    <input type="radio" class="btn-check" name="viewMode" id="modeGrid" value="grid" onchange="renderTable()">
+                    <label class="btn btn-outline-primary fw-bold px-4 py-2" for="modeGrid"><i class="fa-solid fa-list me-2"></i>Dạng Lưới Căn Bản</label>
+
+                    <input type="radio" class="btn-check" name="viewMode" id="modeLinked" value="linked" checked onchange="renderTable()">
+                    <label class="btn btn-outline-primary fw-bold px-4 py-2" for="modeLinked"><i class="fa-solid fa-layer-group me-2"></i>Dạng Master-Detail (Chi Tiết Gốc)</label>
+                </div>
+
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-primary bg-opacity-10 px-4 py-2 rounded-pill border border-primary border-opacity-25 shadow-sm">
+                        <span class="text-primary fw-bold small me-2 text-uppercase">Đã chọn:</span>
+                        <span class="fs-5 fw-900 text-primary" id="lblSelectedTotal">0 ₫</span>
+                    </div>
+                    <button class="btn btn-success fw-bold px-4 py-2 shadow-sm" onclick="exportExcel()"><i class="fa-solid fa-file-excel me-2"></i>Xuất Excel Báo Cáo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vùng hiển thị Dữ Liệu -->
+    <div class="table-responsive table-custom">
+        <table class="table mb-0" id="invoiceTable">
+            <thead id="tblHead"></thead>
+            <tbody id="tblBody">
+                <tr><td colspan="100%" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let currentType = 1; // 1: Đầu ra, 2: Đầu vào
+        let currentData = [];
+        const INVOICE_EXPAND_KEY = 'invoice_expanded_rows';
+
+        $(document).ready(function() {
+            $(".datepicker").flatpickr({ dateFormat: "Y-m-d", locale: "vn" });
+            applyQuickFilter('thisMonth', document.getElementById('btnThisMonth'));
+        });
+
+        function switchType(type) {
+            currentType = type;
+            $('.nav-link').removeClass('active');
+            if (type === 1) $('#outbound-tab').addClass('active');
+            else $('#inbound-tab').addClass('active');
+            loadData();
+        }
+
+        function applyQuickFilter(period, btnElement) {
+            if (btnElement) {
+                $('.quick-filter-btn').removeClass('active');
+                $(btnElement).addClass('active');
+            } else if (period === 'year') {
+                $('.quick-filter-btn').removeClass('active');
+            }
+
+            const year = parseInt($('#selYear').val());
+            let fromDate, toDate;
+            const now = new Date();
+
+            switch (period) {
+                case 'year': fromDate = new Date(year, 0, 1); toDate = new Date(year, 11, 31); break;
+                case 'q1': fromDate = new Date(year, 0, 1); toDate = new Date(year, 2, 31); break;
+                case 'q2': fromDate = new Date(year, 3, 1); toDate = new Date(year, 5, 30); break;
+                case 'q3': fromDate = new Date(year, 6, 1); toDate = new Date(year, 8, 30); break;
+                case 'q4': fromDate = new Date(year, 9, 1); toDate = new Date(year, 11, 31); break;
+                case 'thisMonth':
+                    if (year === now.getFullYear()) {
+                        fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                        toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                    } else {
+                        fromDate = new Date(year, 0, 1); toDate = new Date(year, 0, 31);
+                    }
+                    break;
+            }
+
+            document.getElementById('dateFrom')._flatpickr.setDate(fromDate);
+            document.getElementById('dateTo')._flatpickr.setDate(toDate);
+            loadData();
+        }
+
+        function loadData() {
+            let from = $('#dateFrom').val();
+            let to = $('#dateTo').val();
+
+            document.getElementById('lblSelectedTotal').innerText = "0 ₫";
+            $('#tblBody').html('<tr><td colspan="100%" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>');
+
+            $.ajax({
+                url: '/InvoiceManager/GetInvoices',
+                type: 'GET',
+                data: { type: currentType, fromDate: from, toDate: to },
+                success: function(res) {
+                    if (res.success) {
+                        currentData = res.data;
+                        renderTable();
+                    }
+                }
+            });
+        }
+
+        // TÍNH TỔNG TIỀN CÁC HÓA ĐƠN ĐƯỢC CHECK
+        function toggleAllInvoices(source) {
+            let checkboxes = document.querySelectorAll('.chk-invoice');
+            checkboxes.forEach(chk => chk.checked = source.checked);
+            calculateSelectedTotal();
+        }
+
+        function calculateSelectedTotal() {
+            let checkboxes = document.querySelectorAll('.chk-invoice:checked');
+            let total = 0;
+            checkboxes.forEach(chk => {
+                total += parseFloat(chk.getAttribute('data-amount')) || 0;
+            });
+            document.getElementById('lblSelectedTotal').innerText = total.toLocaleString('vi-VN') + " ₫";
+        }
+
+        // QUẢN LÝ TRẠNG THÁI ĐÓNG MỞ (MASTER-DETAIL)
+        function getExpanded() { return JSON.parse(localStorage.getItem(INVOICE_EXPAND_KEY) || '[]'); }
+        function saveExpanded(arr) { localStorage.setItem(INVOICE_EXPAND_KEY, JSON.stringify(arr)); }
+
+        function toggleSubDetail(invoiceId) {
+            let safeSubCode = "inv_" + invoiceId;
+            let $tr = $('#sub-' + safeSubCode);
+            let $icon = $('#icon-sub-' + safeSubCode);
+            let expanded = getExpanded();
+
+            if ($tr.is(':visible')) {
+                $tr.hide(); // Dùng hide() thay vì slideUp để tránh lag layout table
+                $icon.removeClass('expanded');
+                expanded = expanded.filter(x => x !== invoiceId);
+            } else {
+                $tr.show();
+                $icon.addClass('expanded');
+                if (!expanded.includes(invoiceId)) expanded.push(invoiceId);
+            }
+            saveExpanded(expanded);
+        }
+
+        function restoreExpandedState() {
+            let expanded = getExpanded();
+            expanded.forEach(invoiceId => {
+                let safeSubCode = "inv_" + invoiceId;
+                $('#sub-' + safeSubCode).show();
+                $('#icon-sub-' + safeSubCode).addClass('expanded');
+            });
+        }
+
+        function renderTable() {
+            let mode = $('input[name="viewMode"]:checked').val();
+            let headHtml = ''; let bodyHtml = '';
+
+            document.getElementById('lblSelectedTotal').innerText = "0 ₫";
+
+            if (mode === 'grid') {
+                headHtml = `<tr>
+                            <th width="40" class="text-center"><input type="checkbox" class="form-check-input border-secondary shadow-sm" id="chkAll" onchange="toggleAllInvoices(this)"></th>
+                            <th width="120">Ngày xuất HĐ</th>
+                            <th width="150">Số Hóa Đơn</th>
+                            <th>Tên Đối Tác / Công ty</th>
+                            <th class="text-end">Giá Trị Hóa Đơn</th>
+                            <th class="text-center">Thanh toán</th>
+                            <th>Ghi chú</th>
+                        </tr>`;
+
+                if (currentData.length === 0) {
+                    bodyHtml = `<tr><td colspan="7" class="text-center py-5 text-muted fst-italic"><i class="fa-solid fa-folder-open fa-3x mb-3 text-secondary opacity-50"></i><br>Không có hóa đơn nào trong kỳ.</td></tr>`;
+                } else {
+                    currentData.forEach(item => {
+                        let payStatus = item.lastPaymentDate !== "" ? `<span class="badge bg-success text-white px-2 py-1 shadow-sm"><i class="fa-solid fa-check"></i> Đã Thu/Chi</span><div class="small text-muted mt-1 fw-bold">${item.lastPaymentDate}</div>` : `<span class="badge bg-danger text-white px-2 py-1 shadow-sm">Chưa thanh toán</span>`;
+                        let fileHtml = item.file ? `<a href="/invoices/${item.file}" target="_blank" class="text-primary ms-2 link-doc" title="Xem Hóa Đơn PDF"><i class="fa-solid fa-file-pdf fs-5"></i></a>` : '';
+
+                        bodyHtml += `<tr>
+                                    <td class="text-center"><input type="checkbox" class="form-check-input chk-invoice border-secondary shadow-sm" value="${item.id}" data-amount="${item.totalAmount}" onchange="calculateSelectedTotal()"></td>
+                                    <td><div class="fw-bold text-dark">${item.invoiceDate}</div></td>
+                                    <td><span class="badge bg-primary text-white fs-6 font-monospace shadow-sm px-2 py-1">${item.invoiceNumber}</span> ${fileHtml}</td>
+                                    <td><div class="fw-bold text-dark">${item.partnerName}</div></td>
+                                    <td class="text-end"><div class="fw-800 text-danger fs-5">${item.totalAmount.toLocaleString('vi-VN')}</div></td>
+                                    <td class="text-center">${payStatus}</td>
+                                    <td class="text-muted small fw-bold">${item.note || ''}</td>
+                                </tr>`;
+                    });
+                }
+            } else {
+                // LINKED MODE (MASTER - DETAIL DẠNG XỔ XUỐNG)
+                headHtml = `<tr>
+                            <th width="40" class="text-center"></th>
+                            <th width="40" class="text-center"><input type="checkbox" class="form-check-input border-secondary shadow-sm" id="chkAll" onchange="toggleAllInvoices(this)"></th>
+                            <th width="120">Ngày HĐ</th>
+                            <th width="150">Số Hóa Đơn</th>
+                            <th>Đối Tác</th>
+                            <th class="text-end">Giá Trị HĐ</th>
+                            <th class="text-center">Trạng Thái</th>
+                        </tr>`;
+
+                if (currentData.length === 0) {
+                    bodyHtml = `<tr><td colspan="7" class="text-center py-5 text-muted fst-italic"><i class="fa-solid fa-folder-open fa-3x mb-3 text-secondary opacity-50"></i><br>Không có hóa đơn nào.</td></tr>`;
+                } else {
+                    currentData.forEach(item => {
+                        let docsCount = item.linkedDocs.length;
+                        let safeSubCode = "inv_" + item.id;
+                        let payStatus = item.lastPaymentDate !== "" ? `<span class="badge bg-success text-white px-2 py-1 shadow-sm"><i class="fa-solid fa-check"></i> Đã Thu/Chi</span>` : `<span class="badge bg-danger text-white px-2 py-1 shadow-sm">Chưa thanh toán</span>`;
+
+                        // MASTER ROW
+                        bodyHtml += `<tr class="master-row bg-white" onclick="toggleSubDetail('${item.id}')">
+                                    <td class="text-center align-middle"><i id="icon-sub-${safeSubCode}" class="fa-solid fa-chevron-right text-secondary fs-6 icon-toggle"></i></td>
+                                    <td class="text-center align-middle" onclick="event.stopPropagation();"><input type="checkbox" class="form-check-input chk-invoice border-secondary shadow-sm" value="${item.id}" data-amount="${item.totalAmount}" onchange="calculateSelectedTotal()"></td>
+                                    <td class="fw-bold text-dark align-middle">${item.invoiceDate}</td>
+                                    <td class="align-middle"><span class="badge bg-dark text-white fs-6 font-monospace shadow-sm px-2 py-1">${item.invoiceNumber}</span></td>
+                                    <td class="fw-bold text-dark align-middle">${item.partnerName}</td>
+                                    <td class="text-end fw-800 text-danger align-middle fs-5">${item.totalAmount.toLocaleString('vi-VN')}</td>
+                                    <td class="text-center align-middle">${payStatus}</td>
+                                </tr>`;
+
+                        // BUILD NỘI DUNG CHO BẢNG CON (SUB-DETAIL)
+                        let subRows = '';
+                        if (docsCount === 0) {
+                            subRows = `<tr><td colspan="2" class="text-muted fst-italic py-3"><i class="fa-solid fa-circle-info text-warning me-2"></i>Hóa đơn này không có nguồn chứng từ gốc liên kết.</td></tr>`;
+                        } else {
+                            item.linkedDocs.forEach(d => {
+                                let linkUrl = "#"; let docIcon = "fa-file-lines";
+                                let bgColor = "secondary"; let txtColor = "white";
+
+                                if (d.docType.includes('Đơn Hàng')) { linkUrl = `/Order/Index?colCode=${d.docCode}`; docIcon = "fa-cart-shopping"; bgColor = "primary"; txtColor = "white"; }
+                                else if (d.docType.includes('PO') || d.docType.includes('đặt hàng')) { linkUrl = `/PurchaseOrder/Index?keyword=${d.docCode}`; docIcon = "fa-truck-field"; bgColor = "info"; txtColor = "dark"; }
+                                else if (d.docType.includes('Vận Tải')) { linkUrl = `/ExportShipment/Index?keyword=${d.docCode}`; docIcon = "fa-truck-fast"; bgColor = "warning"; txtColor = "dark"; }
+                                else if (d.docType.includes('Nhập Kho')) { linkUrl = `/Warehouse/History?docCode=${d.docCode}`; docIcon = "fa-boxes-packing"; bgColor = "success"; txtColor = "white"; }
+
+                                let linkHtml = `<a href="${linkUrl}" target="_blank" class="badge bg-${bgColor} text-${txtColor} text-decoration-none font-monospace px-3 py-2 link-doc shadow-sm border border-${bgColor}"><i class="fa-solid ${docIcon} me-2"></i>${d.docCode}</a>`;
+
+                                subRows += `<tr class="border-bottom border-light">
+                                            <td class="py-3 ps-3 align-middle">${linkHtml} <span class="small fw-bold text-secondary ms-2 text-uppercase">${d.docType}</span></td>
+                                            <td class="text-end fw-bold text-dark align-middle fs-6 pe-3">${d.amount.toLocaleString('vi-VN')} <span class="text-muted small fw-normal">₫</span></td>
+                                        </tr>`;
+                            });
+                        }
+
+                        // WRAP BẢNG CON VÀO DÒNG ẨN
+                        bodyHtml += `<tr id="sub-${safeSubCode}" class="sub-detail-row">
+                                    <td colspan="7">
+                                        <div class="sub-content-box">
+                                            <h6 class="fw-bold text-muted mb-3 text-uppercase small"><i class="fa-solid fa-link me-2 text-info"></i> Danh sách nguồn chứng từ gốc phân bổ</h6>
+                                            <table class="table table-sm table-borderless mb-0">
+                                                <tbody>${subRows}</tbody>
+                                            </table>
+                                        </div>
+                                    </td>
+                                </tr>`;
+                    });
+                }
+            }
+
+            $('#tblHead').html(headHtml);
+            $('#tblBody').html(bodyHtml);
+
+            // Khôi phục trạng thái mở khi đổi chế độ hoặc phân trang
+            if (mode === 'linked') restoreExpandedState();
+        }
+
+        function exportExcel() {
+            let from = $('#dateFrom').val();
+            let to = $('#dateTo').val();
+            let mode = $('input[name="viewMode"]:checked').val();
+            let url = `/InvoiceManager/ExportExcel?type=${currentType}&fromDate=${from}&toDate=${to}&mode=${mode}`;
+            window.location.href = url;
+        }
+    </script>
+}

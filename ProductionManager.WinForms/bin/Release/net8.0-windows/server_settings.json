@@ -1,0 +1,18 @@
+{
+  "AdminEmail": "sitinhtutu6@gmail.com",
+  "SenderEmail": "sitinhtutu6@gmail.com",
+  "SenderPassword": "v/CPtFZI\u002B82hwGrqi3JFZ3AdIAxeDzuXVBkSbvY2hIp1k\u002BmWET\u002BAqH907hfnb34v",
+  "TeleToken": "7924485911:AAHbqk8xFiFWK9y-cuKfY4NTEQ-C5DYxrO0",
+  "TeleChatId": "-5115164192",
+  "DiscordWebhook": "https://discord.com/api/webhooks/1452872879908589720/DwOvQoEccEgkLMyRo6G9P6BNhfmf_8rPaoJadAPpFfcbOfmYjI9tROXkw41qpb5HW381",
+  "DbProvider": "MySQL",
+  "ConnectionString": "Server=localhost;Port=3306;Database=ProductionDB;User=root;Password=123456;",
+  "MySQL_Host": "localhost",
+  "MySQL_Db": "ProductionDB",
+  "MySQL_User": "DEmQ2XQeNaN6oDAT93SgiyjqzAlhWGdOt\u002BThV8u\u002Bxsk=",
+  "MySQL_Pass": "BaZ2yoCPFhdKQe6ua0wA/OtEycCiI1WmWSkoeDCIAzw=",
+  "AutoStartWeb": false,
+  "AutoStartAi": false,
+  "AutoStartN8n": false,
+  "NgrokToken": "35Kgke3R0qGeKnqAadWHXk3rDVZ_4AsCCz7fxNyZ6jgbuekoh"
+}

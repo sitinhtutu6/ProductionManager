@@ -1,0 +1,449 @@
+﻿@{
+    ViewData["Title"] = "Điều Phối Sản Xuất";
+}
+
+<link href="https://unpkg.com/vis-timeline/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
+<script src="https://unpkg.com/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js"></script>
+
+
+<style>
+    /* --- 1. CONFIG MÀU NỀN (THEMES) --- */
+    :root {
+        --bg-body: #f1f5f9; /* Mặc định (Xám nhạt) */
+        --bg-sidebar: #ffffff;
+        --text-color: #212529;
+    }
+    
+    /* Theme Tối (Dark) */
+    [data-theme="dark"] {
+        --bg-body: #1e293b;
+        --bg-sidebar: #334155;
+        --text-color: #f8fafc;
+    }
+    /* Theme Đại dương (Ocean) */
+    [data-theme="ocean"] {
+        --bg-body: #e0f2fe; /* Xanh nhạt */
+        --bg-sidebar: #ffffff;
+        --text-color: #0c4a6e;
+    }
+    /* Theme Ấm áp (Warm) */
+    [data-theme="warm"] {
+        --bg-body: #fff7ed; /* Cam nhạt */
+        --bg-sidebar: #ffffff;
+        --text-color: #431407;
+    }
+
+    /* ÁP DỤNG MÀU */
+    body { background-color: var(--bg-body); color: var(--text-color); transition: background 0.3s; }
+    .sidebar-container, .timeline-wrapper, .page-header {
+        background: var(--bg-sidebar) !important;
+        color: var(--text-color);
+    }
+
+    /* --- 2. CSS CHO TIMELINE ITEM --- */
+    .vis-item { border-color: transparent; border-radius: 4px; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    
+    /* 🔵 Đang SX */
+    .vis-item.blue-event { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
+    /* 🟠 Chờ duyệt */
+    .vis-item.orange-event { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+    
+    /* 🔴 TRỄ TIẾN ĐỘ */
+    .vis-item.red-event { 
+        background: linear-gradient(135deg, #ef4444, #b91c1c); 
+        color: white; 
+        border: 2px solid #ffeba7;
+        animation: pulse 2s infinite;
+    }
+
+    @("@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }")
+
+    /* List chờ: Đơn trễ */
+    .card-late { border-left-color: #ef4444 !important; background-color: #fef2f2; }
+    .badge-late { background-color: #ef4444 !important; color: white; animation: blink 1s infinite; }
+    @("@keyframes blink { 50% { opacity: 0.5; } }")
+
+    /* UI Khác */
+    .page-header { padding: 15px 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .sidebar-container { border-radius: 12px; padding: 15px; height: 75vh; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+    .unplanned-list { flex-grow: 1; overflow-y: auto; padding-right: 5px; margin-top: 10px; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 10px; }
+    .draggable-card { background: white; border: 1px solid #cbd5e1; border-left: 4px solid #64748b; padding: 10px; margin-bottom: 10px; border-radius: 6px; cursor: grab; box-shadow: 0 2px 2px rgba(0,0,0,0.05); }
+    .timeline-wrapper { border-radius: 12px; padding: 15px; height: 75vh; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+    #visualization { flex-grow: 1; border: 1px solid #cbd5e1; border-radius: 8px; }
+
+    /* MENU CHUỘT PHẢI (CONTEXT MENU) */
+    .context-menu-item:hover { background-color: #f8f9fa; }
+</style>
+
+<div class="container-fluid pt-3">
+    
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <div>
+            <h4 class="fw-bold mb-0"><i class="fa-solid fa-calendar-check text-primary"></i> Điều Phối Kế Hoạch</h4>
+            <small class="opacity-75">Kéo đơn hàng từ danh sách thả vào timeline</small>
+        </div>
+        <div class="d-flex gap-2">
+            <div class="dropdown">
+                <button class="btn btn-outline-dark fw-bold shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fa-solid fa-palette"></i> Giao diện
+                </button>
+                <ul class="dropdown-menu shadow">
+                    <li><a class="dropdown-item" href="#" onclick="changeTheme('default')">⚪ Mặc định</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="changeTheme('dark')">⚫ Chế độ Tối (Dark)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="changeTheme('ocean')">🔵 Đại dương (Blue)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="changeTheme('warm')">🟠 Ấm áp (Orange)</a></li>
+                </ul>
+            </div>
+
+            <a asp-action="History" class="btn btn-outline-secondary fw-bold shadow-sm"><i class="fa-solid fa-clock-rotate-left"></i> Lịch sử</a>
+            <button class="btn btn-light border fw-bold text-secondary shadow-sm" onclick="timeline.fit()"><i class="fa-solid fa-compress"></i> Thu gọn</button>
+            <button id="btn-save" class="btn btn-primary fw-bold px-4 shadow-sm" onclick="saveData()"><i class="fa-solid fa-save"></i> LƯU THAY ĐỔI</button>
+            <a asp-action="ExportToExcel" class="btn btn-success fw-bold shadow-sm">
+                <i class="fa-solid fa-file-excel"></i> Xuất Excel
+            </a>
+            <a href="/ProductionPlan/Tracking" class="btn btn-primary fw-bold shadow-sm ms-2">
+                <i class="fa-solid fa-list-ol me-1"></i> THEO DÕI ĐƠN HÀNG
+            </a>
+            <button type="button" class="btn btn-warning fw-bold shadow-sm text-dark" onclick="document.getElementById('importFile').click()">
+                <i class="fa-solid fa-file-import"></i> Nhập Excel
+            </button>
+            <input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="uploadExcel()" />
+
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-3">
+            <div class="sidebar-container">
+                <h6 class="fw-bold mb-2"><i class="fa-solid fa-box-open"></i> Đơn Chờ Xếp (<span id="count-unplanned">0</span>)</h6>
+                <div class="input-group mb-2">
+                    <span class="input-group-text bg-transparent border-end-0"><i class="fa-solid fa-search opacity-50"></i></span>
+                    <input type="text" class="form-control border-start-0 ps-0" placeholder="Tìm đơn hàng..." id="search-box" onkeyup="filterList()">
+                </div>
+                <div id="unplanned-items" class="unplanned-list">
+                    <div class="text-center py-5"><i class="fa-solid fa-spinner fa-spin opacity-50"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <div class="timeline-wrapper">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold mb-0"><i class="fa-solid fa-timeline"></i> Biểu Đồ Kế Hoạch</h6>
+                    <div class="btn-group btn-group-sm shadow-sm">
+                        <button class="btn btn-outline-secondary" onclick="zoomTimeline('day')">Ngày</button>
+                        <button class="btn btn-outline-secondary" onclick="zoomTimeline('week')">Tuần</button>
+                        <button class="btn btn-outline-secondary" onclick="zoomTimeline('month')">Tháng</button>
+                        <button class="btn btn-outline-secondary" onclick="zoomTimeline('year')">Năm</button>
+                    </div>
+                </div>
+                <div id="visualization"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="context-menu" class="dropdown-menu shadow" style="display:none; position:fixed; z-index:9999;">
+    <h6 class="dropdown-header">Đổi màu đơn hàng</h6>
+    <div class="p-2 d-flex gap-1 flex-wrap" style="width: 160px;">
+        <button onclick="pickColor('#3b82f6')" class="btn btn-sm rounded-circle" style="width:30px; height:30px; background:#3b82f6; border:1px solid #ccc;" title="Xanh dương"></button>
+        <button onclick="pickColor('#10b981')" class="btn btn-sm rounded-circle" style="width:30px; height:30px; background:#10b981; border:1px solid #ccc;" title="Xanh lá"></button>
+        <button onclick="pickColor('#f59e0b')" class="btn btn-sm rounded-circle" style="width:30px; height:30px; background:#f59e0b; border:1px solid #ccc;" title="Cam"></button>
+        <button onclick="pickColor('#8b5cf6')" class="btn btn-sm rounded-circle" style="width:30px; height:30px; background:#8b5cf6; border:1px solid #ccc;" title="Tím"></button>
+        <button onclick="pickColor('#ec4899')" class="btn btn-sm rounded-circle" style="width:30px; height:30px; background:#ec4899; border:1px solid #ccc;" title="Hồng"></button>
+        <button onclick="pickColor('#64748b')" class="btn btn-sm rounded-circle" style="width:30px; height:30px; background:#64748b; border:1px solid #ccc;" title="Xám"></button>
+        <button onclick="pickColor('#ef4444')" class="btn btn-sm rounded-circle" style="width:30px; height:30px; background:#ef4444; border:1px solid #ccc;" title="Đỏ"></button>
+        <button onclick="pickColor(null)" class="btn btn-sm rounded-circle border d-flex align-items-center justify-content-center" style="width:30px; height:30px; background:#fff;" title="Mặc định">
+            <i class="fa-solid fa-rotate-left small"></i>
+        </button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    // --- CÁC BIẾN TOÀN CỤC ---
+    var timeline;
+    var itemsDataSet = new vis.DataSet();
+    var unplannedData = [];
+    var selectedItemId = null;
+
+    // --- KHI TRANG VỪA TẢI XONG ---
+    document.addEventListener("DOMContentLoaded", function () {
+        initTimeline();
+        loadData();
+        loadTheme();
+    });
+
+    // ============================================================
+    // 🔥 HÀM UPLOAD EXCEL (ĐÃ SỬA LỖI CLICK) 🔥
+    // ============================================================
+    function uploadExcel() {
+        console.log("Đang bắt đầu upload..."); // Kiểm tra F12 xem có dòng này không
+
+        var fileInput = document.getElementById('importFile');
+        
+        // Kiểm tra xem có file nào được chọn không
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            console.log("Chưa chọn file");
+            return;
+        }
+
+        var file = fileInput.files[0];
+        var formData = new FormData();
+        formData.append("fileExcel", file);
+
+        // Hiển thị thông báo đang xử lý
+        Swal.fire({
+            title: 'Đang xử lý...',
+            text: 'Đang đọc file Excel và cập nhật dữ liệu.',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading() }
+        });
+
+        // Gọi API
+        fetch('/ProductionPlan/ImportFromExcel', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Thành công!',
+                    text: data.message,
+                    timer: 2000
+                }).then(() => {
+                    loadData(); // Tải lại dữ liệu Timeline sau khi nhập xong
+                });
+            } else {
+                Swal.fire('Lỗi!', data.message, 'error');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            Swal.fire('Lỗi!', 'Không thể kết nối Server (Xem F12)', 'error');
+        })
+        .finally(() => {
+            // Reset input để nếu chọn lại file cũ thì vẫn kích hoạt sự kiện onchange
+            fileInput.value = ''; 
+        });
+    }
+
+    // ============================================================
+    // CÁC HÀM CŨ (THEME, TIMELINE, SAVE...) GIỮ NGUYÊN BÊN DƯỚI
+    // ============================================================
+
+    function changeTheme(themeName) {
+        document.body.setAttribute('data-theme', themeName);
+        localStorage.setItem('production_theme', themeName);
+    }
+    
+    function loadTheme() {
+        var savedTheme = localStorage.getItem('production_theme');
+        if (savedTheme) document.body.setAttribute('data-theme', savedTheme);
+    }
+
+    function initTimeline() {
+        var container = document.getElementById('visualization');
+        var options = {
+            height: '100%',
+            editable: { add: true, updateTime: true, remove: true },
+            onRemove: function(item, callback) { moveToUnplanned(item); callback(item); },
+            margin: { item: 10, axis: 5 },
+            stack: true,
+            zoomMin: 1000 * 60 * 60 * 24,
+            zoomMax: 1000 * 60 * 60 * 24 * 365 * 2,
+            orientation: 'top'
+        };
+        timeline = new vis.Timeline(container, itemsDataSet, options);
+
+        timeline.on('contextmenu', function (props) {
+            props.event.preventDefault();
+            var item = props.item;
+            if (item) {
+                selectedItemId = item;
+                var menu = document.getElementById('context-menu');
+                menu.style.display = 'block';
+                menu.style.left = props.event.clientX + 'px';
+                menu.style.top = props.event.clientY + 'px';
+            } else {
+                hideContextMenu();
+            }
+        });
+    }
+
+    function pickColor(colorCode) {
+        if (!selectedItemId) return;
+        var item = itemsDataSet.get(selectedItemId);
+        if (colorCode) {
+            item.style = `background-color: ${colorCode}; border-color: ${colorCode}; color: white;`;
+            item.className = ''; 
+        } else {
+            item.style = null; 
+            item.className = 'orange-event'; 
+        }
+        itemsDataSet.update(item);
+        hideContextMenu();
+        
+        fetch('/ProductionPlan/UpdateOrderColor', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ Id: selectedItemId, Color: colorCode })
+        }).catch(err => console.error(err));
+    }
+
+    function hideContextMenu() {
+        document.getElementById('context-menu').style.display = 'none';
+    }
+    document.addEventListener('click', function(e) { hideContextMenu(); });
+
+    function loadData() {
+        fetch('/ProductionPlan/GetProductionData')
+            .then(res => res.json())
+            .then(data => {
+                itemsDataSet.clear();
+                itemsDataSet.add(data.planned);
+                unplannedData = data.unplanned;
+                renderUnplannedList(unplannedData);
+                timeline.fit();
+            });
+    }
+
+    function renderUnplannedList(list) {
+        var container = document.getElementById('unplanned-items');
+        document.getElementById('count-unplanned').innerText = list.length;
+        container.innerHTML = "";
+
+        if(list.length === 0) {
+            container.innerHTML = "<div class='text-center opacity-50 small mt-4'>Không có đơn chờ</div>";
+            return;
+        }
+
+        list.forEach(item => {
+            var el = document.createElement('div');
+            var isLateClass = item.isLate ? 'card-late' : '';
+            var deadlineBadge = item.isLate ? 'badge-late' : 'bg-light text-dark border';
+            var deadlineText = item.isLate ? item.deadline + ' (Trễ)' : item.deadline;
+
+            el.className = `draggable-card ${isLateClass}`;
+            el.draggable = true;
+            el.setAttribute('data-id', item.id);
+            el.innerHTML = `
+                <div class="d-flex justify-content-between">
+                    <span class="fw-bold text-dark">${item.content}</span>
+                    <span class="badge ${deadlineBadge}">${deadlineText}</span>
+                </div>
+                <div class="small opacity-75 text-truncate">${item.customer}</div>
+                <div class="small mt-1"><i class="fa-solid fa-box"></i> ${item.qty} SP</div>
+            `;
+
+            el.addEventListener('dragstart', function (event) {
+                // 🔥 CẬP NHẬT: Gửi toàn bộ thông tin gốc đi
+                var dragData = {
+                    id: item.id,
+                    content: `<b>${item.content}</b> <span style='font-size:0.8em'>(${item.customer})</span>`,
+                    className: item.isLate ? 'red-event' : 'orange-event',
+                
+                    // Các trường dữ liệu để restore
+                    orderCode: item.content, 
+                    customer: item.customer,
+                    deadline: item.deadline,
+                    qty: item.qty,
+                    isLate: item.isLate
+                };
+                event.dataTransfer.setData('text/plain', JSON.stringify(dragData));
+                window.draggedItemId = item.id;
+            });
+            container.appendChild(el);
+        });
+    }
+
+    var timelineContainer = document.getElementById('visualization');
+    timelineContainer.addEventListener('dragover', function(e) { e.preventDefault(); });
+
+    timelineContainer.addEventListener('drop', function(e) {
+        e.preventDefault();
+        try {
+            var data = JSON.parse(e.dataTransfer.getData('text/plain'));
+            var props = timeline.getEventProperties(e);
+        
+            itemsDataSet.add({
+                id: data.id, 
+                content: data.content,
+                start: props.time,
+                end: new Date(props.time.getTime() + (2 * 86400000)),
+                className: data.className,
+                orderCode: data.orderCode,
+                customer: data.customer,
+                deadline: data.deadline,
+                qty: data.qty,
+                isLate: data.isLate
+            });
+        
+            removeFromUnplanned(window.draggedItemId);
+        } catch (err) { console.error(err); }
+    });
+
+    function removeFromUnplanned(id) {
+        unplannedData = unplannedData.filter(x => x.id != id);
+        renderUnplannedList(unplannedData);
+    }
+
+    function moveToUnplanned(item) {
+ 
+    var code = item.orderCode;
+    var cust = item.customer;
+    
+    if (!code && item.content) {
+        var tempDiv = document.createElement("div");
+        tempDiv.innerHTML = item.content;
+        code = tempDiv.textContent.split('(')[0].trim(); // Lấy mã đơn
+        cust = "Khách lẻ (Khôi phục)"; // Không lấy lại được tên khách chính xác nếu không có data gốc
+    }
+
+    unplannedData.push({ 
+        id: item.id, 
+        content: code || "Đơn hàng", 
+        customer: cust || "...", 
+        deadline: item.deadline || "--/--", 
+        qty: item.qty || 0, 
+        isLate: item.isLate || false 
+    });
+    
+    renderUnplannedList(unplannedData);
+}
+    
+    function saveData() {
+        var btn = document.getElementById('btn-save');
+        var originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ...';
+        btn.disabled = true;
+        
+        var payload = itemsDataSet.get().map(x => ({ Id: x.id, Start: x.start, End: x.end }));
+        fetch('/ProductionPlan/SaveAllPlans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(res => res.json()).then(data => {
+            Swal.fire({ icon: 'success', title: 'Thành công!', text: data.message, timer: 1500, showConfirmButton: false });
+            loadData();
+        }).finally(() => { btn.innerHTML = originalText; btn.disabled = false; });
+    }
+
+    function filterList() {
+        var term = document.getElementById('search-box').value.toLowerCase();
+        renderUnplannedList(unplannedData.filter(x => x.content.toLowerCase().includes(term)));
+    }
+
+    function zoomTimeline(type) {
+        var start = new Date(); start.setDate(start.getDate() - 1); var end = new Date(start);
+        if(type === 'day') end.setDate(end.getDate() + 5);
+        if(type === 'week') end.setDate(end.getDate() + 14);
+        if(type === 'month') end.setMonth(end.getMonth() + 1);
+        if(type === 'year') end.setFullYear(end.getFullYear() + 1);
+        timeline.setWindow(start, end);
+    }
+    function resetView() { timeline.fit(); }
+</script>

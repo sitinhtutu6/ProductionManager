@@ -1,0 +1,200 @@
+﻿@model IEnumerable<ProductionManager.Data.Shipment>
+@using ProductionManager.Data
+@{
+    ViewData["Title"] = "Lịch sử nhận hàng lỗi";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Xuất Hàng Hoá", Url.Action("Index", "Shipment")), 
+        ("Lịch Sử Nhận Hàng Lỗi", "") 
+    };
+    // Nhận dữ liệu xuất bù từ Controller
+    var compDict = ViewBag.Compensations as Dictionary<int, List<ShipmentDetail>>;
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+    .page-bg { background: #f8f9fa; min-height: 100vh; padding-bottom: 3rem; }
+    .glass-panel { background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-radius: 12px; }
+    .table-custom thead th { background-color: #fef2f2; color: #dc2626; font-weight: 700; text-transform: uppercase; font-size: 0.8rem; border-bottom: 2px solid #fca5a5; }
+    
+    /* CSS cho các link lịch sử xuất bù */
+    .comp-link { display: inline-flex; align-items: center; background: #fff; border: 1px solid #93c5fd; color: #1d4ed8; padding: 3px 8px; border-radius: 6px; font-size: 0.8rem; text-decoration: none; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .comp-link:hover { background: #eff6ff; border-color: #3b82f6; transform: translateY(-1px); }
+    .comp-qty { background: #dbeafe; padding: 1px 6px; border-radius: 4px; font-weight: 800; margin-left: 6px; }
+</style>
+
+<div class="page-bg">
+    <div class="container-fluid pt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h3 class="fw-bold text-danger mb-1"><i class="fa-solid fa-boxes-packing text-danger me-2"></i>QUẢN LÝ NHẬP HÀNG LỖI (RMA)</h3>
+                <span class="text-muted small">Đối soát hàng trả về và tiến độ xuất bù (bảo hành) cho khách</span>
+            </div>
+            <div class="bg-danger bg-opacity-10 border border-danger text-danger px-4 py-2 rounded-pill fw-bold shadow-sm">
+                Tổng hàng lỗi kỳ này: <span class="fs-5">@ViewBag.TotalDefectiveItems?.ToString("N0")</span> cái
+            </div>
+        </div>
+
+        <div class="glass-panel p-3 mb-4 border-top border-4 border-danger">
+            <form method="get" asp-action="ReturnHistory" class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted mb-1">Từ ngày</label>
+                    <input type="text" name="fromDate" class="form-control datepicker bg-white" placeholder="dd/mm/yyyy" value="@(ViewBag.FromDate?.ToString("yyyy-MM-dd"))" />
+                </div>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted mb-1">Đến ngày</label>
+                    <input type="text" name="toDate" class="form-control datepicker bg-white" placeholder="dd/mm/yyyy" value="@(ViewBag.ToDate?.ToString("yyyy-MM-dd"))" />
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-danger w-100 fw-bold"><i class="fa-solid fa-filter me-1"></i> Lọc dữ liệu</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="glass-panel overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-custom table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Mã Phiếu Thu Hồi</th>
+                            <th>Ngày nhập</th>
+                            <th>Khách hàng / Đơn gốc</th>
+                            <th>Lý do & Phiếu đối ứng</th>
+                            <th class="text-center">Số lượng</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr><td colspan="5" class="text-center py-5 text-success fw-bold"><i class="fa-solid fa-face-smile-beam fa-2x mb-2"></i><br/>Tuyệt vời! Không có hàng lỗi nào bị trả về trong kỳ.</td></tr>
+                        }
+                        @foreach (var item in Model)
+                        {
+                            var totalDefect = item.ShipmentDetails.Sum(x => Math.Abs(x.QuantityShipped));
+                            
+                            // 🔥 LOGIC MỚI: Lấy mã phiếu xuất bù gốc từ ParentShipment
+                            var originalCode = item.ParentShipment != null ? item.ParentShipment.ShipmentCode : "Không xác định";
+                            var originalId = item.ParentShipment?.Id;
+
+                            <tr style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#detail_@item.Id">
+                                <td class="ps-4 fw-bold text-danger">
+                                    <i class="fa-solid fa-arrow-right-to-bracket me-1"></i>@item.ShipmentCode
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">@item.ShipmentDate.ToString("dd/MM/yyyy")</div>
+                                    <small class="text-muted">@item.ShipmentDate.ToString("HH:mm")</small>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">@item.Customer?.CompanyName</div>
+                                    @if(item.Order != null) {
+                                        <span class="badge bg-light text-secondary border mt-1">Đơn: @item.Order.OrderCode</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="small text-muted d-block fst-italic">@item.Notes</span>
+                                    
+                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary mt-1">
+                                        Lệnh xuất bù: 
+                                        @if (originalId.HasValue)
+                                        {
+                                            <a href="/Shipment/Details/@originalId" target="_blank" class="text-primary text-decoration-none fw-bold" title="Xem phiếu xuất bù">
+                                                @originalCode <i class="fa-solid fa-external-link-alt ms-1" style="font-size: 0.7rem;"></i>
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            @originalCode
+                                        }
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-danger fw-bold" type="button">
+                                        @totalDefect.ToString("N0") <i class="fa-solid fa-caret-down ms-1"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            
+                            <tr class="collapse bg-light" id="detail_@item.Id">
+                                <td colspan="5" class="p-0 border-0">
+                                    <div class="p-3 border-bottom border-danger border-opacity-25 bg-white m-2 rounded shadow-sm">
+                                        <h6 class="fw-bold text-primary small mb-2"><i class="fa-solid fa-code-compare me-1"></i> ĐỐI SOÁT TIẾN ĐỘ XUẤT BÙ</h6>
+                                        <table class="table table-sm mb-0 table-bordered">
+                                            <thead class="bg-light text-muted" style="font-size: 0.75rem;">
+                                                <tr>
+                                                    <th class="ps-3">Sản phẩm bị lỗi thu hồi</th>
+                                                    <th class="text-center" width="100">SL Thu Hồi</th>
+                                                    <th class="text-center" width="130">Tình trạng bù</th>
+                                                    <th width="350">Lịch sử các lần xuất bù (Click để xem)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach(var d in item.ShipmentDetails)
+                                                {
+                                                    // 1. Tính số lượng lỗi
+                                                    var returnedQty = Math.Abs(d.QuantityShipped);
+                                                    
+                                                    // 2. Lấy danh sách lịch sử xuất bù của món này
+                                                    var compHistory = compDict != null && compDict.ContainsKey(d.OrderDetailId) ? compDict[d.OrderDetailId] : new List<ShipmentDetail>();
+                                                    var totalCompensated = compHistory.Sum(x => x.QuantityShipped);
+                                                    
+                                                    <tr>
+                                                        <td class="ps-3 align-middle">
+                                                            <div class="fw-bold text-dark">@d.OrderDetail?.ProductName</div>
+                                                            <div class="text-muted fst-italic" style="font-size: 0.75rem;">@d.OrderDetail?.Specifications</div>
+                                                        </td>
+                                                        <td class="text-center text-danger fw-bold align-middle fs-6">@returnedQty</td>
+                                                        <td class="text-center align-middle">
+                                                            @if(totalCompensated >= returnedQty) {
+                                                                <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Đã bù đủ (@totalCompensated)</span>
+                                                            } else if (totalCompensated > 0) {
+                                                                <span class="badge bg-warning text-dark"><i class="fa-solid fa-clock-rotate-left me-1"></i>Bù thiếu (@totalCompensated/@returnedQty)</span>
+                                                            } else {
+                                                                <span class="badge bg-danger"><i class="fa-solid fa-xmark me-1"></i>Chưa bù</span>
+                                                            }
+                                                        </td>
+                                                        <td class="align-middle">
+                                                            @if(compHistory.Any())
+                                                            {
+                                                                <div class="d-flex flex-wrap gap-2">
+                                                                    @foreach(var comp in compHistory)
+                                                                    {
+                                                                        <a href="/Shipment/Details/@comp.ShipmentId" class="comp-link" target="_blank" title="Ngày xuất: @comp.Shipment?.ShipmentDate.ToString("dd/MM/yyyy HH:mm")">
+                                                                            <i class="fa-solid fa-truck-fast me-1 opacity-75"></i>@comp.Shipment?.ShipmentCode
+                                                                            <span class="comp-qty">@comp.QuantityShipped</span>
+                                                                        </a>
+                                                                    }
+                                                                </div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="small text-muted fst-italic">Chưa có giao dịch xuất bù nào.</span>
+                                                            }
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        flatpickr(".datepicker", {
+            altInput: true,
+            altFormat: "d/m/Y",  
+            dateFormat: "Y-m-d",  
+            allowInput: true,
+            locale: "vn"          
+        });
+    });
+</script>

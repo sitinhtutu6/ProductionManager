@@ -1,0 +1,156 @@
+﻿@model ProductionApp.Web.Controllers.SettingsViewModel
+@{
+    ViewData["Title"] = "Cài đặt hệ thống";
+}
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-9">
+
+            @if (TempData["SuccessCompany"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show shadow-sm border-0 border-start border-5 border-success">
+                    <h6 class="fw-bold mb-0">@TempData["SuccessCompany"]</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            @if (TempData["SuccessNotification"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show shadow-sm border-0 border-start border-5 border-success">
+                    <h6 class="fw-bold mb-0">@TempData["SuccessNotification"]</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            <ul class="nav nav-tabs mb-4" id="settingsTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active fw-bold text-primary" id="company-tab" data-bs-toggle="tab" data-bs-target="#company" type="button" role="tab" aria-controls="company" aria-selected="true">
+                        <i class="fa-solid fa-building me-2"></i>Thông tin Doanh nghiệp
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold text-dark" id="notification-tab" data-bs-toggle="tab" data-bs-target="#notification" type="button" role="tab" aria-controls="notification" aria-selected="false">
+                        <i class="fa-solid fa-bell me-2"></i>Thông báo chạy (Ticker)
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="settingsTabContent">
+                
+                <div class="tab-pane fade show active" id="company" role="tabpanel" aria-labelledby="company-tab">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-dark text-white py-3">
+                            <h5 class="mb-0 fw-bold"><i class="fa-solid fa-building me-2 text-warning"></i> CẤU HÌNH THÔNG TIN CÔNG TY</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="alert alert-light border fst-italic text-muted small mb-4">
+                                <i class="fa-solid fa-circle-info text-primary me-1"></i> Thông tin này sẽ được in trên <strong>Tiêu đề (Header)</strong> của các file xuất Excel và xuất PDF (Báo cáo P&L, Phiếu xuất kho...).
+                            </div>
+
+                            <form asp-action="UpdateCompany" method="post">
+                                <input type="hidden" asp-for="Company.Id" />
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold text-secondary small">Tên Doanh Nghiệp (*)</label>
+                                    <input asp-for="Company.CompanyName" class="form-control fw-bold text-primary shadow-sm" required placeholder="VD: CÔNG TY TNHH SẢN XUẤT ABC..." />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold text-secondary small">Địa chỉ trụ sở</label>
+                                    <textarea asp-for="Company.Address" class="form-control shadow-sm" rows="2" placeholder="Số nhà, Phường/Xã, Quận/Huyện, Tỉnh/Thành phố..."></textarea>
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold text-secondary small">Mã Số Thuế (MST)</label>
+                                        <div class="input-group shadow-sm">
+                                            <span class="input-group-text bg-white"><i class="fa-solid fa-hashtag text-muted"></i></span>
+                                            <input asp-for="Company.TaxCode" class="form-control font-monospace fw-bold" placeholder="VD: 0312345678" />
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold text-secondary small">Điện thoại Hotline</label>
+                                        <div class="input-group shadow-sm">
+                                            <span class="input-group-text bg-white"><i class="fa-solid fa-phone text-muted"></i></span>
+                                            <input asp-for="Company.Phone" class="form-control" placeholder="0909 123 456" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold text-secondary small">Email liên hệ</label>
+                                    <div class="input-group shadow-sm">
+                                        <span class="input-group-text bg-white"><i class="fa-solid fa-envelope text-muted"></i></span>
+                                        <input asp-for="Company.Email" type="email" class="form-control" placeholder="contact@domain.com" />
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-end border-top pt-3">
+                                    <button type="submit" class="btn btn-primary fw-bold px-4 shadow">
+                                        <i class="fa-solid fa-floppy-disk me-2"></i> Lưu Cấu Hình Công Ty
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="notification" role="tabpanel" aria-labelledby="notification-tab">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-primary text-white py-3">
+                            <h5 class="mb-0 fw-bold"><i class="fa-solid fa-bullhorn me-2"></i> THÔNG BÁO CHẠY (TICKER)</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <form asp-action="UpdateNotification" method="post">
+                                <input type="hidden" asp-for="Notification.Id" />
+
+                                <div class="mb-4 bg-light p-3 rounded border">
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" asp-for="Notification.IsEnabled" id="flexSwitchCheckChecked">
+                                        <label class="form-check-label fw-bold text-primary" for="flexSwitchCheckChecked">Bật hiển thị thông báo trên toàn hệ thống</label>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold text-secondary small">Nội dung thông báo</label>
+                                    <textarea asp-for="Notification.Message" class="form-control shadow-sm fw-bold" rows="3" placeholder="Nhập nội dung muốn chạy trên màn hình..."></textarea>
+                                </div>
+
+                                <div class="row mb-4">
+                                    <div class="col-md-6 mb-3 mb-md-0">
+                                        <label class="form-label fw-bold text-secondary small">Ngày bắt đầu hiện</label>
+                                        <input asp-for="Notification.StartTime" class="form-control shadow-sm" type="datetime-local" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold text-secondary small">Ngày kết thúc (Hết hạn)</label>
+                                        <input asp-for="Notification.EndTime" class="form-control shadow-sm" type="datetime-local" />
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-end border-top pt-3">
+                                    <button type="submit" class="btn btn-primary fw-bold px-4 shadow">
+                                        <i class="fa-solid fa-floppy-disk me-2"></i> Lưu Cấu Hình Ticker
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // JS phụ trợ: Đổi màu chữ Tab khi chuyển đổi để dễ nhìn hơn
+    document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function (event) {
+            document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(t => {
+                t.classList.remove('text-primary'); t.classList.add('text-dark');
+            });
+            event.target.classList.remove('text-dark');
+            event.target.classList.add('text-primary');
+        })
+    });
+</script>

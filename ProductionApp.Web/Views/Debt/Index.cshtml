@@ -1,0 +1,687 @@
+﻿@model ProductionApp.Web.Models.ViewModels.DebtDashboardVM
+@using System.Globalization
+@{
+    ViewData["Title"] = "Quản lý Công Nợ";
+    bool isReceivable = Model.Type == 1;
+
+    string actionText = isReceivable ? "Thu tiền" : "Thanh toán";
+    string actionTextUpper = isReceivable ? "THU TIỀN" : "CHI TIỀN";
+    string themeColor = isReceivable ? "primary" : "success";
+    string voucherLabel = isReceivable ? "Số Phiếu Thu / Hóa Đơn" : "Số Ủy nhiệm chi / Phiếu Chi";
+    string iconAct = isReceivable ? "fa-hand-holding-dollar" : "fa-money-bill-transfer";
+
+    string activeQF = Context.Request.Query["qf"].ToString();
+    if (string.IsNullOrEmpty(activeQF)) activeQF = "thisMonth";
+    string yearStr = Context.Request.Query["year"].ToString();
+    if (string.IsNullOrEmpty(yearStr)) yearStr = DateTime.Now.Year.ToString();
+}
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+
+<style>
+    body {
+        background-color: #f8fafc;
+        font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    .nav-custom {
+        background: white;
+        padding: 10px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+        border: 1px solid #e2e8f0;
+        margin-bottom: 20px;
+    }
+
+        .nav-custom .nav-link {
+            font-weight: 800;
+            color: #64748b;
+            border-radius: 8px;
+            padding: 12px 20px;
+            transition: 0.2s;
+            border: 1px solid transparent;
+        }
+
+            .nav-custom .nav-link:hover:not(.active) {
+                background-color: #f1f5f9;
+                color: #0ea5e9;
+            }
+
+            .nav-custom .nav-link.active.outbound {
+                background-color: #e0f2fe;
+                color: #0284c7;
+                border-color: #bae6fd;
+            }
+
+            .nav-custom .nav-link.active.inbound {
+                background-color: #d1fae5;
+                color: #059669;
+                border-color: #a7f3d0;
+            }
+
+    .quick-filter-btn {
+        font-size: 0.8rem;
+        font-weight: 700;
+        padding: 6px 14px;
+        border-radius: 20px;
+        border: 1px solid #cbd5e1;
+        color: #475569;
+        background: white;
+        transition: 0.2s;
+    }
+
+        .quick-filter-btn:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+
+        .quick-filter-btn.active {
+            background: #0ea5e9;
+            border-color: #0ea5e9;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.3);
+        }
+
+    .summary-card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        transition: transform 0.2s;
+    }
+
+        .summary-card:hover {
+            transform: translateY(-3px);
+        }
+
+    .table-custom {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+        border: 1px solid #e2e8f0;
+    }
+
+        .table-custom thead th {
+            background-color: #f8fafc;
+            color: #475569;
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            padding: 15px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .table-custom tbody td {
+            padding: 15px;
+            vertical-align: middle;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+    .card-header-master {
+        cursor: pointer;
+        transition: background-color 0.2s;
+        user-select: none;
+    }
+
+        .card-header-master:hover {
+            filter: brightness(0.95);
+        }
+
+    .icon-toggle {
+        transition: transform 0.3s;
+    }
+
+        .icon-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+    .select2-container--bootstrap-5 .select2-selection {
+        min-height: 40px;
+        padding-top: 4px;
+        font-weight: 600;
+    }
+
+    /* Giao diện Bảng con (Chi tiết phiếu nhập) */
+    .sub-detail-row {
+        display: none;
+    }
+
+        .sub-detail-row td {
+            background-color: #fcfcfd;
+            padding: 0 !important;
+            border-bottom: 1px dashed #e2e8f0 !important;
+        }
+
+    .sub-content-box {
+        border-left: 4px solid #0ea5e9;
+        margin: 15px 15px 15px 50px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        overflow: hidden;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="fw-bold @(isReceivable ? "text-primary" : "text-success") mb-0">
+            <i class="fa-solid @(isReceivable ? "fa-arrow-down-up-across-line" : "fa-truck-fast") me-2"></i>SỔ CÔNG NỢ TỔNG HỢP
+        </h3>
+    </div>
+
+    <ul class="nav nav-pills nav-custom" role="tablist">
+        <li class="nav-item flex-grow-1 text-center"><a class="nav-link outbound @(isReceivable ? "active" : "")" href="/Debt/Index?type=1"><i class="fa-solid fa-hand-holding-dollar me-2"></i>Phải Thu (Khách hàng)</a></li>
+        <li class="nav-item flex-grow-1 text-center"><a class="nav-link inbound @(!isReceivable ? "active" : "")" href="/Debt/Index?type=2"><i class="fa-solid fa-file-invoice-dollar me-2"></i>Phải Trả (Nhà Cung Cấp)</a></li>
+    </ul>
+
+    <div class="card border-0 shadow-sm rounded-4 mb-4 border">
+        <div class="card-body p-3 p-md-4">
+            <form method="get" action="/Debt/Index" id="filterForm">
+                <input type="hidden" name="type" value="@Model.Type" />
+                <input type="hidden" name="qf" id="hdnQf" value="@activeQF" />
+                <input type="hidden" name="year" id="hdnYear" value="@yearStr" />
+
+                <div class="row g-3 align-items-center mb-3">
+                    <div class="col-md-3 col-lg-3">
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white text-muted"><i class="fa-solid fa-calendar"></i></span>
+                            <input type="text" name="fromDate" id="fromDate" class="form-control datepicker fw-bold text-primary" placeholder="Từ ngày" value="@Model.FromDate?.ToString("yyyy-MM-dd")">
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-lg-3">
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white text-muted">-</span>
+                            <input type="text" name="toDate" id="toDate" class="form-control datepicker fw-bold text-primary" placeholder="Đến ngày" value="@Model.ToDate?.ToString("yyyy-MM-dd")">
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg-4">
+                        <select name="keyword" id="keywordFilter" class="form-select fw-bold select2-partner shadow-sm">
+                            <option value="">-- Tất cả Đối tác / Khách hàng --</option>
+                            @if (ViewBag.PartnerList != null)
+                            {
+                                foreach (var item in ViewBag.PartnerList)
+                                {
+                                    <option value="@item.Value" selected="@(Model.Keyword == item.Value ? "selected" : null)">@item.Text</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-2 col-lg-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary fw-bold flex-grow-1 shadow-sm" onclick="document.getElementById('hdnQf').value='custom'"><i class="fa-solid fa-magnifying-glass me-1"></i> TÌM</button>
+                        <button type="button" class="btn btn-success fw-bold shadow-sm" onclick="exportFilteredReport()" title="Xuất Excel báo cáo này"><i class="fa-solid fa-file-excel"></i></button>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center gap-2 pt-3 border-top border-light">
+                    <span class="small fw-bold text-muted text-uppercase me-2"><i class="fa-solid fa-bolt text-warning me-1"></i> Lọc nhanh:</span>
+                    <select id="selYear" class="form-select form-select-sm fw-bold border-0 bg-light text-primary shadow-none me-2" style="width: 100px; cursor:pointer;" onchange="applyQuickFilter('year')">
+                        <option value="2026" selected="@(yearStr == "2026")">Năm 2026</option>
+                        <option value="2025" selected="@(yearStr == "2025")">Năm 2025</option>
+                        <option value="2024" selected="@(yearStr == "2024")">Năm 2024</option>
+                    </select>
+                    <button type="button" class="quick-filter-btn @(activeQF == "thisMonth" ? "active" : "")" onclick="applyQuickFilter('thisMonth')">Tháng này</button>
+                    <button type="button" class="quick-filter-btn @(activeQF == "q1" ? "active" : "")" onclick="applyQuickFilter('q1')">Quý 1</button>
+                    <button type="button" class="quick-filter-btn @(activeQF == "q2" ? "active" : "")" onclick="applyQuickFilter('q2')">Quý 2</button>
+                    <button type="button" class="quick-filter-btn @(activeQF == "q3" ? "active" : "")" onclick="applyQuickFilter('q3')">Quý 3</button>
+                    <button type="button" class="quick-filter-btn @(activeQF == "q4" ? "active" : "")" onclick="applyQuickFilter('q4')">Quý 4</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @{
+        decimal sumTotal = Model.DebtGroups?.SelectMany(g => g.Details).Sum(i => i.TotalAmount) ?? 0;
+        decimal sumPaid = Model.DebtGroups?.SelectMany(g => g.Details).Sum(i => i.PaidAmount) ?? 0;
+        decimal sumRemain = Model.DebtGroups?.Sum(g => g.TotalDebt) ?? 0;
+    }
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="summary-card card bg-primary bg-opacity-10 border border-primary border-opacity-25 h-100">
+                <div class="card-body">
+                    <div class="text-primary small fw-bold text-uppercase mb-2"><i class="fa-solid fa-chart-line me-1"></i> TỔNG PHÁT SINH</div>
+                    <h3 class="fw-black text-primary mb-0">@sumTotal.ToString("N0") <small class="fs-6 text-muted">đ</small></h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="summary-card card bg-success bg-opacity-10 border border-success border-opacity-25 h-100">
+                <div class="card-body">
+                    <div class="text-success small fw-bold text-uppercase mb-2"><i class="fa-solid fa-check-double me-1"></i> @(isReceivable ? "ĐÃ THU" : "ĐÃ CHI")</div>
+                    <h3 class="fw-black text-success mb-0">@sumPaid.ToString("N0") <small class="fs-6 text-muted">đ</small></h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="summary-card card bg-danger bg-opacity-10 border border-danger border-opacity-25 h-100">
+                <div class="card-body">
+                    <div class="text-danger small fw-bold text-uppercase mb-2"><i class="fa-solid fa-triangle-exclamation me-1"></i> CÒN LẠI (NỢ ĐỌNG)</div>
+                    <h3 class="fw-black text-danger mb-0">@sumRemain.ToString("N0") <small class="fs-6 text-muted">đ</small></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.DebtGroups != null && Model.DebtGroups.Any())
+    {
+        foreach (var group in Model.DebtGroups)
+        {
+            string rawId = (group.PartnerCode ?? "KL") + "_" + (group.PartnerName ?? "Unknown");
+            string safeCode = "grp_" + System.Text.RegularExpressions.Regex.Replace(rawId, "[^a-zA-Z0-9]", "");
+
+            <div class="card table-custom mb-4 border-0">
+                <!-- MASTER (Tên công ty) -->
+                <div class="card-header bg-dark text-white p-3 d-flex justify-content-between align-items-center card-header-master" onclick="toggleDebtState('@safeCode')">
+                    <div class="d-flex align-items-center">
+                        <i id="icon-@safeCode" class="fa-solid fa-chevron-up me-3 icon-toggle fs-5"></i>
+                        <div>
+                            <h5 class="mb-0 fw-bold">@group.PartnerName</h5>
+                            <small class="text-light opacity-75">Mã: @(group.PartnerCode ?? "N/A") | Phát sinh: @group.Details.Count mục</small>
+                        </div>
+                    </div>
+                    <div class="text-end d-flex align-items-center gap-3">
+                        <div onclick="event.stopPropagation();">
+                            @if (!isReceivable)
+                            {
+                                <button class="btn btn-sm btn-info fw-bold shadow-sm text-dark me-2" onclick="openBatchInvoiceModal(this, '@group.PartnerName', '@group.PartnerCode')">
+                                    <i class="fa-solid fa-file-invoice-dollar me-1"></i> Gom HĐ Đầu Vào
+                                </button>
+                            }
+                            <button class="btn btn-sm btn-@themeColor fw-bold shadow-sm" onclick="openBatchPaymentModal(this, '@group.PartnerName')">
+                                <i class="fa-solid fa-check-double me-1"></i> @actionTextUpper LÔ
+                            </button>
+                        </div>
+                        <span class="badge bg-danger fs-5 fw-bold px-3 py-2 shadow-sm border border-white">Nợ: @group.TotalDebt.ToString("N0") ₫</span>
+                    </div>
+                </div>
+
+                <!-- DETAILS (Bảng Danh sách chứng từ) -->
+                <div id="body-@safeCode" class="debt-body" data-code="@safeCode">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead>
+                                <tr>
+                                    <th width="40" class="text-center"></th>
+                                    <th width="40" class="text-center"><input class="form-check-input border-secondary shadow-sm" type="checkbox" onchange="toggleAllCheckboxes(this)"></th>
+                                    <th width="150">Chứng từ</th>
+                                    <th>Ngày</th>
+                                    <th>Diễn giải / Ghi chú</th>
+                                    <th class="text-end">Phát sinh</th>
+                                    <th class="text-end">@(isReceivable ? "Đã Thu" : "Đã Chi")</th>
+                                    <th class="text-end">Còn nợ</th>
+                                    <th class="text-center">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in group.Details)
+                                {
+                                    bool isLocked = item.Note != null && item.Note.Contains("[ĐÃ KHÓA SỔ]");
+                                    string safeSubCode = "sub_" + System.Text.RegularExpressions.Regex.Replace(item.Code, "[^a-zA-Z0-9]", "");
+
+                                    <tr>
+                                        <!-- Nút xổ mở chi tiết chứng từ (Sub-Detail) -->
+                                        <td class="text-center">
+                                            <i id="icon-sub-@safeSubCode" class="fa-solid fa-chevron-right text-secondary fs-6" style="cursor:pointer; transition: 0.2s;" onclick="toggleSubDetail('@safeSubCode', @item.Id, '@item.Code')"></i>
+                                        </td>
+                                        <td class="text-center">
+                                            @if (item.RemainingAmount > 0)
+                                            {
+                                                <input class="form-check-input chk-item border-secondary shadow-sm" type="checkbox" data-id="@item.Id" data-code="@item.Code" data-remain="@item.RemainingAmount.ToString(CultureInfo.InvariantCulture)">
+                                            }
+                                        </td>
+                                        <td><span class="badge bg-primary text-white border fs-6 font-monospace shadow-sm px-2 py-1">@item.Code</span></td>
+                                        <td><div class="fw-bold text-dark">@item.Date.ToString("dd/MM/yyyy")</div><small class="text-muted fw-bold">@item.Date.ToString("HH:mm")</small></td>
+                                        <td>@if (isLocked) {
+                                            <i class="fa-solid fa-lock text-danger me-1"></i>
+                                        }
+                                        <span class="fw-bold text-muted">@item.Note</span></td>
+                                        <td class="text-end fw-bold text-dark">@item.TotalAmount.ToString("N0")</td>
+                                        <td class="text-end fw-bold text-@themeColor">@item.PaidAmount.ToString("N0")</td>
+                                        <td class="text-end fw-900 text-danger fs-6">@item.RemainingAmount.ToString("N0")</td>
+                                        <td class="text-center">
+                                            <button class="btn btn-sm btn-outline-@themeColor fw-bold shadow-sm" title="@actionText khoản này"
+                                                    onclick="openSinglePaymentModal(@item.Id, '@item.Code', @item.RemainingAmount.ToString(CultureInfo.InvariantCulture), '@group.PartnerName')">
+                                                <i class="fa-solid fa-money-bill-wave"></i> @actionTextUpper
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Dòng con ẩn (Sub-Detail Content) chứa danh sách vật tư -->
+                                    <tr id="sub-@safeSubCode" class="sub-detail-row">
+                                        <td colspan="9">
+                                            <div class="sub-content-box" id="sub-content-@safeSubCode">
+                                                <div class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm text-info me-2"></div> Đang tải chi tiết vật tư...</div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot class="bg-light">
+                                <tr>
+                                    <td colspan="5" class="text-end fw-bold text-muted text-uppercase">CỘNG BẢNG:</td>
+                                    <td class="text-end fw-black text-dark fs-6">@group.Details.Sum(i => i.TotalAmount).ToString("N0")</td>
+                                    <td class="text-end fw-black text-@themeColor fs-6">@group.Details.Sum(i => i.PaidAmount).ToString("N0")</td>
+                                    <td class="text-end fw-black text-danger fs-5">@group.TotalDebt.ToString("N0")</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0 mt-4">
+            <i class="fa-solid fa-folder-open fa-4x text-muted opacity-25 mb-3 d-block"></i>
+            <h5 class="fw-bold text-muted">Không có dữ liệu công nợ</h5>
+            <p class="text-muted">Thử thay đổi mốc thời gian hoặc chọn đối tác khác.</p>
+        </div>
+    }
+</div>
+
+<!-- Modal Thanh Toán Từng Khoản -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-@themeColor text-white border-0 pb-3">
+                <h5 class="modal-title fw-bold"><i class="fa-solid @iconAct me-2"></i> THỰC HIỆN @actionTextUpper</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <form id="paymentForm">
+                    <input type="hidden" id="payType" name="type" value="@Model.Type" />
+                    <input type="hidden" id="payBatchData" name="batchDataJson" />
+                    <input type="hidden" id="payPartnerName" name="partnerName" />
+
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Chứng từ / Đối tác</label>
+                        <input type="text" id="payDocCode" class="form-control fw-bold bg-white text-dark" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Tổng nợ cần @actionText.ToLower()</label>
+                        <input type="text" id="payRemain" class="form-control fw-bold bg-white text-danger fs-5" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-dark">Số tiền THỰC @(isReceivable ? "THU" : "CHI") <span class="text-danger">*</span></label>
+                        <input type="text" id="payAmount" name="amount" class="form-control form-control-lg fw-bold text-@themeColor border-@themeColor shadow-sm" required oninput="formatCurrency(this)">
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-dark">@voucherLabel <span class="text-danger">*</span></label>
+                        <input type="text" id="payVoucher" name="note" class="form-control fw-bold border-primary" placeholder="@(isReceivable ? "Ghi chú thu..." : "Ghi chú chi...")" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="small fw-bold text-dark">Phương thức</label>
+                            <select id="payMethod" name="method" class="form-select fw-bold shadow-sm">
+                                <option value="2">Chuyển khoản</option>
+                                <option value="1">Tiền mặt</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="small fw-bold text-dark">Ngày TT</label>
+                            <input type="text" id="payDate" name="date" class="form-control datepicker fw-bold shadow-sm" value="@DateTime.Now.ToString("yyyy-MM-dd")" required>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-white border-top-0 pt-0 pb-4">
+                <button type="button" class="btn btn-light fw-bold rounded-pill px-4 border" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-@themeColor fw-bold rounded-pill px-5 shadow-sm" onclick="savePayment()"><i class="fa-solid fa-check me-1"></i> Xác nhận @actionTextUpper</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        const isReceivable = @isReceivable.ToString().ToLower();
+        const actionText = isReceivable ? "Thu tiền" : "Thanh toán";
+
+        // Khóa lưu State cho Công ty (Master) và Chi tiết (Sub-Detail)
+        const COLLAPSE_KEY = 'debt_collapsed_partners_v3';
+        const COLLAPSE_SUB_KEY = 'debt_expanded_subdocs_v3';
+
+        $(document).ready(function() {
+            $('.select2-partner').select2({ theme: 'bootstrap-5', width: '100%', placeholder: 'Tìm kiếm tên đối tác...', allowClear: true });
+            $(".datepicker").flatpickr({ dateFormat: "Y-m-d", locale: "vn" });
+
+            restoreCollapsedState();
+            restoreExpandedSubs();
+        });
+
+        // ===============================================
+        // QUICK FILTERS & EXPORT
+        // ===============================================
+        function applyQuickFilter(period) {
+            document.getElementById('hdnQf').value = period;
+            document.getElementById('hdnYear').value = document.getElementById('selYear').value;
+
+            const year = parseInt($('#selYear').val());
+            let fromDate, toDate;
+            const now = new Date();
+
+            switch (period) {
+                case 'year': fromDate = new Date(year, 0, 1); toDate = new Date(year, 11, 31); break;
+                case 'q1': fromDate = new Date(year, 0, 1); toDate = new Date(year, 2, 31); break;
+                case 'q2': fromDate = new Date(year, 3, 1); toDate = new Date(year, 5, 30); break;
+                case 'q3': fromDate = new Date(year, 6, 1); toDate = new Date(year, 8, 30); break;
+                case 'q4': fromDate = new Date(year, 9, 1); toDate = new Date(year, 11, 31); break;
+                case 'thisMonth':
+                    if (year === now.getFullYear()) {
+                        fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                        toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                    } else {
+                        fromDate = new Date(year, 0, 1); toDate = new Date(year, 0, 31);
+                    }
+                    break;
+            }
+
+            document.getElementById('fromDate')._flatpickr.setDate(fromDate);
+            document.getElementById('toDate')._flatpickr.setDate(toDate);
+            document.getElementById('filterForm').submit();
+        }
+
+        function exportFilteredReport() {
+            let from = $('#fromDate').val();
+            let to = $('#toDate').val();
+            let kw = $('#keywordFilter').val();
+            let type = document.querySelector('input[name="type"]').value;
+
+            let url = `/Debt/ExportExcel?type=${type}&fromDate=${from}&toDate=${to}&keyword=${encodeURIComponent(kw)}`;
+            Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Đang xuất báo cáo...', showConfirmButton: false, timer: 1500 });
+            window.location.href = url;
+        }
+
+        // ===============================================
+        // MASTER TOGGLE (Công Ty)
+        // ===============================================
+        function getCollapsed() { return JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]'); }
+        function saveCollapsed(arr) { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(arr)); }
+
+        function toggleDebtState(code) {
+            let $body = $('#body-' + code);
+            let $icon = $('#icon-' + code);
+            let collapsed = getCollapsed();
+
+            if ($body.is(':visible')) {
+                $body.slideUp(250);
+                $icon.addClass('collapsed');
+                if (!collapsed.includes(code)) collapsed.push(code);
+            } else {
+                $body.slideDown(250);
+                $icon.removeClass('collapsed');
+                collapsed = collapsed.filter(x => x !== code);
+            }
+            saveCollapsed(collapsed);
+        }
+
+        function restoreCollapsedState() {
+            let collapsed = getCollapsed();
+            $('.debt-body').each(function() {
+                let code = $(this).data('code');
+                if (collapsed.includes(code)) {
+                    $(this).hide();
+                    $('#icon-' + code).addClass('collapsed');
+                }
+            });
+        }
+
+        // ===============================================
+        // SUB-DETAIL TOGGLE (Chi Tiết Vật Tư)
+        // ===============================================
+        function getExpandedSubs() { return JSON.parse(localStorage.getItem(COLLAPSE_SUB_KEY) || '[]'); }
+        function saveExpandedSubs(arr) { localStorage.setItem(COLLAPSE_SUB_KEY, JSON.stringify(arr)); }
+
+        function toggleSubDetail(safeSubCode, id, realCode) {
+            let $tr = $('#sub-' + safeSubCode);
+            let $icon = $('#icon-sub-' + safeSubCode);
+            let expanded = getExpandedSubs();
+
+            if ($tr.is(':visible')) {
+                $tr.slideUp(200);
+                $icon.removeClass('fa-chevron-down text-info').addClass('fa-chevron-right text-secondary');
+                expanded = expanded.filter(x => x !== safeSubCode);
+            } else {
+                $tr.slideDown(200);
+                $icon.removeClass('fa-chevron-right text-secondary').addClass('fa-chevron-down text-info');
+                if (!expanded.includes(safeSubCode)) expanded.push(safeSubCode);
+
+                let $content = $('#sub-content-' + safeSubCode);
+                if (!$content.hasClass('loaded')) {
+                    fetchSubDetails(safeSubCode, id, realCode, $content);
+                }
+            }
+            saveExpandedSubs(expanded);
+        }
+
+        function fetchSubDetails(safeSubCode, id, realCode, $content) {
+            $.get(`/Debt/GetDocumentItems?id=${id}&code=${encodeURIComponent(realCode)}`, function(res) {
+                if (res.success && res.data && res.data.length > 0) {
+                    let html = `<table class="table table-sm table-borderless mb-0 align-middle"><thead class="border-bottom text-muted small text-uppercase"><tr><th class="ps-4">Tên hàng / Sản phẩm</th><th class="text-center">Số lượng</th><th class="text-end">Đơn giá</th><th class="text-end pe-4">Thành tiền</th></tr></thead><tbody>`;
+                    res.data.forEach(d => {
+                        html += `<tr><td class="ps-4 fw-bold text-dark"><i class="fa-solid fa-box-open text-primary me-2 opacity-50"></i>${d.name}</td><td class="text-center fw-bold text-secondary">${d.qty}</td><td class="text-end text-muted">${d.price.toLocaleString('vi-VN')}</td><td class="text-end fw-bold text-dark pe-4">${d.total.toLocaleString('vi-VN')}</td></tr>`;
+                    });
+                    html += `</tbody></table>`;
+                    $content.html(html).addClass('loaded');
+                } else {
+                    $content.html(`<div class="text-muted fst-italic py-3 px-4"><i class="fa-solid fa-circle-info me-2 text-warning"></i> ${res.message || 'Không có dữ liệu vật tư chi tiết.'}</div>`).addClass('loaded');
+                }
+            }).fail(function() {
+                $content.html('<div class="text-danger py-3 px-4"><i class="fa-solid fa-triangle-exclamation me-2"></i> Lỗi mất kết nối hệ thống.</div>');
+            });
+        }
+
+        function restoreExpandedSubs() {
+            let expanded = getExpandedSubs();
+            expanded.forEach(safeSubCode => {
+                let $tr = $('#sub-' + safeSubCode);
+                if ($tr.length) {
+                    $tr.show();
+                    $('#icon-sub-' + safeSubCode).removeClass('fa-chevron-right text-secondary').addClass('fa-chevron-down text-info');
+
+                    let $content = $('#sub-content-' + safeSubCode);
+                    if (!$content.hasClass('loaded')) {
+                        // Lấy data từ thẻ <input type="checkbox"> ở dòng trên nó
+                        let btn = $tr.prev().find('.chk-item');
+                        if (btn.length) {
+                            let id = btn.data('id');
+                            let code = btn.data('code');
+                            fetchSubDetails(safeSubCode, id, code, $content);
+                        }
+                    }
+                }
+            });
+        }
+
+        // ===============================================
+        // ACTION BUTTONS (GOM HÓA ĐƠN & THANH TOÁN)
+        // ===============================================
+        function toggleAllCheckboxes(source) {
+            let table = source.closest('table');
+            let checkboxes = table.querySelectorAll('.chk-item');
+            checkboxes.forEach(chk => chk.checked = source.checked);
+        }
+
+        function formatCurrency(input) {
+            let val = input.value.replace(/\D/g, '');
+            if (val !== "") { input.value = new Intl.NumberFormat('vi-VN').format(val); }
+        }
+
+        function openSinglePaymentModal(id, code, remain, partner) {
+            let batchData = [{ Id: id, Code: code, Remain: remain }];
+            document.getElementById('payBatchData').value = JSON.stringify(batchData);
+            document.getElementById('payPartnerName').value = partner;
+            document.getElementById('payDocCode').value = code + " (" + partner + ")";
+            document.getElementById('payRemain').value = new Intl.NumberFormat('vi-VN').format(remain) + " đ";
+            document.getElementById('payAmount').value = new Intl.NumberFormat('vi-VN').format(remain);
+            new bootstrap.Modal(document.getElementById('paymentModal')).show();
+        }
+
+        function openBatchInvoiceModal(btn, partnerName, partnerCode) {
+            let table = btn.closest('.card').querySelector('table');
+            let checkboxes = table.querySelectorAll('.chk-item:checked');
+
+            if (checkboxes.length === 0) {
+                Swal.fire("Nhắc nhở", "Vui lòng tick chọn các chứng từ gốc để gom vào Hóa đơn!", "info");
+                return;
+            }
+
+            let selectedCodes = [];
+            checkboxes.forEach(chk => {
+                let code = chk.getAttribute('data-code');
+                if (!code.toUpperCase().includes("INV") && !code.toUpperCase().includes("HD")) {
+                    selectedCodes.push(code);
+                }
+            });
+
+            if (selectedCodes.length === 0) {
+                Swal.fire("Lỗi", "Các chứng từ bạn chọn đã là Hóa đơn hoặc không hợp lệ để gom!", "warning");
+                return;
+            }
+
+            let url = `/APInvoice/CreateBatch?partnerName=${encodeURIComponent(partnerName)}&docCodes=${selectedCodes.join(',')}`;
+            window.location.href = url;
+        }
+
+        function openBatchPaymentModal(btn, partnerName) {
+            let table = btn.closest('.card').querySelector('table');
+            let checkboxes = table.querySelectorAll('.chk-item:checked');
+            if (checkboxes.length === 0) { Swal.fire("Nhắc nhở", "Vui lòng tick chọn ít nhất 1 chứng từ để thao tác!", "info"); return; }
+            let type = document.querySelector('input[name="type"]').value;
+            window.location.href = `/Debt/BatchPayment?type=${type}&partner=${encodeURIComponent(partnerName)}`;
+        }
+
+        function savePayment() {
+            let form = document.getElementById('paymentForm');
+            if (!form.checkValidity()) { form.reportValidity(); return; }
+
+            let amountStr = document.getElementById('payAmount').value.replace(/\D/g, '');
+            let amount = parseFloat(amountStr);
+            if (isNaN(amount) || amount <= 0) { Swal.fire("Lỗi", "Số tiền không hợp lệ", "warning"); return; }
+
+            Swal.fire({ title: 'Đang xử lý...', didOpen: () => Swal.showLoading() });
+
+            let formData = new FormData(form);
+            let bData = JSON.parse(document.getElementById('payBatchData').value);
+            formData.set("amount", amount);
+            formData.set("docId", bData[0].Id);
+
+            fetch('/Debt/ProcessPayment', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.success) Swal.fire("Thành công!", res.message, "success").then(() => location.reload());
+                    else Swal.fire("Lỗi", res.message, "error");
+                })
+                .catch(err => Swal.fire("Lỗi hệ thống", err.message, "error"));
+        }
+    </script>
+}

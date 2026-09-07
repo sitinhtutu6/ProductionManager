@@ -1,0 +1,344 @@
+﻿@{
+    ViewData["Title"] = "Tổng quan Mua hàng";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Đặt Hàng", Url.Action("Index", "PurchaseOrder")),
+        ("Dashboard Phân Tích", "")
+    };
+}
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+    body {
+        background-color: #f4f6f8;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .erp-card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+
+    .erp-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        background: #fff;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .filter-box {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        background: #fff;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+    }
+
+        .filter-box input {
+            border: none;
+            outline: none;
+            width: 100px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #0ea5e9;
+            text-align: center;
+        }
+
+    .tab-switch {
+        display: inline-flex;
+        background: #f1f5f9;
+        padding: 4px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .tab-btn {
+        background: transparent;
+        border: none;
+        padding: 8px 24px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #64748b;
+        border-radius: 6px;
+        transition: 0.3s;
+        cursor: pointer;
+    }
+
+        .tab-btn.active {
+            background: #fff;
+            color: #0ea5e9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+    .erp-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .erp-table th {
+            background: #f8fafc;
+            font-size: 12px;
+            font-weight: 700;
+            color: #475569;
+            padding: 12px 16px;
+            border-bottom: 1px solid #e2e8f0;
+            text-transform: uppercase;
+        }
+
+        .erp-table td {
+            padding: 10px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px;
+            color: #1e293b;
+            vertical-align: middle;
+        }
+
+        .erp-table tr:hover td {
+            background-color: #f8fafc;
+        }
+
+    .progress-bar-bg {
+        background: #e2e8f0;
+        height: 6px;
+        border-radius: 10px;
+        width: 80px;
+        display: inline-block;
+        overflow: hidden;
+        margin-left: 10px;
+    }
+
+    .progress-bar-fill {
+        background: #0ea5e9;
+        height: 100%;
+        border-radius: 10px;
+    }
+
+    .chart-container {
+        height: 350px;
+        position: relative;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+</style>
+
+<div class="container-fluid py-4 px-2 px-lg-4">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h5 class="fw-800 text-dark mb-0 fs-5"><i class="fa-solid fa-chart-pie text-primary me-2"></i>Tổng Quan Mua Hàng</h5>
+            <p class="text-muted small mb-0 mt-1">Theo dõi khối lượng nhập và chi phí phát sinh</p>
+        </div>
+
+        <form asp-action="CostOverview" method="get" class="d-flex gap-2">
+            <div class="filter-box shadow-sm">
+                <i class="fa-regular fa-calendar text-muted"></i>
+                <input type="text" id="fromDate" name="fromDate" class="datepicker" value="@ViewBag.FromDate" />
+                <span class="text-muted">-</span>
+                <input type="text" id="toDate" name="toDate" class="datepicker" value="@ViewBag.ToDate" />
+            </div>
+            <button type="submit" class="btn btn-primary fw-bold rounded-2 px-3 shadow-sm">Tìm kiếm</button>
+        </form>
+    </div>
+
+    <div class="erp-card">
+        <div class="erp-header bg-light flex-wrap gap-3">
+            <div class="tab-switch">
+                <button type="button" class="tab-btn active" id="btnSupplier" onclick="switchView('supplier')">Theo Nhà Cung Cấp</button>
+                <button type="button" class="tab-btn" id="btnProduct" onclick="switchView('product')">Theo Hàng Hóa</button>
+            </div>
+            <div class="d-flex gap-4">
+                <div class="text-end border-end pe-4">
+                    <div class="small text-muted fw-bold text-uppercase">TỔNG KHỐI LƯỢNG</div>
+                    <div class="fs-5 fw-800 text-primary">@(((double)ViewBag.TotalQty).ToString("N2"))</div>
+                </div>
+                <div class="text-end">
+                    <div class="small text-muted fw-bold text-uppercase">TỔNG CHI PHÍ TRỊ GIÁ</div>
+                    <div class="fs-5 fw-800 text-danger">@(((decimal)ViewBag.TotalCost).ToString("N0")) <span class="fs-6 text-muted">₫</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-0">
+            <div class="col-lg-5 border-end">
+                <div class="p-4 d-flex flex-column h-100 justify-content-center align-items-center">
+                    <h6 class="fw-bold text-dark text-center mb-1" id="chartTitle">Tỷ trọng Phân bổ</h6>
+                    <div class="small fw-600 text-muted mb-4" id="chartMetricLabel"></div>
+                    <div class="chart-container">
+                        <canvas id="costChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7">
+                <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                    <table class="erp-table">
+                        <thead style="position: sticky; top: 0; z-index: 10;">
+                            <tr>
+                                <th width="40" class="text-center">#</th>
+                                <th id="thName">Tên Đối Tượng</th>
+                                <th class="text-center">Số Lượng</th>
+                                <th class="text-end">Chi Phí (VNĐ)</th>
+                                <th width="130">Tỷ trọng</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tblBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        const supplierData = @Html.Raw(ViewBag.SupplierCostsJson);
+        const productData = @Html.Raw(ViewBag.ProductCostsJson);
+
+        let currentChart = null;
+
+        $(document).ready(function () {
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn" });
+        switchView('supplier');
+        });
+
+        function switchView(type) {
+        $('.tab-btn').removeClass('active');
+        if (type === 'supplier') {
+        $('#btnSupplier').addClass('active');
+        $('#thName').text('Tên Nhà Cung Cấp');
+        renderDashboard(supplierData, 'NCC');
+        } else {
+        $('#btnProduct').addClass('active');
+        $('#thName').text('Tên Vật tư / Hàng hóa');
+        renderDashboard(productData, 'Vật tư');
+        }
+        }
+
+        function renderDashboard(data, typeKey) {
+        let tbodyHtml = '';
+
+        // 🔥 THUẬT TOÁN THÔNG MINH: Kiểm tra xem tất cả các đơn có bị 0đ hay không?
+        let isZeroPrice = data.length > 0 && data.every(x => x.TotalAmount === 0);
+
+        // Nếu 0đ -> Vẽ biểu đồ theo Số lượng. Nếu có tiền -> Vẽ theo Tiền.
+        let chartMetricValue = isZeroPrice ? 'TotalQuantity' : 'TotalAmount';
+        let globalTotalMetric = data.reduce((sum, item) => sum + item[chartMetricValue], 0);
+
+        // Đổi Label thông báo cho Sếp biết máy đang vẽ theo trục nào
+        if (data.length === 0) {
+        $('#chartMetricLabel').text('Chưa có dữ liệu giao dịch');
+        } else if (isZeroPrice) {
+        $('#chartMetricLabel').html('<i class="fa-solid fa-scale-unbalanced me-1 text-warning"></i> Trục phân tích: Khối Lượng (Do chưa cập nhật Đơn giá)');
+        } else {
+        $('#chartMetricLabel').html('<i class="fa-solid fa-coins me-1 text-success"></i> Trục phân tích: Giá trị tiền (VNĐ)');
+        }
+
+        if (data.length === 0) {
+        tbodyHtml = `<tr><td colspan="5" class="text-center py-5 text-muted fst-italic">Không có dữ liệu trong khoảng thời gian này.</td></tr>`;
+        } else {
+        data.forEach((item, index) => {
+        // Tính phần trăm dựa theo biến linh động (Tiền hoặc Khối lượng)
+        let percent = globalTotalMetric > 0 ? ((item[chartMetricValue] / globalTotalMetric) * 100).toFixed(1) : 0;
+
+        let unitDisplay = item.Unit ? `<small class="text-muted ms-1">${item.Unit}</small>` : '';
+        let qtyDisplay = item.TotalQuantity < 1 && item.TotalQuantity > 0 ? item.TotalQuantity.toFixed(4) : item.TotalQuantity.toFixed(2);
+
+        tbodyHtml += `
+        <tr>
+        <td class="text-center text-muted fw-bold small">${index + 1}</td>
+        <td>
+        <div class="fw-bold text-dark">${item.Name}</div>
+        <div class="small text-muted">${item.SubText}</div>
+        </td>
+        <td class="text-center fw-bold text-primary">${qtyDisplay} ${unitDisplay}</td>
+        <td class="text-end fw-bold text-danger">${item.TotalAmount.toLocaleString('vi-VN')}</td>
+        <td>
+        <div class="d-flex align-items-center">
+        <span class="small fw-bold text-secondary" style="width: 35px;">${percent}%</span>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: ${percent}%; ${isZeroPrice ? 'background-color: #f59e0b;' : ''}"></div></div>
+        </div>
+        </td>
+        </tr>
+        `;
+        });
+        }
+        $('#tblBody').html(tbodyHtml);
+
+        // Render Biểu đồ Chart.js
+        let chartLabels = [];
+        let chartValues = [];
+        let chartColors = isZeroPrice
+        ? ['#f59e0b', '#fbbf24', '#fcd34d', '#fde68a', '#fef3c7', '#e2e8f0'] // Tone cam vàng nếu tính theo Số Lượng
+        : ['#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#10b981', '#cbd5e1']; // Tone xanh nếu tính theo Tiền
+
+        if (data.length > 5) {
+        let top5 = data.slice(0, 5);
+        let others = data.slice(5).reduce((sum, current) => sum + current[chartMetricValue], 0);
+
+        chartLabels = top5.map(x => x.Name);
+        chartLabels.push("Khác");
+
+        chartValues = top5.map(x => x[chartMetricValue]);
+        chartValues.push(others);
+        } else {
+        chartLabels = data.map(x => x.Name);
+        chartValues = data.map(x => x[chartMetricValue]);
+        }
+
+        if (currentChart) currentChart.destroy();
+
+        const ctx = document.getElementById('costChart').getContext('2d');
+        currentChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+        labels: chartLabels,
+        datasets: [{
+        data: chartValues,
+        backgroundColor: chartColors,
+        borderWidth: 0,
+        hoverOffset: 8
+        }]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15, font: { family: 'Inter' } } },
+        tooltip: {
+        callbacks: {
+        label: function (context) {
+        let valStr = context.raw.toLocaleString('vi-VN');
+        let suffix = isZeroPrice ? ' (KL)' : ' ₫';
+        let percentage = globalTotalMetric > 0 ? ((context.raw / globalTotalMetric) * 100).toFixed(1) : 0;
+        return `  ${valStr}${suffix} (${percentage}%)`;
+        }
+        },
+        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+        padding: 12,
+        titleFont: { size: 14, family: 'Inter' },
+        bodyFont: { size: 13, family: 'Inter' }
+        }
+        }
+        }
+        });
+        }
+    </script>
+}

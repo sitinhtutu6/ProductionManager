@@ -1,0 +1,320 @@
+﻿@using ProductionApp.Web.Models.ViewModels
+@model List<LoanVM>
+@{
+    ViewData["Title"] = "Quản Lý Vay & Cho Vay";
+
+    // --- TÍNH TOÁN SỐ LIỆU TỔNG QUAN ---
+    var totalBorrow = Model.Where(x => x.Type == LoanType.Borrowing).Sum(x => x.Remaining);
+    var totalLend = Model.Where(x => x.Type == LoanType.Lending).Sum(x => x.Remaining);
+    var countBorrow = Model.Count(x => x.Type == LoanType.Borrowing && !x.IsFinished);
+    var countLend = Model.Count(x => x.Type == LoanType.Lending && !x.IsFinished);
+    
+    // Giá trị mặc định cho bộ lọc ngày
+    var defaultFromDate = Context.Request.Query["fromDate"].ToString();
+    var defaultToDate = Context.Request.Query["toDate"].ToString();
+    
+    if(string.IsNullOrEmpty(defaultFromDate)) defaultFromDate = DateTime.Now.ToString("yyyy-01-01");
+    if(string.IsNullOrEmpty(defaultToDate)) defaultToDate = DateTime.Now.ToString("yyyy-MM-dd");
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold text-uppercase mb-1 text-primary"><i class="fa-solid fa-scale-balanced me-2"></i> SỔ VAY NỢ</h4>
+            <small class="text-muted">Theo dõi các khoản vay và cho vay cá nhân/tổ chức</small>
+        </div>
+        <a asp-controller="CashBook" asp-action="Index" class="btn btn-outline-secondary shadow-sm">
+            <i class="fa-solid fa-arrow-left me-2"></i> Quay lại Sổ Quỹ
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4 bg-light">
+        <div class="card-body py-3">
+            <form asp-action="ExportExcel" method="get" class="row g-2 align-items-center">
+                <div class="col-auto fw-bold text-muted small text-uppercase"><i class="fa-solid fa-filter me-2"></i>Xuất dữ liệu từ:</div>
+                <div class="col-auto" style="width: 150px;">
+                    <input type="text" name="fromDate" class="form-control form-control-sm datepicker text-center fw-bold" 
+                           placeholder="dd/mm/yyyy" value="@defaultFromDate">
+                </div>
+                <div class="col-auto fw-bold text-muted small text-uppercase">đến:</div>
+                <div class="col-auto" style="width: 150px;">
+                    <input type="text" name="toDate" class="form-control form-control-sm datepicker text-center fw-bold" 
+                           placeholder="dd/mm/yyyy" value="@defaultToDate">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-success btn-sm fw-bold shadow-sm px-3">
+                        <i class="fa-solid fa-file-excel me-2"></i> Xuất Excel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm border-start border-5 border-danger h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-uppercase fw-bold text-danger small mb-1">MÌNH ĐI VAY (Phải trả)</div>
+                            <div class="fs-3 fw-bold text-dark">@totalBorrow.ToString("N0") <span class="fs-6 text-muted">VNĐ</span></div>
+                            <div class="small text-muted mt-1"><i class="fa-solid fa-file-invoice me-1"></i> Đang nợ: <strong>@countBorrow</strong> hồ sơ</div>
+                        </div>
+                        <div class="bg-danger bg-opacity-10 p-3 rounded-circle text-danger">
+                            <i class="fa-solid fa-arrow-trend-down fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm border-start border-5 border-success h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-uppercase fw-bold text-success small mb-1">MÌNH CHO VAY (Phải thu)</div>
+                            <div class="fs-3 fw-bold text-dark">@totalLend.ToString("N0") <span class="fs-6 text-muted">VNĐ</span></div>
+                            <div class="small text-muted mt-1"><i class="fa-solid fa-piggy-bank me-1"></i> Đang cho vay: <strong>@countLend</strong> hồ sơ</div>
+                        </div>
+                        <div class="bg-success bg-opacity-10 p-3 rounded-circle text-success">
+                            <i class="fa-solid fa-arrow-trend-up fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white p-1">
+            <ul class="nav nav-pills nav-fill fw-bold" id="pills-tab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active py-2" id="pills-borrow-tab" data-bs-toggle="pill" data-bs-target="#pills-borrow" type="button">
+                        <span class="text-danger"><i class="fa-solid fa-arrow-down me-2"></i> MÌNH ĐI VAY</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link py-2" id="pills-lend-tab" data-bs-toggle="pill" data-bs-target="#pills-lend" type="button">
+                        <span class="text-success"><i class="fa-solid fa-arrow-up me-2"></i> MÌNH CHO VAY</span>
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="tab-content" id="pills-tabContent">
+
+        <div class="tab-pane fade show active" id="pills-borrow" role="tabpanel">
+            <div class="row g-4">
+                @if (Model.Any(x => x.Type == LoanType.Borrowing))
+                {
+                    @foreach (var item in Model.Where(x => x.Type == LoanType.Borrowing))
+                    {
+                        <div class="col-md-6 col-xl-4">
+                            <div class="card h-100 border-0 shadow-sm hover-shadow transition-card">
+                                <div class="card-header bg-white border-bottom-0 pt-3 pb-0 d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="fw-bold text-danger mb-1"><i class="fa-solid fa-user-tag me-2"></i>@item.PartnerName</h6>
+                                        <span class="badge bg-light text-muted border">Ngày vay: @item.StartDate.ToString("dd/MM/yy")</span>
+                                    </div>
+                                    @if (item.IsFinished)
+                                    {
+                                        <span class="badge bg-secondary"><i class="fa-solid fa-check me-1"></i>Xong</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger bg-opacity-75">Đang nợ</span>
+                                    }
+                                </div>
+
+                                <div class="card-body">
+                                    <div class="mb-3 text-center">
+                                        <div class="text-muted small text-uppercase">Số tiền còn nợ</div>
+                                        <div class="fs-2 fw-bold text-danger">@item.Remaining.ToString("N0")</div>
+                                        <div class="small text-muted">Tổng gốc: @item.TotalAmount.ToString("N0")</div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between small mb-1 fw-bold">
+                                        <span class="text-success">Đã trả: @item.ProcessedAmount.ToString("N0")</span>
+                                        <span class="text-muted">@Math.Round(item.Progress)%</span>
+                                    </div>
+                                    <div class="progress mb-3" style="height: 12px; background-color: #ffe5e5; border-radius: 10px;">
+                                        <div class="progress-bar bg-danger progress-bar-striped" role="progressbar" style="width: @(item.Progress)%"></div>
+                                    </div>
+
+                                    <div class="accordion accordion-flush bg-light rounded mb-3" id="acc-@item.Id">
+                                        <div class="accordion-item bg-transparent">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button collapsed py-2 small fw-bold text-muted" type="button" data-bs-toggle="collapse" data-bs-target="#flush-@item.Id">
+                                                    <i class="fa-solid fa-clock-rotate-left me-2"></i> Lịch sử trả nợ (@item.History.Count)
+                                                </button>
+                                            </h2>
+                                            <div id="flush-@item.Id" class="accordion-collapse collapse" data-bs-parent="#acc-@item.Id">
+                                                <div class="accordion-body p-0">
+                                                    <table class="table table-sm table-borderless mb-0 small table-hover">
+                                                        <tbody>
+                                                            @foreach (var h in item.History.Take(5)) // Chỉ hiện 5 gd gần nhất
+                                                            {
+                                                                <tr class="border-top">
+                                                                    <td class="ps-3 text-muted">@h.Date.ToString("dd/MM")</td>
+                                                                    <td class="text-end fw-bold text-dark">@h.Amount.ToString("N0")</td>
+                                                                    <td class="fst-italic text-muted text-truncate" style="max-width: 100px;" title="@h.Note">@h.Note</td>
+                                                                </tr>
+                                                            }
+                                                            @if (!item.History.Any())
+                                                            {
+                                                                <tr><td colspan="3" class="text-center text-muted p-2">Chưa có giao dịch.</td></tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @if (!item.IsFinished)
+                                    {
+                                        <a asp-controller="CashBook" asp-action="Create"
+                                           asp-route-type="Payment"
+                                           asp-route-parentId="@item.Id"
+                                           class="btn btn-danger w-100 fw-bold shadow-sm py-2">
+                                            <i class="fa-solid fa-money-bill-transfer me-2"></i> LẬP PHIẾU CHI TRẢ NỢ
+                                        </a>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="col-12 py-5 text-center">
+                        <div class="text-muted opacity-50"><i class="fa-solid fa-clipboard-check fa-4x mb-3"></i></div>
+                        <h5 class="text-muted">Tuyệt vời! Bạn không có khoản nợ nào.</h5>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-lend" role="tabpanel">
+            <div class="row g-4">
+                @if (Model.Any(x => x.Type == LoanType.Lending))
+                {
+                    @foreach (var item in Model.Where(x => x.Type == LoanType.Lending))
+                    {
+                        <div class="col-md-6 col-xl-4">
+                            <div class="card h-100 border-0 shadow-sm hover-shadow transition-card">
+                                <div class="card-header bg-white border-bottom-0 pt-3 pb-0 d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="fw-bold text-success mb-1"><i class="fa-solid fa-user-tag me-2"></i>@item.PartnerName</h6>
+                                        <span class="badge bg-light text-muted border">Ngày tạo: @item.StartDate.ToString("dd/MM/yy")</span>
+                                    </div>
+                                    @if (item.IsFinished)
+                                    {
+                                        <span class="badge bg-secondary"><i class="fa-solid fa-check me-1"></i>Xong</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success bg-opacity-75">Đang cho vay</span>
+                                    }
+                                </div>
+
+                                <div class="card-body">
+                                    <div class="mb-3 text-center">
+                                        <div class="text-muted small text-uppercase">Số tiền cần thu</div>
+                                        <div class="fs-2 fw-bold text-success">@item.Remaining.ToString("N0")</div>
+                                        <div class="small text-muted">Tổng gốc: @item.TotalAmount.ToString("N0")</div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between small mb-1 fw-bold">
+                                        <span class="text-primary">Đã thu: @item.ProcessedAmount.ToString("N0")</span>
+                                        <span class="text-muted">@Math.Round(item.Progress)%</span>
+                                    </div>
+                                    <div class="progress mb-3" style="height: 12px; background-color: #e5ffe5; border-radius: 10px;">
+                                        <div class="progress-bar bg-success progress-bar-striped" role="progressbar" style="width: @(item.Progress)%"></div>
+                                    </div>
+
+                                    <div class="accordion accordion-flush bg-light rounded mb-3" id="acc-@item.Id">
+                                        <div class="accordion-item bg-transparent">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button collapsed py-2 small fw-bold text-muted" type="button" data-bs-toggle="collapse" data-bs-target="#flush-@item.Id">
+                                                    <i class="fa-solid fa-clock-rotate-left me-2"></i> Lịch sử thu nợ (@item.History.Count)
+                                                </button>
+                                            </h2>
+                                            <div id="flush-@item.Id" class="accordion-collapse collapse" data-bs-parent="#acc-@item.Id">
+                                                <div class="accordion-body p-0">
+                                                    <table class="table table-sm table-borderless mb-0 small table-hover">
+                                                        <tbody>
+                                                            @foreach (var h in item.History.Take(5)) // Chỉ hiện 5 gd gần nhất
+                                                            {
+                                                                <tr class="border-top">
+                                                                    <td class="ps-3 text-muted">@h.Date.ToString("dd/MM")</td>
+                                                                    <td class="text-end fw-bold text-dark">@h.Amount.ToString("N0")</td>
+                                                                    <td class="fst-italic text-muted text-truncate" style="max-width: 100px;" title="@h.Note">@h.Note</td>
+                                                                </tr>
+                                                            }
+                                                            @if (!item.History.Any())
+                                                            {
+                                                                <tr><td colspan="3" class="text-center text-muted p-2">Chưa có giao dịch.</td></tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @if (!item.IsFinished)
+                                    {
+                                        <a asp-controller="CashBook" asp-action="Create"
+                                           asp-route-type="Receipt"
+                                           asp-route-parentId="@item.Id"
+                                           class="btn btn-success w-100 fw-bold shadow-sm py-2">
+                                            <i class="fa-solid fa-hand-holding-dollar me-2"></i> LẬP PHIẾU THU HỒI NỢ
+                                        </a>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="col-12 py-5 text-center">
+                        <div class="text-muted opacity-50"><i class="fa-solid fa-box-open fa-4x mb-3"></i></div>
+                        <h5 class="text-muted">Bạn chưa cho ai vay tiền.</h5>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-shadow:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+    }
+
+    .transition-card {
+        transition: all 0.3s ease;
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Kích hoạt Flatpickr cho bộ lọc ngày
+        flatpickr(".datepicker", {
+            altInput: true,
+            altFormat: "d/m/Y",   // Hiển thị dạng ngày/tháng/năm
+            dateFormat: "Y-m-d",  // Giá trị thực là năm-tháng-ngày
+            allowInput: true,
+            locale: "vn"
+        });
+    });
+</script>

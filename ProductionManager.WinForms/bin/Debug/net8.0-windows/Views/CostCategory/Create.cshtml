@@ -1,0 +1,43 @@
+﻿@model ProductionManager.Data.CostCategory
+@{
+    ViewData["Title"] = "Thêm Danh mục P&L";
+}
+
+<div class="container py-4">
+    <div class="card shadow-sm border-0" style="max-width: 600px; margin: 0 auto;">
+        <div class="card-header bg-success text-white py-3">
+            <h5 class="mb-0 fw-bold"><i class="fa-solid fa-folder-plus me-2"></i>Thêm Danh Mục Chi Phí Mới</h5>
+        </div>
+        <div class="card-body p-4 bg-light">
+            <form asp-action="Create" method="post">
+                <div class="mb-3">
+                    <label class="fw-bold small text-dark mb-1">Tên loại chi phí (*)</label>
+                    <input asp-for="Name" class="form-control fw-bold" placeholder="VD: Tiền mua giấy in, Bơm mực..." required />
+                    <div class="form-text small">Tên này sẽ hiển thị trong Menu thả xuống của Kế toán khi lập Sổ quỹ.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="fw-bold small text-danger mb-1">Thuộc Nhóm trên Báo Cáo P&L (*)</label>
+                    <select asp-for="Section" class="form-select fw-bold border-danger" asp-items="Html.GetEnumSelectList<ProductionManager.Data.PnlSection>()"></select>
+                    <div class="form-text small text-danger">Hệ thống sẽ dựa vào nhóm này để tính công thức Lợi nhuận.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="fw-bold small text-dark mb-1">Mô tả / Ghi chú</label>
+                    <textarea asp-for="Description" class="form-control" rows="2"></textarea>
+                </div>
+
+                <div class="mb-4 form-check form-switch">
+                    <input asp-for="IsActive" class="form-check-input" type="checkbox" id="isActive" checked>
+                    <label class="form-check-label fw-bold text-success" for="isActive">Kích hoạt ngay</label>
+                </div>
+
+                <hr />
+                <div class="d-flex gap-2 justify-content-end">
+                    <a asp-action="Index" class="btn btn-secondary px-4 fw-bold">Hủy</a>
+                    <button type="submit" class="btn btn-success px-4 fw-bold">LƯU LẠI</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

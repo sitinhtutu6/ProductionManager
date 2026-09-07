@@ -1,0 +1,342 @@
+﻿@model ProductionManager.Data.Shipment
+@{
+    ViewData["Title"] = "Tạo phiếu xuất hàng";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Xuất Hàng Hoá", Url.Action("Index", "Shipment")),
+        ("Tạo Phiếu Xuất", "")
+    };
+    var preSelectCustomerId = ViewBag.SelectedCustomerId;
+    var preSelectOrderId = ViewBag.PreSelectOrderId;
+    var preSelectExportId = ViewBag.PreSelectExportId;
+    var customersJson = System.Text.Json.JsonSerializer.Serialize(ViewBag.CustomerId);
+}
+
+<style>
+    .shipment-bg {
+        background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+        min-height: 100vh;
+        padding-bottom: 50px;
+        font-family: 'Segoe UI', system-ui;
+    }
+
+    .glass-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+        .glass-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.08);
+        }
+
+    .card-header-custom {
+        background: linear-gradient(to right, #ffffff, #f8f9fa);
+        border-bottom: 2px solid #f1f5f9;
+        padding: 15px 20px;
+        border-radius: 16px 16px 0 0;
+    }
+
+    .order-item {
+        border-radius: 10px;
+        border: 1px solid transparent;
+        transition: all 0.2s;
+        background: #fff;
+        margin-bottom: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    }
+
+        .order-item:hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            cursor: pointer;
+        }
+
+    .order-checkbox:checked + .order-content {
+        background: #dbeafe;
+        border-radius: 8px;
+    }
+
+    .qty-input {
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-weight: 700;
+        color: #0f172a;
+        text-align: center;
+        transition: border-color 0.2s;
+    }
+
+        .qty-input:focus {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+        }
+
+    .suggestion-box {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        max-height: 250px;
+        overflow-y: auto;
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 0 0 8px 8px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        z-index: 1050;
+        display: none;
+    }
+
+    .suggestion-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 0.95rem;
+        color: #334155;
+    }
+
+        .suggestion-item:hover {
+            background-color: #f0f9ff;
+            color: #0284c7;
+            font-weight: 600;
+        }
+
+        .suggestion-item strong {
+            color: #0f172a;
+        }
+</style>
+
+<div class="shipment-bg">
+    <div class="container-fluid pt-4 px-4">
+        <form asp-action="Create" method="post" id="formCreateShipment">
+            <div asp-validation-summary="All" class="alert alert-danger mb-4 shadow-sm border-0 rounded-3" role="alert" style="display:none"></div>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center">
+                    <div class="bg-white p-3 rounded-circle shadow-sm me-3 text-success"><i class="fa-solid fa-truck-ramp-box fa-2x"></i></div>
+                    <div><h4 class="fw-bold text-dark mb-0">Tạo Phiếu Xuất Kho</h4><span class="text-muted small">🚀 Xuất hàng nhanh & Gộp đơn thông minh</span></div>
+                </div>
+                <div>
+                    <a asp-action="Index" class="btn btn-light bg-white border fw-bold me-2 shadow-sm rounded-pill px-4"><i class="fa-solid fa-arrow-left me-2"></i> Quay lại</a>
+                    <button type="button" onclick="submitShipment()" class="btn btn-success fw-bold shadow-lg rounded-pill px-5 btn-lg"><i class="fa-solid fa-paper-plane me-2"></i> HOÀN TẤT XUẤT</button>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-lg-3">
+                    <div class="glass-card h-100">
+                        <div class="card-header-custom"><h6 class="m-0 fw-bold text-primary"><i class="fa-solid fa-circle-info me-2"></i>THÔNG TIN CHUNG</h6></div>
+                        <div class="p-4">
+                            <div class="mb-3">
+                                <label class="fw-bold small text-secondary mb-1">Mã Phiếu (Auto)</label>
+                                <div class="input-group"><span class="input-group-text bg-light border-0"><i class="fa-solid fa-barcode text-muted"></i></span><input asp-for="ShipmentCode" class="form-control bg-light border-0 fw-bold text-primary" placeholder="PX-..." readonly /></div>
+                            </div>
+                            <div class="mb-4 position-relative">
+                                <label class="fw-bold small text-dark mb-1">Khách Hàng (*)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-primary"></i></span>
+                                    <input type="text" id="txtCustomerSearch" class="form-control border-start-0 fw-bold shadow-sm text-primary" placeholder="Gõ tên khách hàng..." autocomplete="off">
+                                    <input type="hidden" asp-for="CustomerId" id="hdnCustomerId" />
+                                </div>
+                                <div id="customerSuggestions" class="suggestion-box"></div>
+                            </div>
+                            <div class="mb-3 p-2 bg-light rounded border">
+                                <label class="fw-bold small text-dark mb-2 d-block">Loại Nghiệp Vụ</label>
+                                <div class="btn-group w-100" role="group">
+                                    <input type="radio" class="btn-check" name="Type" id="typeStandard" value="Standard" checked autocomplete="off" onchange="changeShipmentType()">
+                                    <label class="btn btn-outline-primary btn-sm fw-bold" for="typeStandard">Xuất Bán</label>
+                                    <input type="radio" class="btn-check" name="Type" id="typeWarranty" value="Warranty" autocomplete="off" onchange="changeShipmentType()">
+                                    <label class="btn btn-outline-danger btn-sm fw-bold" for="typeWarranty">Xuất Bù / Sửa</label>
+                                </div>
+                            </div>
+                            <div class="mb-3 p-3 bg-primary bg-opacity-10 border border-primary rounded" id="divLogistics" style="display:none;">
+                                <label class="fw-bold small text-primary mb-2"><i class="fa-solid fa-truck-fast me-1"></i>Ghép vào chuyến xe</label>
+                                <select asp-for="ExportShipmentId" class="form-select border-primary shadow-sm fw-bold text-primary" id="cboExportShipment"><option value="">-- Kho tự xuất --</option></select>
+                            </div>
+                            <div class="mb-3"><label class="fw-bold small text-secondary mb-1">Ngày xuất</label><input asp-for="ShipmentDate" type="text" class="form-control fw-bold datepicker shadow-sm" value="@DateTime.Now.ToString("yyyy-MM-dd")" /></div>
+                            <div class="mb-3"><label class="fw-bold small text-secondary mb-1">Xe / Người nhận</label><input asp-for="VehicleNumber" class="form-control" placeholder="Biển số xe..." /></div>
+                            <div class="mb-0"><label class="fw-bold small text-secondary mb-1">Ghi chú</label><textarea asp-for="Notes" class="form-control bg-light" rows="3"></textarea></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3">
+                    <div class="glass-card h-100 d-flex flex-column">
+                        <div class="card-header-custom d-flex justify-content-between align-items-center">
+                            <h6 class="m-0 fw-bold text-primary"><i class="fa-solid fa-clipboard-list me-2"></i>CHỌN ĐƠN</h6>
+                            <div class="form-check form-switch m-0" title="Chọn tất cả"><input class="form-check-input cursor-pointer" type="checkbox" id="chkAllOrders"></div>
+                        </div>
+                        <div class="p-2 flex-grow-1 position-relative bg-light bg-opacity-25 rounded-bottom" id="orderListContainer" style="overflow-y: auto; max-height: 550px;">
+                            <div class="text-center py-5 mt-4 opacity-50"><p class="small fw-bold">Vui lòng chọn khách hàng</p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="glass-card h-100 d-flex flex-column">
+                        <div class="card-header-custom d-flex justify-content-between align-items-center">
+                            <h6 class="m-0 fw-bold text-success"><i class="fa-solid fa-boxes-packing me-2"></i>VẬT TƯ CẦN XUẤT</h6>
+                            <span class="badge bg-warning text-dark rounded-pill px-3 py-2 shadow-sm" id="itemCountBadge">0 mục</span>
+                        </div>
+                        <div class="table-responsive flex-grow-1 rounded-bottom bg-white" style="max-height: 600px;">
+                            <table class="table table-hover align-middle mb-0" id="tblItems">
+                                <thead class="bg-light small text-uppercase sticky-top" style="z-index: 10;">
+                                    <tr>
+                                        <th class="ps-4 py-3">Sản phẩm</th>
+                                        <th class="text-center" width="90">Đã đặt</th>
+                                        <th class="text-center" width="90">Đã giao</th>
+                                        <th class="text-center bg-warning bg-opacity-10 text-dark" width="140">Lần này</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="4" class="text-center py-5"><div class="opacity-50"><i class="fa-solid fa-box-open fa-3x mb-3 text-secondary"></i><p class="small">Chưa có dữ liệu.</p></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        var preCustId = '@preSelectCustomerId'; var preOrderId = '@preSelectOrderId'; var preExportId = '@preSelectExportId';
+        var customerList = @Html.Raw(customersJson);
+
+        $(document).ready(function () {
+        flatpickr(".datepicker", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", allowInput: true, locale: "vn", defaultDate: "today" });
+        if (preCustId) {
+        let existCust = customerList.find(c => c.Value == preCustId || c.Id == preCustId);
+        if (existCust) selectCustomer(existCust.Value || existCust.Id, existCust.DisplayText || existCust.Text);
+        }
+        });
+
+        $('#txtCustomerSearch').on('input', function () {
+        let keyword = $(this).val().toLowerCase(); let box = $('#customerSuggestions'); box.html('');
+        if (keyword.length < 1) { box.hide(); return; }
+        let matches = customerList.filter(c => (c.DisplayText || c.Text).toLowerCase().includes(keyword));
+        if (matches.length > 0) {
+        matches.forEach(c => {
+        let text = (c.DisplayText || c.Text).replace(new RegExp(keyword, "gi"), (match) => `<strong>${match}</strong>`);
+        box.append(`<div class="suggestion-item" onclick="selectCustomer('${c.Value || c.Id}', '${c.DisplayText || c.Text}')">${text}</div>`);
+        });
+        box.show();
+        } else { box.hide(); }
+        });
+
+        $(document).on('click', function (e) { if (!$(e.target).closest('.position-relative').length) $('#customerSuggestions').hide(); });
+
+        function selectCustomer(id, name) { $('#hdnCustomerId').val(id); $('#txtCustomerSearch').val(name); $('#customerSuggestions').hide(); loadOrders(id); loadActiveExports(id); }
+
+        function loadActiveExports(custId) {
+        $.get('/Shipment/GetActiveExportsByCustomer?customerId=' + custId, function (exports) {
+        let cbo = $('#cboExportShipment'); cbo.empty().append('<option value="">-- Kho tự xuất --</option>');
+        if (exports && exports.length > 0) {
+        $('#divLogistics').slideDown();
+        exports.forEach(e => {
+        let text = `[Mã: ${e.code}] - Xe: ${e.vehicle || 'Đang chờ'} (${e.type})`;
+        let selected = (preExportId && preExportId == e.id) ? 'selected' : '';
+        cbo.append(`<option value="${e.id}" ${selected}>${text}</option>`);
+        });
+        } else { $('#divLogistics').slideUp(); }
+        });
+        }
+
+        function loadOrders(custId) {
+        var container = $('#orderListContainer');
+        container.html('<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>');
+        $('#tblItems tbody').empty(); $('#itemCountBadge').text('0 mục');
+        if (!custId) return;
+        $.get('/Shipment/GetOrdersByCustomer?customerId=' + custId, function (orders) {
+        if (orders.length === 0) { container.html(`<div class="text-center py-5 mt-3"><p class="small text-muted px-3">Không có đơn hàng nào cần xử lý.</p></div>`); return; }
+        var html = '';
+        orders.forEach(o => {
+        var isChecked = (preOrderId && o.id == preOrderId) ? 'checked' : '';
+        html += `<div class="order-item p-2"><div class="form-check m-0 d-flex align-items-center w-100">
+        <input class="form-check-input order-checkbox me-3 shadow-none" type="checkbox" value="${o.id}" id="ord_${o.id}" ${isChecked} style="width: 20px; height: 20px; cursor: pointer;">
+        <label class="form-check-label w-100 cursor-pointer order-content p-2" for="ord_${o.id}">
+        <div class="d-flex justify-content-between align-items-center mb-1"><span class="fw-bold text-primary"><i class="fa-solid fa-file-invoice me-1"></i> ${o.orderCode}</span><span class="badge bg-light text-muted border border-secondary">${o.orderDate}</span></div>
+        <div class="d-flex justify-content-between align-items-center"><span class="small text-muted"><i class="fa-solid fa-cubes me-1"></i> ${o.itemCount} loại SP</span></div>
+        </label>
+        </div></div>`;
+        });
+        container.html(html);
+        if (preOrderId) { loadSelectedOrderItems(); preOrderId = null; }
+        });
+        }
+
+        $('#chkAllOrders').change(function () { $('.order-checkbox').prop('checked', $(this).is(':checked')); loadSelectedOrderItems(); });
+        $(document).on('change', '.order-checkbox', function () { loadSelectedOrderItems(); });
+
+        function changeShipmentType() { loadSelectedOrderItems(); }
+
+        function loadSelectedOrderItems() {
+        var selectedOrderIds = []; $('.order-checkbox:checked').each(function () { selectedOrderIds.push($(this).val()); });
+        if (selectedOrderIds.length === 0) {
+        $('#tblItems tbody').html('<tr><td colspan="4" class="text-center py-5 text-muted opacity-75">Vui lòng tích chọn đơn hàng bên trái</td></tr>'); $('#itemCountBadge').text('0 mục'); return;
+        }
+        var shipType = $('input[name="Type"]:checked').val();
+        $('#tblItems tbody').html('<tr><td colspan="4" class="text-center py-5"><div class="spinner-border spinner-border-sm text-success"></div> Đang tính toán số lượng...</td></tr>');
+        $.ajax({
+        url: '/Shipment/GetPendingItemsByOrderIds', type: 'POST', data: { orderIds: selectedOrderIds, type: shipType },
+        success: function (data) { renderItemsTable(data, shipType); }, error: function () { Swal.fire('Lỗi', 'Không thể tải dữ liệu.', 'error'); }
+        });
+        }
+
+        function renderItemsTable(data, shipType) {
+        if (data.length === 0) {
+        $('#tblItems tbody').html(`<tr><td colspan="4" class="text-center py-5"><div class="text-success"><span class="fw-bold">Đã hoàn thành xuất kho!</span></div></td></tr>`);
+        $('#itemCountBadge').text('0 mục'); return;
+        }
+        var html = ''; var currentOrder = '';
+        data.forEach((item, index) => {
+        if (item.orderCode !== currentOrder) {
+        currentOrder = item.orderCode;
+        html += `<tr class="bg-light border-bottom border-top"><td colspan="4" class="fw-bold text-primary ps-4 py-2 small"><i class="fa-solid fa-caret-down me-1"></i> Đơn hàng: ${currentOrder}</td></tr>`;
+        }
+
+        let warrantyBadge = item.warrantyTotal > 0 ? `<span class="badge bg-danger ms-2" title="Đã từng xuất bù">Đã bù: ${item.warrantyTotal}</span>` : '';
+
+        // 🔥 LOGIC UI: THỤT LỀ NẾU LÀ CHI TIẾT CON
+        let icon = item.isComponent ? '<i class="fa-solid fa-arrow-turn-up fa-rotate-90 text-warning me-2"></i>' : '<i class="fa-solid fa-box text-primary me-2"></i>';
+        let nameClass = item.isComponent ? 'text-muted fst-italic ms-3' : 'text-dark';
+
+        html += `
+        <tr>
+        <td class="ps-4">
+        <div class="fw-bold ${nameClass} mb-1">${icon} ${item.productName} ${warrantyBadge}</div>
+        <div class="small text-muted ${item.isComponent ? 'ms-5' : 'ms-4'}"><i class="fa-solid fa-ruler-combined me-1"></i> ${item.specifications || 'Tiêu chuẩn'}</div>
+        <input type="hidden" name="ShipmentDetails[${index}].OrderDetailId" value="${item.id}" />
+        </td>
+        <td class="text-center"><span class="badge bg-light text-dark border fs-6 shadow-sm">${item.quantityOrdered}</span></td>
+        <td class="text-center"><span class="badge bg-success bg-opacity-10 text-success fs-6">${item.shippedTotal}</span></td>
+        <td class="bg-warning bg-opacity-10">
+        <div class="d-flex align-items-center justify-content-center flex-column">
+        <input type="number" name="ShipmentDetails[${index}].QuantityShipped" class="form-control form-control-sm qty-input text-primary shadow-sm item-qty" min="0" max="${item.pending}" value="${shipType === 'Warranty' ? 0 : item.pending}" onfocus="this.select()" style="width: 80px;" />
+        <small class="text-muted mt-1" style="font-size: 10px;">Max: ${item.pending}</small>
+        </div>
+        </td>
+        </tr>`;
+        });
+        $('#tblItems tbody').html(html); $('#itemCountBadge').text(data.length + ' mục');
+        }
+
+        function submitShipment() {
+        if (!$('#hdnCustomerId').val()) { Swal.fire({ icon: 'error', title: 'Thiếu thông tin', text: 'Vui lòng chọn Khách hàng!' }); return; }
+        var hasData = false; $('.item-qty').each(function () { if ($(this).val() > 0) hasData = true; });
+        if (!hasData) {
+        Swal.fire({ title: "Chưa nhập số lượng!", text: "Tạo phiếu xuất RỖNG (0 sản phẩm)?", icon: "warning", showCancelButton: true, confirmButtonText: "Vẫn tạo" })
+        .then((result) => { if (result.isConfirmed) { if (preExportId) $('<input>').attr({ type: 'hidden', name: 'ExportShipmentId', value: preExportId }).appendTo('#formCreateShipment'); $('#formCreateShipment').submit(); } });
+        return;
+        }
+        if (preExportId) $('<input>').attr({ type: 'hidden', name: 'ExportShipmentId', value: preExportId }).appendTo('#formCreateShipment');
+        $('#formCreateShipment').submit();
+        }
+    </script>
+}

@@ -1,0 +1,55 @@
+﻿@{
+    ViewData["Title"] = "Đăng ký thành công";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <div class="card shadow border-success">
+                <div class="card-body p-5">
+
+                    <div class="mb-4 text-success">
+                        <i class="fa-solid fa-circle-check" style="font-size: 5rem;"></i>
+                    </div>
+
+                    <h2 class="fw-bold text-success">Đăng ký thành công!</h2>
+
+                    <p class="lead mt-3">
+                        Tài khoản của bạn đã được tạo.
+                        <br />
+                        Vui lòng kiểm tra Email để kích hoạt tài khoản.
+                    </p>
+
+                    <hr />
+
+                    <p class="text-muted">
+                        Tự động chuyển về trang đăng nhập sau
+                        <span id="countdown" class="fw-bold text-dark" style="font-size: 1.2rem;">5</span> giây...
+                    </p>
+
+                    <a asp-action="Login" class="btn btn-primary mt-2">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Đăng nhập ngay
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Thiết lập thời gian (5 giây)
+    let timeLeft = 5;
+    const countdownElement = document.getElementById('countdown');
+
+    // 2. Hàm đếm ngược chạy mỗi 1 giây
+    const countdownTimer = setInterval(function () {
+        timeLeft--;
+        countdownElement.textContent = timeLeft;
+
+        if (timeLeft <= 0) {
+            clearInterval(countdownTimer);
+            // 3. Chuyển hướng về trang Login
+            window.location.href = '/Account/Login';
+        }
+    }, 1000);
+</script>

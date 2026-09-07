@@ -1,0 +1,512 @@
+﻿@model ProductionManager.Data.PurchaseOrder
+@{
+    ViewData["Title"] = "Cập nhật Đơn hàng";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Đặt Hàng", Url.Action("Index", "PurchaseOrder")),
+        ("Cập Nhật", "")
+    };
+    var itemsJson = ViewBag.ItemsJson;
+    var existingDetailsJson = ViewBag.ExistingDetailsJson;
+    var suppJson = ViewBag.SuppliersJson;
+    var ordersJson = ViewBag.OrdersJson ?? "[]"; // Nhận danh sách đơn hàng
+}
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+    body {
+        background-color: #f4f6f8;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .erp-card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        margin-bottom: 16px;
+        overflow: hidden;
+    }
+
+    .erp-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f1f5f9;
+        background: #fff;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+        .erp-header h6 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: #1e293b;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+    .erp-body {
+        padding: 16px;
+    }
+
+    .form-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 4px;
+    }
+
+    .form-control, .form-select {
+        border-radius: 6px;
+        border-color: #cbd5e1;
+        font-size: 13px;
+        padding: 6px 10px;
+        box-shadow: none;
+        transition: all 0.2s ease;
+        height: 34px;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+        }
+
+    .select2-container--bootstrap-5 .select2-selection {
+        border-radius: 6px;
+        padding: 4px 10px;
+        min-height: 34px;
+        border-color: #cbd5e1;
+        font-weight: 600;
+        font-size: 13px;
+    }
+
+    .select2-container--bootstrap-5.select2-container--focus .select2-selection {
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+    }
+
+    .erp-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 0;
+    }
+
+        .erp-table th {
+            background: #f8fafc;
+            color: #64748b;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            white-space: nowrap;
+        }
+
+        .erp-table td {
+            padding: 6px 12px;
+            vertical-align: middle;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 13px;
+        }
+
+    .inp-transparent {
+        border: 1px solid transparent;
+        background: transparent;
+        width: 100%;
+        transition: 0.2s;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 13px;
+        height: 30px;
+    }
+
+        .inp-transparent:focus, .inp-transparent:hover {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            outline: none;
+        }
+
+    .input-locked {
+        background-color: #f8fafc !important;
+        color: #94a3b8 !important;
+        pointer-events: none;
+        border-color: transparent !important;
+        font-weight: 500;
+    }
+
+    .summary-box {
+        background: #fffbeb;
+        border-radius: 10px;
+        padding: 16px;
+        border: 1px solid #fde68a;
+        width: 100%;
+        max-width: 380px;
+    }
+
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 13px;
+        align-items: center;
+        color: #475569;
+        font-weight: 600;
+    }
+
+        .summary-row:last-child {
+            margin-bottom: 0;
+        }
+
+    .summary-total {
+        border-top: 2px dashed #fcd34d;
+        padding-top: 12px;
+        margin-top: 12px;
+        font-size: 16px;
+        font-weight: 800;
+        color: #d97706;
+    }
+</style>
+
+<div class="container-fluid py-3 px-2 px-lg-4">
+    <form id="poForm" onsubmit="submitEditPO(event)">
+        <input type="hidden" id="poId" value="@Model.Id" />
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h5 class="fw-800 mb-0 text-dark">Sửa Chứng Từ: <span class="text-warning">@Model.POCode</span></h5>
+            <div class="d-flex gap-2">
+                <a href="/PurchaseOrder" class="btn btn-sm btn-light rounded-pill px-3 fw-bold border shadow-sm text-secondary">Hủy bỏ</a>
+                <button type="submit" class="btn btn-sm btn-warning rounded-pill px-4 fw-bold text-dark shadow-sm"><i class="fa-solid fa-save me-1"></i> Lưu Thay Đổi</button>
+            </div>
+        </div>
+
+        <!-- Master Data -->
+        <div class="erp-card border border-warning border-opacity-50">
+            <div class="erp-header bg-warning bg-opacity-10 border-bottom-0">
+                <h6 class="text-dark"><i class="fa-solid fa-circle-info text-warning me-2"></i>Thông tin chung</h6>
+            </div>
+            <div class="erp-body pt-2">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label text-danger">Nhà Cung Cấp *</label>
+                        <select id="supplierId" class="form-control" required></select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-warning">Lọc theo Nhóm Vật Tư</label>
+                        <select id="categoryFilter" class="form-select fw-bold" onchange="filterByCategory()">
+                            <option value="">-- Tất cả nhóm --</option>
+                            @if (ViewBag.Categories != null)
+                            {
+                                foreach (var cat in ViewBag.Categories)
+                                {
+                                    <option value="@cat.Id">@cat.Name</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Loại Đơn</label>
+                        <select id="poType" class="form-select fw-bold">
+                            <option value="1" selected="@(Model.Type == ProductionManager.Data.POType.Purchase)">Mua thương mại</option>
+                            <option value="2" selected="@(Model.Type == ProductionManager.Data.POType.Outsourcing)">Gia công ngoài</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Ngày Đặt</label>
+                        <input type="text" id="orderDate" class="form-control datepicker text-center fw-bold bg-white text-dark" value="@Model.OrderDate.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Số Chứng Từ</label>
+                        <input id="poCode" class="form-control fw-bold text-center border-0" value="@Model.POCode" readonly style="background:#f1f5f9; color: #64748b;" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Ghi chú / Diễn giải</label>
+                        <input id="note" class="form-control" value="@Model.Note" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Details Data -->
+        <div class="erp-card">
+            <div class="erp-header d-flex justify-content-between align-items-center">
+                <h6><i class="fa-solid fa-boxes-stacked text-success me-2"></i>Chi tiết hàng hóa</h6>
+                @if (Model.Details.Any(x => x.QuantityReceived > 0))
+                {
+                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1 fw-bold"><i class="fa-solid fa-lock me-1"></i> Khóa do đã nhập kho</span>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-sm btn-light border fw-bold text-warning rounded-pill px-3 py-1 shadow-sm" onclick="addRow()">
+                        <i class="fa-solid fa-plus me-1"></i> Thêm dòng
+                    </button>
+                }
+            </div>
+
+            <div class="table-responsive" style="min-height: 200px;">
+                <table class="erp-table" id="tblDetails">
+                    <thead>
+                        <tr>
+                            <th width="40" class="text-center">#</th>
+                            <th style="min-width: 200px;">Mã / Tên Hàng Hóa</th>
+                            <th style="min-width: 150px;">Đơn Hàng SX</th>
+                            <th width="80" class="text-center">ĐVT</th>
+                            <th style="min-width: 100px;" width="12%" class="text-end">Số Lượng</th>
+                            <th style="min-width: 120px;" width="15%" class="text-end">Đơn Giá</th>
+                            <th style="min-width: 120px;" width="15%" class="text-end">Thành Tiền</th>
+                            <th width="50" class="text-center"></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Footer Summary -->
+            <div class="erp-body bg-white border-top">
+                <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-3">
+                    <div class="p-3 bg-warning bg-opacity-10 rounded-3 text-dark small w-100" style="max-width: 500px; border: 1px solid #fde68a;">
+                        <i class="fa-solid fa-shield-halved text-warning me-1 fs-6"></i> <strong>An toàn:</strong> Đơn hàng đang nhập kho sẽ khóa cấu thành. Kế toán chỉ có thể cập nhật <b>Thuế VAT</b> và <b>Tiền cọc</b>.
+                    </div>
+
+                    <div class="summary-box shadow-sm ms-lg-auto">
+                        <div class="summary-row">
+                            <span>Cộng tiền hàng:</span>
+                            <span id="lblTotalAmount" class="fw-bold text-dark fs-6">@Model.TotalAmount.ToString("N0")</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="d-flex align-items-center">Thuế GTGT <input type="number" id="vatPercent" class="form-control text-center mx-2 p-1 fw-bold text-warning" style="width: 55px; height: 28px;" value="@Model.VATPercent" min="0" oninput="calcTotalFinancial()"> %:</span>
+                            <span id="lblVatAmount" class="fw-bold text-dark fs-6">@Model.VATAmount.ToString("N0")</span>
+                        </div>
+                        <div class="summary-row summary-total">
+                            <span>Tổng Thanh Toán:</span>
+                            <span id="lblFinalTotal">@Model.FinalTotal.ToString("N0")</span>
+                        </div>
+                        <div class="summary-row mt-3">
+                            <span class="text-danger">Tiền đặt cọc (Trả trước):</span>
+                            <input type="number" id="depositAmount" class="form-control text-end text-danger fw-bold shadow-sm p-1" style="width: 120px; height: 30px; border-color: #fca5a5;" value="@Model.DepositAmount" min="0" oninput="calcTotalFinancial()" />
+                        </div>
+                        <div class="summary-row mt-2 text-success fs-5 fw-800">
+                            <span>Số tiền còn nợ:</span>
+                            <span id="lblRemainingAmount">@Model.RemainingAmount.ToString("N0")</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        const allMaterialsData = @Html.Raw(itemsJson);
+        let materialsData = [...allMaterialsData];
+        const existingData = @Html.Raw(existingDetailsJson);
+        const suppList = @Html.Raw(suppJson);
+        const orderList = @Html.Raw(ordersJson);
+        const currentSupplierId = @Model.SupplierId;
+        let rowIndex = 0;
+
+        $(document).ready(function () {
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn" });
+
+        let suppSelect = $('#supplierId');
+        suppList.forEach(s => {
+        let opt = new Option(s.Text, s.Id);
+        if (s.Id === currentSupplierId) opt.selected = true;
+        suppSelect.append(opt);
+        });
+        suppSelect.val('@Model.SupplierId').select2({ theme: 'bootstrap-5', width: '100%', placeholder: "🔍 Chọn NCC..." });
+
+        if (existingData && existingData.length > 0) {
+        existingData.forEach(item => {
+        let wId = item.WarehouseItemId || item.warehouseItemId;
+        let qty = item.QuantityOrdered || item.quantityOrdered;
+        let price = item.UnitPrice || item.unitPrice;
+        let linkId = item.LinkedOrderId || item.linkedOrderId; // Hỗ trợ camelCase JS
+        addRow(wId, qty, price, linkId);
+        });
+        } else { addRow(); }
+
+        calcTotalFinancial();
+        });
+
+        function filterByCategory() {
+        let catId = document.getElementById('categoryFilter').value;
+        if (catId === "") materialsData = [...allMaterialsData];
+        else materialsData = allMaterialsData.filter(m => m.CategoryId == catId);
+
+        document.querySelectorAll("#tblDetails tbody tr").forEach(row => {
+        let select = $(row).find('.row-item');
+        if (!select.val()) {
+        select.select2('destroy'); select.empty(); select.append('<option value="">-- Tìm mã/tên hàng hóa --</option>');
+        materialsData.forEach(item => { select.append(`<option value="${item.Id}" data-unit="${item.Unit}" data-price="${item.Price || 0}">${item.Code} - ${item.Name}</option>`); });
+        select.select2({ theme: 'bootstrap-5', width: '100%' });
+        }
+        });
+        }
+
+        // 🔥 NÂNG CẤP ADDROW ĐỂ RENDER GIÁ TRỊ CŨ
+        function addRow(selectedItemId = null, qtyVal = 1, priceVal = 0, selectedOrderId = null) {
+        const tbody = document.querySelector("#tblDetails tbody");
+        const row = tbody.insertRow();
+        row.id = `row-${rowIndex}`;
+
+        let itemOptions = '<option value="">-- Tìm mã/tên hàng hóa --</option>';
+        let unitText = '';
+        materialsData.forEach(item => {
+        let selected = (selectedItemId && item.Id == selectedItemId) ? "selected" : "";
+        if (selected) unitText = item.Unit;
+        itemOptions += `<option value="${item.Id}" data-unit="${item.Unit}" data-price="${item.Price || 0}" ${selected}>${item.Code} - ${item.Name}</option>`;
+        });
+
+        let orderOptions = '<option value="">-- Dùng chung --</option>';
+        orderList.forEach(o => {
+        let selected = (selectedOrderId && o.Id == selectedOrderId) ? "selected" : "";
+        orderOptions += `<option value="${o.Id}" data-code="${o.Code}" ${selected}>${o.Code}</option>`;
+        });
+
+        let stateAttr = selectedItemId ? "" : "readonly";
+        let stateClass = selectedItemId ? "" : "input-locked";
+
+        row.innerHTML = `
+        <td class="text-center text-muted fw-bold align-middle row-idx">${tbody.children.length}</td>
+        <td class="py-2"><select class="form-control form-control-sm row-item" required>${itemOptions}</select></td>
+        <td class="py-2"><select class="form-control form-control-sm row-order">${orderOptions}</select></td>
+        <td class="text-center text-secondary row-unit align-middle fw-600">${unitText}</td>
+        <td class="py-2"><input type="number" class="inp-transparent text-end fw-bold text-primary row-qty ${stateClass}" value="${qtyVal}" min="0.01" step="0.01" required ${stateAttr}></td>
+        <td class="py-2"><input type="number" class="inp-transparent text-end fw-bold text-dark row-price ${stateClass}" value="${priceVal}" min="0" ${stateAttr}></td>
+        <td class="text-end fw-bold text-dark row-total align-middle fs-6">0</td>
+        <td class="text-center align-middle"><button type="button" class="btn btn-sm text-danger p-0 border-0 bg-transparent shadow-none" onclick="removeRow(this)" title="Xóa dòng"><i class="fa-solid fa-trash-can fs-5"></i></button></td>
+        `;
+
+        let newSelectItem = $(row).find('.row-item');
+        newSelectItem.select2({ theme: 'bootstrap-5', width: '100%' });
+        newSelectItem.on('select2:select', function (e) { onItemChange(this); });
+        newSelectItem.on('select2:unselect', function (e) { lockRow(this.closest('tr')); });
+
+        $(row).find('.row-order').select2({ theme: 'bootstrap-5', width: '100%', placeholder: "Dùng chung" });
+
+        rowIndex++;
+        updateRowIndices();
+        if (selectedItemId) calcTotalFinancial();
+        }
+
+        function removeRow(btn) { btn.closest('tr').remove(); updateRowIndices(); calcTotalFinancial(); }
+        function updateRowIndices() { document.querySelectorAll("#tblDetails tbody tr").forEach((row, idx) => { row.querySelector('.row-idx').innerText = idx + 1; }); }
+
+        function lockRow(tr) {
+        tr.querySelector('.row-unit').innerText = '';
+        let qtyInp = tr.querySelector('.row-qty'); let priceInp = tr.querySelector('.row-price');
+        qtyInp.readOnly = true; qtyInp.classList.add('input-locked'); priceInp.readOnly = true; priceInp.classList.add('input-locked');
+        calcTotalFinancial();
+        }
+
+        function onItemChange(select) {
+        const opt = select.selectedOptions[0];
+        let tr = select.closest('tr');
+        if (opt && opt.value) {
+        tr.querySelector('.row-unit').innerText = opt.getAttribute('data-unit') || '';
+        let qtyInp = tr.querySelector('.row-qty'); let priceInp = tr.querySelector('.row-price');
+        qtyInp.readOnly = false; qtyInp.classList.remove('input-locked'); priceInp.readOnly = false; priceInp.classList.remove('input-locked');
+        let defaultPrice = opt.getAttribute('data-price');
+        if (defaultPrice && !isNaN(defaultPrice) && priceInp.value == 0) priceInp.value = defaultPrice;
+        } else { lockRow(tr); }
+        calcTotalFinancial();
+        }
+
+        function calcTotalFinancial() {
+        let total = 0;
+        document.querySelectorAll("#tblDetails tbody tr").forEach(row => {
+        let qty = parseFloat(row.querySelector(".row-qty").value) || 0;
+        let price = parseFloat(row.querySelector(".row-price").value) || 0;
+        let lineTotal = qty * price;
+        row.querySelector(".row-total").innerText = lineTotal.toLocaleString('vi-VN');
+        total += lineTotal;
+        });
+
+        let vatPercent = parseFloat(document.getElementById("vatPercent").value) || 0;
+        let vatAmt = total * (vatPercent / 100);
+        let finalT = total + vatAmt;
+        let deposit = parseFloat(document.getElementById("depositAmount").value) || 0;
+        let remain = finalT - deposit;
+
+        document.getElementById("lblTotalAmount").innerText = total.toLocaleString('vi-VN');
+        document.getElementById("lblVatAmount").innerText = vatAmt.toLocaleString('vi-VN');
+        document.getElementById("lblFinalTotal").innerText = finalT.toLocaleString('vi-VN');
+        document.getElementById("lblRemainingAmount").innerText = remain.toLocaleString('vi-VN');
+        }
+
+        $(document).on('input', '.row-qty, .row-price', function () { calcTotalFinancial(); });
+
+        function submitEditPO(e) {
+        e.preventDefault();
+        const id = document.getElementById("poId").value;
+        const suppSelect = document.getElementById("supplierId");
+        if (!suppSelect.value) { Swal.fire("Lỗi", "Vui lòng chọn Nhà Cung Cấp!", "warning"); return; }
+
+        let rawSuppName = suppSelect.options[suppSelect.selectedIndex].text;
+        let cleanSuppName = rawSuppName.substring(rawSuppName.indexOf("]") + 1).trim();
+
+        const poData = {
+        Id: parseInt(id),
+        POCode: document.getElementById("poCode").value,
+        OrderDate: document.getElementById("orderDate").value,
+        SupplierId: parseInt(suppSelect.value),
+        SupplierName: cleanSuppName,
+        Type: parseInt(document.getElementById("poType").value),
+        Note: document.getElementById("note").value,
+        VATPercent: parseFloat(document.getElementById("vatPercent").value) || 0,
+        DepositAmount: parseFloat(document.getElementById("depositAmount").value) || 0,
+        Details: []
+        };
+
+        const rows = document.querySelectorAll("#tblDetails tbody tr");
+        if (rows.length === 0) { Swal.fire("Lỗi", "Vui lòng nhập ít nhất 1 vật tư", "warning"); return; }
+
+        let isValid = true;
+        rows.forEach(row => {
+        const itemId = row.querySelector(".row-item").value;
+        const qty = parseFloat(row.querySelector(".row-qty").value);
+        const price = parseFloat(row.querySelector(".row-price").value) || 0;
+
+        // Lấy thông tin đơn hàng được liên kết
+        const orderSelect = row.querySelector(".row-order");
+        const orderId = orderSelect.value;
+        const orderCode = orderId ? orderSelect.options[orderSelect.selectedIndex].getAttribute("data-code") : null;
+
+        if (!itemId || qty <= 0) isValid = false;
+        if (itemId) {
+        poData.Details.push({
+        WarehouseItemId: parseInt(itemId),
+        QuantityOrdered: qty,
+        UnitPrice: price,
+        LinkedOrderId: orderId ? parseInt(orderId) : null,
+        LinkedOrderCode: orderCode
+        });
+        }
+        });
+
+        if (!isValid) { Swal.fire("Lỗi", "Vui lòng kiểm tra lại vật tư (Chưa chọn hoặc SL <= 0)", "error"); return; }
+
+        Swal.fire({ title: 'Đang cập nhật...', didOpen: () => Swal.showLoading() });
+        fetch(`/PurchaseOrder/Edit/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(poData)
+        }).then(res => res.json()).then(res => {
+        if (res.success) { Swal.fire("Thành công", res.message, "success").then(() => window.location.href = "/PurchaseOrder/Index"); }
+        else { Swal.fire("Lỗi", res.message, "error"); }
+        });
+        }
+    </script>
+}

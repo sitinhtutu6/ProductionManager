@@ -1,0 +1,53 @@
+﻿@model ProductionManager.Data.Shipment
+@{
+    ViewData["Title"] = "Cập nhật phiếu: " + Model.ShipmentCode;
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Xuất Hàng Hoá", Url.Action("Index", "Shipment")), 
+        ("Sửa Phiếu", "") 
+    };
+}
+
+<div class="container mt-4" style="max-width: 600px;">
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-header bg-warning text-dark py-3">
+            <h5 class="mb-0 fw-bold"><i class="fa-solid fa-pen-to-square me-2"></i> Chỉnh sửa Phiếu Giao / Nhận</h5>
+        </div>
+        <div class="card-body bg-light p-4">
+            <div class="alert alert-info border-info small">
+                <i class="fa-solid fa-circle-info me-1"></i> Để đảm bảo tính chính xác của Tồn kho, hệ thống chỉ cho phép cập nhật <strong>Thông tin vận chuyển và Ghi chú</strong>. Nếu sai số lượng hàng hóa, vui lòng Xóa phiếu và tạo lại.
+            </div>
+
+            <form asp-action="Edit" method="post">
+                <input type="hidden" asp-for="Id" />
+
+                <div class="mb-3">
+                    <label class="fw-bold small text-muted">Mã Phiếu</label>
+                    <input class="form-control fw-bold bg-white" value="@Model.ShipmentCode" readonly />
+                </div>
+
+                <div class="mb-3">
+                    <label class="fw-bold small text-dark">Ngày giao / nhận thực tế</label>
+                    <input asp-for="ShipmentDate" type="datetime-local" class="form-control fw-bold" required />
+                </div>
+
+                <div class="mb-3">
+                    <label class="fw-bold small text-dark">Biển số xe / Tên người giao</label>
+                    <input asp-for="VehicleNumber" class="form-control" placeholder="VD: 51C-123.45 hoặc Nguyễn Văn A" />
+                </div>
+
+                <div class="mb-4">
+                    <label class="fw-bold small text-dark">Ghi chú thêm</label>
+                    <textarea asp-for="Notes" class="form-control" rows="3" placeholder="Ghi chú nội bộ..."></textarea>
+                </div>
+
+                <div class="d-flex justify-content-between">
+                    <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-light border fw-bold px-4">Hủy bỏ</a>
+                    <button type="submit" class="btn btn-warning fw-bold px-5 shadow-sm">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> LƯU THAY ĐỔI
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

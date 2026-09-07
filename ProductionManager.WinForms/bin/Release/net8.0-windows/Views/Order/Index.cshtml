@@ -1,0 +1,1280 @@
+﻿@* @using X.PagedList.Mvc.Core;
+@using X.PagedList;
+@model IPagedList<ProductionManager.Data.Order>
+@using Microsoft.AspNetCore.Authorization
+@using ProductionManager.Data
+@using ProductionApp.Web.Constants
+@using System.Security.Claims
+@using ProductionApp.Web.Resources 
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<SharedResource> Localizer
+
+@{ 
+    ViewData["Title"] = "Danh sách Đơn hàng";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Kinh doanh & Bán hàng", ""),
+        ("Quản lý Đơn hàng", Url.Action("Index", "Order"))
+    };
+    var customerList = ViewBag.CustomerList as IEnumerable<SelectListItem>;
+    var paymentMap = ViewBag.PaymentMap as Dictionary<int, decimal>;
+    var totalOrders = Model != null ? Model.TotalItemCount : 0;
+    var pendingCount = Model != null ? Model.Count(x => x.Status == OrderStatus.PendingApproval) : 0;
+    var productionCount = Model != null ? Model.Count(x => x.Status == OrderStatus.InProduction) : 0;
+
+    decimal totalRevenue = 0;
+    if (ViewBag.TotalRevenue != null) { decimal.TryParse(ViewBag.TotalRevenue.ToString(), out totalRevenue); }
+
+    bool canCreate = User.IsInRole("Admin") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Create);
+    bool canEdit = User.IsInRole("Admin") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Edit);
+    bool canDelete = User.IsInRole("Admin") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Delete);
+    bool canApprove = User.IsInRole("Admin") || User.IsInRole("Manager");
+    bool canViewFinance = User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Accountant") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Approve);
+
+    bool isShowingInvoiced = ViewBag.Status?.ToString() == ((int)OrderStatus.Invoiced).ToString();
+    string currentStatusStr = ViewBag.Status?.ToString(); 
+    
+    int totalColumns = 8 + (canViewFinance ? 1 : 0) + (isShowingInvoiced ? 1 : 0);
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<style>
+    .erp-card { background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border-radius: 12px; }
+    .stat-box { transition: transform 0.2s; border: 1px solid #e5e7eb; }
+    .stat-box:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+    .icon-box { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
+
+    .table-erp { border-collapse: separate; border-spacing: 0; width: 100%; }
+    .table-erp thead th { background: #f8fafc; color: #64748b; font-size: 0.75rem; text-transform: uppercase; padding: 14px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; white-space: nowrap; }
+    .table-erp tbody tr:not(.detail-row):hover { background-color: #f1f5f9; cursor: pointer; }
+    .table-erp tbody td { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 0.875rem; }
+
+    .badge-soft { padding: 6px 12px; border-radius: 30px; font-weight: 600; font-size: 0.75rem; letter-spacing: 0.3px; }
+    .badge-warning-soft { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+    .badge-info-soft { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+    .badge-primary-soft { background: #e0e7ff; color: #4f46e5; border: 1px solid #c7d2fe; }
+    .badge-success-soft { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+    .badge-secondary-soft { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
+
+    .progress-thin { height: 6px; background-color: #e2e8f0; border-radius: 10px; margin-top: 6px; }
+    .progress-bar-fill { height: 100%; border-radius: 10px; transition: width 0.6s ease; }
+
+    .detail-row td { background-color: #f8fafc; padding: 20px 24px !important; border-bottom: 2px solid #cbd5e1 !important; }
+    .inner-card { background: #fff; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); overflow: hidden; }
+    .inner-card-header { background: #fff; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; font-size: 0.8rem; text-transform: uppercase; }
+    
+    .editable-cell { padding: 4px 8px; border-radius: 6px; transition: 0.2s; position: relative; }
+    .editable-cell:hover { background-color: #fef9c3; box-shadow: 0 0 0 1px #fde047; }
+    .editable-cell:hover::after { content: '\f304'; font-family: "Font Awesome 6 Free"; font-weight: 900; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); color: #d97706; opacity: 0.5; font-size: 0.7rem; }
+
+    #quickEditMenu { display: none; position: absolute; z-index: 1060; background: white; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border: 1px solid #e2e8f0; overflow: hidden; }
+    .menu-item { padding: 10px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; color: #334155; transition: 0.1s; }
+    .menu-item:hover { background: #f1f5f9; color: #2563eb; }
+
+    .chevron-icon { transition: transform 0.3s ease; color: #94a3b8; }
+    .row-expanded .chevron-icon { transform: rotate(90deg); color: #3b82f6; }
+    
+    .btn-status-tag { transition: all 0.2s; border: 1px solid transparent; }
+    .btn-status-tag:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+</style>
+
+<div class="container-fluid pb-5">
+    
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1"><i class="fa-solid fa-layer-group text-primary me-2"></i>DANH SÁCH ĐƠN HÀNG</h3>
+            <div class="text-muted small">Quản lý tổng quan tiến độ từng đơn hàng.</div>
+        </div>
+        <div class="d-flex gap-2">
+            @if (canEdit) {
+                <a asp-action="BatchInvoice" class="btn btn-info rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center gap-2 text-white">
+                    <i class="fa-solid fa-file-invoice"></i> Xuất HĐ Lô
+                </a>
+            }
+            @if (canCreate) { 
+                <a asp-action="Create" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Tạo Đơn Mới
+                </a> 
+            }
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="erp-card stat-box p-3 bg-white d-flex align-items-center gap-3">
+                <div class="icon-box bg-primary bg-opacity-10 text-primary"><i class="fa-solid fa-clipboard-list"></i></div>
+                <div><div class="text-muted small fw-bold text-uppercase">Tổng Đơn</div><div class="fs-4 fw-bold text-dark">@totalOrders</div></div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="erp-card stat-box p-3 bg-white d-flex align-items-center gap-3">
+                <div class="icon-box bg-warning bg-opacity-10 text-warning"><i class="fa-solid fa-hourglass-half"></i></div>
+                <div><div class="text-muted small fw-bold text-uppercase">Chờ Duyệt</div><div class="fs-4 fw-bold text-dark">@pendingCount</div></div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="erp-card stat-box p-3 bg-white d-flex align-items-center gap-3">
+                <div class="icon-box bg-info bg-opacity-10 text-info"><i class="fa-solid fa-gears"></i></div>
+                <div><div class="text-muted small fw-bold text-uppercase">Đang SX</div><div class="fs-4 fw-bold text-dark">@productionCount</div></div>
+            </div>
+        </div>
+        @if (canViewFinance) { 
+            string revenueTitle = "Tổng Doanh Thu";
+            if (currentStatusStr == ((int)OrderStatus.PendingApproval).ToString()) revenueTitle = "Tổng Tiền";
+            else if (currentStatusStr == ((int)OrderStatus.InProduction).ToString()) revenueTitle = "Tổng Tiền Hàng (Đang SX)";
+            else if (currentStatusStr == ((int)OrderStatus.Packing).ToString()) revenueTitle = "Tổng Tiền Hàng (Đóng gói)";
+            else if (currentStatusStr == ((int)OrderStatus.Delivered).ToString()) revenueTitle = "Tổng Tiền Hàng (Đang giao)";
+            else if (currentStatusStr == ((int)OrderStatus.Invoiced).ToString()) revenueTitle = "Doanh Thu (Đã xuất HĐ)";
+            else if (currentStatusStr == ((int)OrderStatus.Completed).ToString()) revenueTitle = "Doanh Thu (Hoàn thành)";
+            else if (currentStatusStr == ((int)OrderStatus.Canceled).ToString()) revenueTitle = "Tiền Đơn Hủy";
+            <div class="col-md-3">
+                <div class="erp-card stat-box p-3 bg-white d-flex align-items-center gap-3">
+                    <div class="icon-box bg-success bg-opacity-10 text-success"><i class="fa-solid fa-sack-dollar"></i></div>
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">@revenueTitle</div>
+                        <div class="fs-5 fw-bold text-success" title="@totalRevenue.ToString("N0") VNĐ">@string.Format("{0:N0}", totalRevenue) đ</div>
+                    </div>
+                </div>
+            </div> 
+        }
+    </div>
+
+    <div class="erp-card p-3 mb-4">
+        <div class="d-flex flex-wrap gap-2 mb-3 pb-3 border-bottom">
+            <button type="button" onclick="filterStatus('')" class="btn btn-sm btn-status-tag @(string.IsNullOrEmpty(currentStatusStr) ? "btn-dark shadow" : "btn-light border text-muted") rounded-pill px-3 fw-bold">
+                Tất cả
+            </button>
+            <button type="button" onclick="filterStatus('@((int)OrderStatus.PendingApproval)')" class="btn btn-sm btn-status-tag @(currentStatusStr == ((int)OrderStatus.PendingApproval).ToString() ? "btn-warning shadow" : "btn-light border text-warning") rounded-pill px-3 fw-bold">
+                <i class="fa-solid fa-hourglass-half me-1"></i> Chờ duyệt
+            </button>
+            <button type="button" onclick="filterStatus('@((int)OrderStatus.InProduction)')" class="btn btn-sm btn-status-tag @(currentStatusStr == ((int)OrderStatus.InProduction).ToString() ? "btn-info text-white shadow" : "btn-light border text-info") rounded-pill px-3 fw-bold">
+                <i class="fa-solid fa-gears me-1"></i> Đang SX
+            </button>
+            <button type="button" onclick="filterStatus('@((int)OrderStatus.Packing)')" class="btn btn-sm btn-status-tag @(currentStatusStr == ((int)OrderStatus.Packing).ToString() ? "btn-secondary text-white shadow" : "btn-light border text-secondary") rounded-pill px-3 fw-bold">
+                <i class="fa-solid fa-box-open me-1"></i> Đóng gói
+            </button>
+            <button type="button" onclick="filterStatus('@((int)OrderStatus.Delivered)')" class="btn btn-sm btn-status-tag @(currentStatusStr == ((int)OrderStatus.Delivered).ToString() ? "btn-primary shadow" : "btn-light border text-primary") rounded-pill px-3 fw-bold">
+                <i class="fa-solid fa-truck-fast me-1"></i> Đang giao
+            </button>
+            <button type="button" onclick="filterStatus('@((int)OrderStatus.Invoiced)')" class="btn btn-sm btn-status-tag @(currentStatusStr == ((int)OrderStatus.Invoiced).ToString() ? "btn-outline-dark bg-white shadow" : "btn-light border text-dark") rounded-pill px-3 fw-bold">
+                <i class="fa-solid fa-file-invoice-dollar me-1"></i> Đã xuất HĐ
+            </button>
+            <button type="button" onclick="filterStatus('@((int)OrderStatus.Completed)')" class="btn btn-sm btn-status-tag @(currentStatusStr == ((int)OrderStatus.Completed).ToString() ? "btn-success shadow" : "btn-light border text-success") rounded-pill px-3 fw-bold">
+                <i class="fa-solid fa-check-double me-1"></i> Hoàn thành
+            </button>
+            <button type="button" onclick="filterStatus('@((int)OrderStatus.Canceled)')" class="btn btn-sm btn-status-tag @(currentStatusStr == ((int)OrderStatus.Canceled).ToString() ? "btn-danger shadow" : "btn-light border text-danger") rounded-pill px-3 fw-bold">
+                <i class="fa-solid fa-ban me-1"></i> Đã hủy
+            </button>
+        </div>
+
+        <form id="filterForm" asp-action="Index" method="get" class="row g-2 align-items-center">
+            <input type="hidden" name="status" id="hdnStatus" value="@ViewBag.Status" />
+            <div class="col-md-5">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="fa-regular fa-calendar text-muted"></i></span>
+                    <input type="text" name="fromDate" class="form-control border-start-0 ps-0 datepicker" placeholder="Từ ngày" value="@(ViewBag.FromDate != null ? ((DateTime)ViewBag.FromDate).ToString("yyyy-MM-dd") : "")" />
+                    <span class="input-group-text bg-light border-start-0 border-end-0 text-muted"><i class="fa-solid fa-arrow-right"></i></span>
+                    <input type="text" name="toDate" class="form-control border-start-0 ps-0 datepicker" placeholder="Đến ngày" value="@(ViewBag.ToDate != null ? ((DateTime)ViewBag.ToDate).ToString("yyyy-MM-dd") : "")" />
+                </div>
+            </div>
+            <div class="col-md-4">
+                <select name="customerId" class="form-select form-select-sm fw-bold text-secondary">
+                    <option value="">-- Tất cả khách hàng --</option>
+                    @if (customerList != null) { foreach (var item in customerList) { <option value="@item.Value" selected="@(ViewBag.CustomerId?.ToString() == item.Value ? "selected" : null)">@item.Text</option> } }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <div class="d-flex gap-1">
+                    <button type="submit" class="btn btn-dark btn-sm w-100 fw-bold shadow-sm"><i class="fa-solid fa-filter me-1"></i> Lọc</button>
+                    <button type="submit" asp-action="ExportExcel" data-turbo="false" class="btn btn-success btn-sm w-100 fw-bold shadow-sm" title="Xuất Excel theo bộ lọc"><i class="fa-solid fa-file-excel me-1"></i> Excel</button>
+                    <a asp-action="Index" class="btn btn-light btn-sm fw-bold text-muted border px-3"><i class="fa-solid fa-rotate-left me-1"></i></a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="erp-card overflow-hidden">
+        <div class="table-responsive" style="min-height: 450px;">
+            <table class="table table-erp mb-0">
+                <thead>
+                    <tr>
+                        <th width="40" class="text-center"></th>
+                        <th>Mã Đơn / CT</th>
+                        <th>Khách hàng</th>
+                        <th class="text-center">Lịch Trình</th>
+                        <th>Tiến độ Giao Hàng</th>
+                        @if (canViewFinance) { <th class="text-end">Tài chính</th> }
+                        
+                        @if (isShowingInvoiced) { 
+                            <th class="text-center text-white bg-primary shadow-sm" style="min-width: 140px;">
+                                <i class="fa-solid fa-calendar-check me-1"></i> NGÀY XUẤT HĐ
+                            </th> 
+                        }
+                        <th class="text-center" style="min-width: 160px;">Tiến độ Hóa đơn</th>
+                        <th class="text-center">Trạng thái</th>
+                        <th class="text-end pe-4">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model == null || !Model.Any()) { 
+                        <tr><td colspan="@totalColumns" class="text-center py-5 text-muted fst-italic"><i class="fa-solid fa-box-open fa-3x mb-3 opacity-25"></i><br>Chưa có dữ liệu.</td></tr> 
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            double totalQty = item.OrderDetails?.Sum(x => x.Quantity) ?? 0;
+                            double shippedQty = item.OrderDetails?.SelectMany(od => od.ShipmentDetails).Sum(sd => sd.QuantityShipped) ?? 0;
+                            double percent = totalQty > 0 ? (shippedQty / totalQty) * 100 : 0;
+                            string progressColor = percent >= 100 ? "bg-success" : (percent > 0 ? "bg-primary" : "bg-secondary opacity-50");
+                            
+                            decimal paidAmount = 0;
+                            if (paymentMap != null && paymentMap.ContainsKey(item.Id)) { paidAmount = paymentMap[item.Id]; }
+                            decimal remainAmount = item.TotalAmount - paidAmount;
+                            string statusBadge = item.Status switch {
+                                OrderStatus.PendingApproval => "<span class='badge-soft badge-warning-soft'>Chờ duyệt</span>",
+                                OrderStatus.Approved => "<span class='badge-soft badge-warning-soft'>Đã duyệt</span>",
+                                OrderStatus.InProduction => "<span class='badge-soft badge-info-soft'>Đang Sản Xuất</span>",
+                                OrderStatus.Packing => "<span class='badge-soft badge-secondary-soft text-white bg-secondary'>Đóng gói</span>",
+                                OrderStatus.Delivered => "<span class='badge-soft badge-primary-soft'>Đang Giao Hàng</span>",
+                                OrderStatus.Invoiced => "<span class='badge-soft badge-secondary-soft border-secondary'>Đã xuất HĐ</span>",
+                                OrderStatus.Completed => "<span class='badge-soft badge-success-soft'>Hoàn Thành</span>",
+                                _ => "<span class='badge-soft bg-dark text-white'>Huỷ Đơn</span>"
+                            };
+                            string deadlineColor = "text-muted";
+                            if (item.DeliveryDeadline.HasValue && item.Status != OrderStatus.Completed && item.Status != OrderStatus.Delivered && item.Status != OrderStatus.Canceled)
+                            {
+                                var daysLeft = (item.DeliveryDeadline.Value.Date - DateTime.Today).TotalDays;
+                                if (daysLeft < 0) deadlineColor = "text-danger fw-bold";
+                                else if (daysLeft <= 3) deadlineColor = "text-warning fw-bold";
+                            }
+
+                            // Biến Hóa đơn mới
+                            decimal billed = item.InvoiceDetails?.Sum(d => d.BilledAmount) ?? 0;
+                            decimal remainToBill = item.TotalAmount - billed;
+                            decimal billPercent = item.TotalAmount > 0 ? (billed / item.TotalAmount) * 100 : 0;
+
+                            var latestInvoiceDate = item.InvoiceDetails?.OrderByDescending(d => d.Invoice.InvoiceDate).FirstOrDefault()?.Invoice.InvoiceDate;
+                            <tr class="main-row" onclick="toggleDetail(@item.Id, this)">
+                                <td class="text-center"><i class="fa-solid fa-chevron-right chevron-icon"></i></td>
+                                
+                                <td>
+                                    <div class="fw-bold text-primary font-monospace" style="font-size: 0.95rem;">@item.OrderCode</div>
+                                    <div class="editable-cell text-muted small mt-1 d-inline-block font-monospace" data-id="@item.Id" data-field="PaperOrderCode" data-value="@item.PaperOrderCode" title="Click phải để sửa PO gốc">
+                                        <i class="fa-solid fa-file-lines me-1"></i>@(string.IsNullOrEmpty(item.PaperOrderCode) ? "---" : item.PaperOrderCode)
+                                    </div>
+                                </td>
+
+                                <td class="editable-cell" data-id="@item.Id" data-field="Customer" data-value="@item.CustomerId">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="bg-light rounded-circle d-flex align-items-center justify-content-center text-secondary fw-bold" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                                            @(item.Customer?.CompanyName?.Substring(0,1).ToUpper() ?? "K")
+                                        </div>
+                                        <div class="fw-bold text-dark text-truncate" style="max-width: 200px;">@item.Customer?.CompanyName</div>
+                                    </div>
+                                </td>
+
+                                <td class="text-center">
+                                    <div class="editable-cell small text-dark fw-bold mb-1" data-id="@item.Id" data-field="OrderDate" data-value="@item.OrderDate.ToString("yyyy-MM-dd")">
+                                        <i class="fa-solid fa-calendar-plus text-muted me-1"></i> @item.OrderDate.ToString("dd/MM")
+                                    </div>
+                                    <div class="editable-cell small @deadlineColor" data-id="@item.Id" data-field="DeliveryDeadline" data-value="@item.DeliveryDeadline?.ToString("yyyy-MM-dd")">
+                                        <i class="fa-solid fa-truck-fast text-muted me-1"></i> @(item.DeliveryDeadline.HasValue ? item.DeliveryDeadline.Value.ToString("dd/MM") : "--/--")
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <div class="d-flex justify-content-between small fw-bold mb-1" style="font-size: 0.75rem;">
+                                        <span class="text-dark">@shippedQty.ToString("N0") / @totalQty.ToString("N0")</span>
+                                        <span class="text-primary">@percent.ToString("0")%</span>
+                                    </div>
+                                    <div class="progress-thin"><div class="progress-bar-fill @progressColor" style="width: @percent%"></div></div>
+                                </td>
+                                
+                                @if (canViewFinance) {
+                                    <td class="text-end">
+                                        <div class="fw-bold text-dark" style="font-size: 0.95rem;">@item.TotalAmount.ToString("N0")</div>
+                                        @if (remainAmount > 0)
+                                        {
+                                            <div class="small text-danger" style="font-size: 0.75rem;"><i class="fa-solid fa-arrow-turn-down"></i> Còn: @remainAmount.ToString("N0")</div>
+
+                                            @if (latestInvoiceDate.HasValue)
+                                            {
+                                                var debtDays = (int)(DateTime.Today - latestInvoiceDate.Value.Date).TotalDays;
+                                                if(debtDays > 30) {
+                                                    <div class="small text-danger fw-bold mt-1 bg-danger bg-opacity-10 rounded px-1" style="font-size: 0.7rem;" title="Đã quá hạn thanh toán"><i class="fa-solid fa-triangle-exclamation"></i> Nợ: @debtDays ngày</div>
+                                                } else if (debtDays >= 0) {
+                                                    <div class="small text-warning fw-bold mt-1" style="font-size: 0.7rem;"><i class="fa-solid fa-clock"></i> Tuổi nợ: @debtDays ngày</div>
+                                                }
+                                            }
+                                        }
+                                        else 
+                                        { <div class="small text-success fw-bold" style="font-size: 0.75rem;"><i class="fa-solid fa-check-double"></i> Đã thu đủ</div> }
+                                    </td>
+                                }
+
+                                @if (isShowingInvoiced)
+                                {
+                                    <td class="text-center align-middle bg-primary bg-opacity-10 border-start border-end border-primary border-opacity-25">
+
+                                        @if (latestInvoiceDate.HasValue)
+                                        {
+                                            <div class="d-flex flex-column align-items-center justify-content-center">
+                                                <span class="badge bg-primary px-3 py-2 fs-6 shadow-sm mb-1">
+                                                    @latestInvoiceDate.Value.ToString("dd/MM/yyyy")
+                                                </span>
+                                                @{ var dueDate = latestInvoiceDate.Value.AddDays(30); }
+                                                <div class="small text-danger fw-bold mt-1" style="font-size: 0.75rem;">
+                                                    <i class="fa-solid fa-clock-rotate-left me-1"></i>Hạn thu: @dueDate.ToString("dd/MM/yyyy")
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="text-muted fst-italic small">
+                                                <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i>Chưa cập nhật ngày
+                                            </div>
+                                        }
+                                    </td>
+                                }
+
+                                <td class="align-middle" onclick="event.stopPropagation()">
+                                    @if (billed > 0) 
+                                    {
+                                        <div class="text-start mb-2" style="font-size: 0.8rem;">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span class="text-muted">Đã xuất:</span>
+                                                <span class="fw-bold text-success">@billed.ToString("N0") đ</span>
+                                            </div>
+                                            <div class="progress" style="height: 6px;" title="@billPercent.ToString("0.0")%">
+                                                <div class="progress-bar bg-success" role="progressbar" style="width: @billPercent%;" aria-valuenow="@billPercent" aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                            @if (remainToBill > 0) {
+                                                <div class="d-flex justify-content-between mt-1">
+                                                    <span class="text-muted">Còn lại:</span>
+                                                    <span class="fw-bold text-danger">@remainToBill.ToString("N0") đ</span>
+                                                </div>
+                                            } else {
+                                                <div class="text-center mt-1 fw-bold text-success"><i class="fa-solid fa-check-circle"></i> Đã xuất đủ 100%</div>
+                                            }
+                                        </div>
+                                    }
+
+                                    @if (remainToBill > 0) 
+                                    {
+                                        <button onclick="openUploadModal(@item.Id, '@item.OrderCode', @remainToBill)" class="btn btn-sm btn-outline-primary py-1 px-2 w-100 shadow-sm" title="Up thêm HĐ mới">
+                                            <i class="fa-solid fa-plus"></i> Xuất HĐ (@remainToBill.ToString("N0"))
+                                        </button>
+                                    }
+                                </td>
+
+                                <td class="editable-cell text-center" data-id="@item.Id" data-field="Status" data-value="@((int)item.Status)">
+                                    @Html.Raw(statusBadge)
+                                 </td>
+
+                                <td class="text-end pe-4" onclick="event.stopPropagation()">
+                                    <div class="dropdown">
+                                        <button class="btn btn-light btn-sm border bg-white rounded-circle shadow-sm" style="width: 32px; height: 32px;" type="button" data-bs-toggle="dropdown"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="border-radius: 10px;">
+                                            @if (item.Status == OrderStatus.PendingApproval && canApprove) { 
+                                                <li><form asp-action="ApproveOrder" method="post" class="d-inline"><input type="hidden" name="id" value="@item.Id" /><button class="dropdown-item text-success fw-bold py-2"><i class="fa-solid fa-check-double me-2"></i>Duyệt đưa vào SX</button></form></li>
+                                            }
+                                            <li><a asp-action="Details" asp-route-id="@item.Id" class="dropdown-item py-2"><i class="fa-solid fa-expand me-2 text-primary"></i>Mở trang Chi tiết</a></li>
+                                            @if (canEdit && !item.IsLocked) { <li><a asp-action="Edit" asp-route-id="@item.Id" class="dropdown-item py-2"><i class="fa-solid fa-pen-to-square me-2 text-warning"></i>Sửa đơn hàng</a></li> }
+                                            <li><hr class="dropdown-divider"></li>
+                                            @if (canDelete) { <li><a asp-action="Delete" asp-route-id="@item.Id" class="dropdown-item text-danger py-2" onclick="return confirm('Toàn bộ chi tiết sẽ bị xóa. Tiếp tục?')"><i class="fa-solid fa-trash-can me-2"></i>Xóa đơn hàng</a></li> }
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <tr id="detail-@item.Id" class="detail-row" style="display: none;">
+                                <td colspan="@totalColumns">
+                                    <div class="row g-4">
+                                        <div class="col-md-4">
+                                            <div class="inner-card h-100">
+                                                <div class="inner-card-header text-primary"><i class="fa-solid fa-list-check me-2"></i>Danh sách SP Đặt</div>
+                                                <div class="table-responsive" style="max-height: 250px;">
+                                                    <table class="table table-hover table-borderless mb-0 small">
+                                                        <thead class="bg-light text-muted border-bottom"><tr><th class="ps-3">Tên sản phẩm</th><th>Quy cách</th><th class="text-center pe-3">SL</th></tr></thead>
+                                                        <tbody>
+                                                            @if (item.OrderDetails != null) {
+                                                                foreach (var d in item.OrderDetails) {
+                                                                    <tr class="border-bottom border-light">
+                                                                        <td class="fw-bold text-dark ps-3">@d.ProductName</td>
+                                                                        <td class="text-muted">@d.Specifications</td>
+                                                                        <td class="text-center fw-bold pe-3">@d.Quantity</td>
+                                                                    </tr>
+                                                                }
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                        
+                                        <div class="col-md-5">
+                                            <div class="inner-card h-100">
+                                                <div class="inner-card-header d-flex justify-content-between align-items-center">
+                                                    <span class="text-info"><i class="fa-solid fa-boxes-stacked me-2"></i>Tiến độ BOM</span>
+                                                    <a href="/Warehouse/ImportExport?type=Export" target="_blank" class="btn btn-sm btn-outline-info py-0 px-2 rounded-pill" style="font-size: 0.7rem;"><i class="fa-solid fa-share-from-square me-1"></i> Cấp VT</a>
+                                                </div>
+                                                @{
+                                                    var progressMap = ViewBag.BomProgressMap as Dictionary<int, List<dynamic>>;
+                                                    var progressList = progressMap != null && progressMap.ContainsKey(item.Id) ? progressMap[item.Id] : new List<dynamic>();
+                                                }
+
+                                                @if (progressList.Any())
+                                                {
+                                                    <div class="table-responsive" style="max-height: 250px;">
+                                                        <table class="table table-hover table-borderless mb-0 small align-middle">
+                                                            <thead class="bg-light text-muted text-center border-bottom">
+                                                                <tr>
+                                                                    <th class="text-start ps-3">Vật tư cần thiết</th>
+                                                                    <th width="15%">Định mức</th>
+                                                                    <th width="15%">Đã xuất</th>
+                                                                    <th width="20%" class="pe-3">Tình trạng</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach (var p in progressList.OrderByDescending(x => (double)x.Missing))
+                                                                {
+                                                                    double req = (double)p.Required;
+                                                                    double exp = (double)p.Exported;
+                                                                    double missing = (double)p.Missing;
+                                                                    
+                                                                    <tr class="border-bottom border-light">
+                                                                        <td class="fw-bold text-dark ps-3">@p.MatName <span class="badge bg-light text-secondary ms-1 fw-normal border">@p.Unit</span></td>
+                                                                        <td class="text-end text-info fw-bold bg-info bg-opacity-10">@(req > 0 ? req.ToString("N1") : "-")</td>
+                                                                        <td class="text-end text-success fw-bold bg-success bg-opacity-10">@(exp > 0 ? exp.ToString("N1") : "-")</td>
+                                                                        <td class="text-end fw-bold pe-3">
+                                                                            @if(req == 0 && exp > 0) {
+                                                                                <span class="badge-soft badge-secondary-soft">Ngoài BOM</span>
+                                                                            } else if(missing > 0) {
+                                                                                <span class="text-danger"><i class="fa-solid fa-arrow-down me-1"></i>Thiếu @missing.ToString("N1")</span>
+                                                                            } else if(missing < 0) {
+                                                                                <span class="text-warning"><i class="fa-solid fa-arrow-up me-1"></i>Dư @Math.Abs(missing).ToString("N1")</span>
+                                                                            } else {
+                                                                                <span class="text-success"><i class="fa-solid fa-check"></i> Đủ</span>
+                                                                            }
+                                                                        </td>
+                                                                    </tr>
+                                                                }
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="text-center py-4">
+                                                        <i class="fa-solid fa-folder-open text-secondary opacity-25 mb-2 fa-2x"></i>
+                                                        <div class="text-muted small fst-italic">Đơn này chưa có BOM.</div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <div class="inner-card h-100">
+                                                <div class="inner-card-header text-success d-flex justify-content-between align-items-center">
+                                                    <span><i class="fa-solid fa-file-invoice-dollar me-2"></i>Lịch sử Hóa đơn</span>
+                                                    <span class="badge bg-success bg-opacity-10 text-success border border-success">@((item.InvoiceDetails?.Count ?? 0)) đợt</span>
+                                                </div>
+                                                
+                                                <div class="p-2 bg-light border-bottom text-center" style="font-size: 0.85rem;">
+                                                    <div class="d-flex justify-content-between px-2">
+                                                        <span class="text-muted">Giá trị Đơn:</span>
+                                                        <span class="fw-bold text-dark">@item.TotalAmount.ToString("N0")</span>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between px-2 mt-1 border-top pt-1">
+                                                        <span class="text-muted fw-bold">Chưa xuất HĐ:</span>
+                                                        <span class="fw-bold text-danger">@((item.TotalAmount - (item.InvoiceDetails?.Sum(d => d.BilledAmount) ?? 0)).ToString("N0"))</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="table-responsive" style="max-height: 200px;">
+                                                    <table class="table table-hover table-borderless mb-0 small align-middle">
+                                                        <tbody>
+                                                            @if (item.InvoiceDetails != null && item.InvoiceDetails.Any())
+                                                            {
+                                                                foreach (var detail in item.InvoiceDetails.OrderByDescending(x => x.Invoice.InvoiceDate))
+                                                                {
+                                                                    <tr class="border-bottom border-light">
+                                                                        <td class="ps-3">
+                                                                            <div class="fw-bold text-dark font-monospace" style="font-size: 0.85rem;">@detail.Invoice.InvoiceNumber</div>
+                                                                            <div class="text-muted mt-1" style="font-size:0.75rem;"><i class="fa-solid fa-calendar-check me-1"></i> @detail.Invoice.InvoiceDate.ToString("dd/MM/yyyy")</div>
+                                                                        </td>
+                                                                        <td class="text-end pe-3">
+                                                                            <div class="fw-bold text-success mb-1">@detail.BilledAmount.ToString("N0") đ</div>
+                                                                            <div class="btn-group shadow-sm">
+                                                                                @if (!string.IsNullOrEmpty(detail.Invoice.InvoiceFile))
+                                                                                {
+                                                                                    <a href="~/invoices/@detail.Invoice.InvoiceFile" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2" title="Tải PDF"><i class="fa-solid fa-file-pdf"></i></a>
+                                                                                }
+                                                                                <button onclick="openEditInvoiceModal(@detail.Id, '@(detail.Invoice.InvoiceNumber ?? "")', '@detail.Invoice.InvoiceDate.ToString("yyyy-MM-dd")', @detail.BilledAmount.ToString(System.Globalization.CultureInfo.InvariantCulture), @((detail.BilledAmount + remainToBill).ToString(System.Globalization.CultureInfo.InvariantCulture)))" class="btn btn-sm btn-outline-warning py-0 px-2" title="Sửa Hóa đơn">
+                                                                                    <i class="fa-solid fa-pen"></i>
+                                                                                </button>
+                                                                                <button onclick="deleteInvoice(@detail.Id)" class="btn btn-sm btn-outline-danger py-0 px-2" title="Xóa Hóa đơn"><i class="fa-solid fa-trash"></i></button>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                <tr>
+                                                                    <td class="text-center py-4 text-muted fst-italic">
+                                                                        <i class="fa-solid fa-folder-open mb-2 opacity-50 fa-2x"></i><br/> Chưa xuất hóa đơn.
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="p-3 border-top bg-white d-flex justify-content-between align-items-center rounded-bottom">
+            <span class="text-muted small fw-bold">Trang @Model.PageNumber / @Model.PageCount</span>
+            <div class="pagination-sm m-0">
+                @Html.PagedListPager(Model, page => Url.Action("Index", new { page, fromDate = ViewBag.FromDate, toDate = ViewBag.ToDate, status = ViewBag.Status, customerId = ViewBag.CustomerId }), new PagedListRenderOptions { LiElementClasses = new string[] { "page-item" }, PageClasses = new string[] { "page-link shadow-sm" }, DisplayLinkToPreviousPage = PagedListDisplayMode.Always, DisplayLinkToNextPage = PagedListDisplayMode.Always, MaximumPageNumbersToDisplay = 5 })
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-light">
+                <h6 class="modal-title fw-bold text-dark"><i class="fa-solid fa-file-invoice text-primary me-2"></i>Xuất Hóa đơn mới</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="frmUpload" enctype="multipart/form-data">
+                    <input type="hidden" id="hdOrderId" name="id" />
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Số hóa đơn</label>
+                        <input type="text" name="invoiceNumber" id="txtInvoiceNumber" class="form-control fw-bold" placeholder="VD: HD-12345" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Ngày xuất HĐ</label>
+                        <input type="text" name="invoiceDate" id="txtInvoiceDate" class="form-control datepicker" placeholder="dd/MM/yyyy" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Số tiền xuất HĐ đợt này <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="number" id="billedAmount" name="billedAmount" class="form-control fw-bold text-success" required min="1">
+                            <span class="input-group-text fw-bold">VNĐ</span>
+                        </div>
+                        <small class="text-muted mt-1 d-block" id="billedAmountHint"></small>
+                    </div>
+                    <div class="mb-4">
+                        <label class="small fw-bold text-muted mb-1">File đính kèm (PDF, JPG)</label>
+                        <input type="file" name="invoiceFile" class="form-control form-control-sm" accept=".pdf,.jpg,.png,.jpeg" />
+                    </div>
+                    <button type="button" onclick="submitUpload()" class="btn btn-primary w-100 fw-bold shadow-sm py-2"><i class="fa-solid fa-floppy-disk me-1"></i> LƯU HÓA ĐƠN</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editInvoiceModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-light">
+                <h6 class="modal-title fw-bold text-warning"><i class="fa-solid fa-pen-to-square me-2"></i>Sửa Hóa đơn</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="frmEditInvoice" enctype="multipart/form-data">
+                    <input type="hidden" id="editDetailId" name="detailId" />
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Số hóa đơn</label>
+                        <input type="text" name="invoiceNumber" id="editInvoiceNumber" class="form-control fw-bold" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Ngày xuất HĐ</label>
+                        <input type="text" name="invoiceDate" id="editInvoiceDate" class="form-control datepicker" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Sửa số tiền xuất HĐ <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="number" id="editBilledAmount" name="billedAmount" class="form-control fw-bold text-warning" required min="1">
+                            <span class="input-group-text fw-bold">VNĐ</span>
+                        </div>
+                        <small class="text-muted mt-1 d-block" id="editBilledAmountHint"></small>
+                    </div>
+                    <div class="mb-4">
+                        <label class="small fw-bold text-muted mb-1">Up đè File mới (Để trống nếu giữ cũ)</label>
+                        <input type="file" name="invoiceFile" class="form-control form-control-sm" accept=".pdf,.jpg,.png,.jpeg" />
+                    </div>
+                    <button type="button" onclick="submitEditInvoice()" class="btn btn-warning text-dark w-100 fw-bold shadow-sm py-2"><i class="fa-solid fa-floppy-disk me-1"></i> CẬP NHẬT</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="quickEditMenu">
+    <div class="inner-card-header text-muted"><i class="fa-solid fa-bolt text-warning me-1"></i> Sửa nhanh</div>
+    <div class="menu-item" id="btnQuickEditAction">
+        <i class="fa-solid fa-pen text-primary me-2"></i> Cập nhật dữ liệu ô này
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    // 🔥 MAP TRẠNG THÁI TIẾNG VIỆT ĐỂ SWEETALERT2 HIỂN THỊ
+    const statusMap = {
+        '@((int)OrderStatus.PendingApproval)': 'Chờ duyệt',
+        '@((int)OrderStatus.InProduction)': 'Đang Sản Xuất',
+        '@((int)OrderStatus.Packing)': 'Đóng gói',
+        '@((int)OrderStatus.Delivered)': 'Đang Giao Hàng',
+        '@((int)OrderStatus.Invoiced)': 'Đã xuất HĐ',
+        '@((int)OrderStatus.Completed)': 'Hoàn Thành',
+        '@((int)OrderStatus.Canceled)': 'Huỷ Đơn'
+    };
+
+    let contextData = { id: 0, field: '', value: '' };
+    const menu = document.getElementById('quickEditMenu');
+
+    function filterStatus(statusValue) {
+        document.getElementById('hdnStatus').value = statusValue;
+        document.getElementById('filterForm').requestSubmit();
+    }
+
+    function openUploadModal(orderId, orderCode, remainAmount) { 
+        var modalEl = document.getElementById('uploadModal');
+        if (modalEl.parentNode !== document.body) document.body.appendChild(modalEl);
+        
+        $('#hdOrderId').val(orderId);
+        document.getElementById('frmUpload').reset();
+        
+        let amountInput = document.getElementById('billedAmount');
+        amountInput.value = remainAmount;
+        amountInput.max = remainAmount;
+        document.getElementById('billedAmountHint').innerText = "Tối đa: " + new Intl.NumberFormat('vi-VN').format(remainAmount) + " đ";
+        flatpickr("#txtInvoiceDate", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn", defaultDate: new Date() });
+        var myModal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        myModal.show();
+    }
+
+    function submitUpload() {
+        if (!$('#txtInvoiceNumber').val() || !$('#billedAmount').val()) { Swal.fire('Lỗi', 'Vui lòng nhập đủ các trường bắt buộc', 'warning'); return; }
+        var formData = new FormData($('#frmUpload')[0]);
+        $.ajax({ url: '/Order/UploadInvoice', type: 'POST', data: formData, processData: false, contentType: false, 
+            success: function(res) { if(res.success) location.reload(); else Swal.fire('Lỗi', res.message, 'error'); } 
+        });
+    }
+
+    let editInvoiceDatePickr = null;
+    function openEditInvoiceModal(detailId, num, date, currentAmount, maxAmount) {
+        var modalEl = document.getElementById('editInvoiceModal');
+        if (modalEl.parentNode !== document.body) document.body.appendChild(modalEl);
+
+        document.getElementById('frmEditInvoice').reset();
+        $('#editDetailId').val(detailId);
+        $('#editInvoiceNumber').val(num);
+        
+        let amountInput = document.getElementById('editBilledAmount');
+        amountInput.value = currentAmount;
+        amountInput.max = maxAmount;
+        document.getElementById('editBilledAmountHint').innerText = "Tối đa: " + new Intl.NumberFormat('vi-VN').format(maxAmount) + " đ";
+        if (editInvoiceDatePickr) { editInvoiceDatePickr.destroy(); }
+        editInvoiceDatePickr = flatpickr("#editInvoiceDate", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn", defaultDate: date });
+        var myModal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        myModal.show();
+    }
+
+    function submitEditInvoice() {
+        var form = document.getElementById('frmEditInvoice');
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+        var formData = new FormData(form);
+        $.ajax({ url: '/Order/UpdateInvoice', type: 'POST', data: formData, processData: false, contentType: false, 
+            success: function(res) { if(res.success) location.reload(); else Swal.fire('Lỗi', res.message, 'error'); },
+            error: function() { Swal.fire('Lỗi', 'Không thể kết nối đến máy chủ!', 'error'); }
+        });
+    }
+
+    function deleteInvoice(detailId) {
+        Swal.fire({
+            title: 'Chắc chắn xóa?', text: "Hành động này sẽ xóa vĩnh viễn hóa đơn!", icon: 'warning',
+            showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6', confirmButtonText: 'Đồng ý, Xóa!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.post('/Order/DeleteInvoice', { detailId: detailId }, function(res) {
+                    if (res.success) { Swal.fire('Đã xóa!', res.message, 'success').then(() => location.reload()); }
+                    else { Swal.fire('Lỗi', res.message, 'error'); }
+                });
+            }
+        });
+    }
+
+    document.addEventListener('contextmenu', function(e) {
+        const cell = e.target.closest('.editable-cell');
+        if (cell) {
+            e.preventDefault();
+            if (menu.parentNode !== document.body) document.body.appendChild(menu);
+
+            contextData.id = cell.getAttribute('data-id');
+            contextData.field = cell.getAttribute('data-field');
+            contextData.value = cell.getAttribute('data-value');
+
+            menu.style.display = 'block';
+
+            let posX = e.pageX; let posY = e.pageY;
+            if (posX + menu.offsetWidth > document.documentElement.scrollWidth) posX = posX - menu.offsetWidth; 
+            if (e.clientY + menu.offsetHeight > window.innerHeight) posY = posY - menu.offsetHeight; 
+
+            menu.style.left = posX + 'px'; menu.style.top = posY + 'px';
+        } else {
+            menu.style.display = 'none';
+        }
+    });
+    
+    document.addEventListener('click', () => menu.style.display = 'none');
+    document.addEventListener('scroll', () => menu.style.display = 'none', true);
+    
+    document.getElementById('btnQuickEditAction').addEventListener('click', function() {
+        const { id, field, value } = contextData;
+        let title = ''; let inputType = 'text'; let inputOptions = null; let htmlContent = '';
+
+        if (field === 'OrderDate' || field === 'DeliveryDeadline') {
+            title = field === 'OrderDate' ? 'Sửa Ngày đặt' : 'Sửa Ngày giao';
+            inputType = null; 
+            htmlContent = `<input type="text" id="swal-date" class="form-control text-center fw-bold fs-5" value="${value}">`;
+        } else if (field === 'PaperOrderCode') {
+            title = 'Nhập Mã Chứng từ gốc';
+            inputType = 'text';
+        } else if (field === 'Status') {
+            // 🔥 XỬ LÝ DROPDOWN CHỌN TRẠNG THÁI (TIẾNG VIỆT)
+            title = 'Cập nhật Trạng thái Đơn hàng';
+            inputType = 'select';
+            inputOptions = statusMap;
+        }
+
+        Swal.fire({
+            title: title, input: inputType, inputOptions: inputOptions, inputValue: value, html: htmlContent,
+            showCancelButton: true, confirmButtonText: 'Lưu thay đổi', cancelButtonText: 'Hủy',
+            didOpen: () => {
+                if (field === 'OrderDate' || field === 'DeliveryDeadline') {
+                    flatpickr("#swal-date", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", defaultDate: value, locale: "vn", zIndex: 999999 });
+                }
+            },
+            preConfirm: () => { 
+                if (htmlContent) return document.getElementById('swal-date').value; 
+                // Với Select, thư viện tự trả về Option.value (Mã Số nguyên)
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Backend vẫn sẽ nhận được số nguyên "0, 1, 2..." để lưu vào Database
+                $.post('/Order/QuickUpdate', { id: id, field: field, value: result.value || result.value === 0 ? result.value : '' }, function(res) {
+                    if (res.success) { Swal.fire({ icon: 'success', title: 'Đã cập nhật!', toast: true, position: 'top-end', showConfirmButton: false, timer: 1000 }).then(() => location.reload()); } 
+                    else { Swal.fire('Lỗi', res.message, 'error'); }
+                });
+            }
+        });
+    });
+
+    function toggleDetail(id, row) { 
+        var d = document.getElementById('detail-' + id);
+        if (d.style.display === 'none') { 
+            d.style.display = 'table-row';
+            row.classList.add('row-expanded');
+        } else { 
+            d.style.display = 'none'; 
+            row.classList.remove('row-expanded');
+        } 
+    }
+
+    document.addEventListener("turbo:load", function() {
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn" });
+    });
+</script>
+ *@
+
+@using X.PagedList.Mvc.Core;
+@using X.PagedList;
+@model IPagedList<ProductionManager.Data.Order>
+@using Microsoft.AspNetCore.Authorization
+@using ProductionManager.Data.Entities
+@using ProductionApp.Web.Constants
+
+@{ 
+    ViewData["Title"] = "Quản lý Đơn hàng";
+    var customerList = ViewBag.CustomerList as IEnumerable<SelectListItem>;
+    var paymentMap = ViewBag.PaymentMap as Dictionary<int, decimal>;
+    var totalOrders = Model != null ? Model.TotalItemCount : 0;
+    var pendingCount = Model != null ? Model.Count(x => x.Status == OrderStatus.PendingApproval) : 0;
+    var productionCount = Model != null ? Model.Count(x => x.Status == OrderStatus.InProduction) : 0;
+
+    decimal totalRevenue = 0;
+    if (ViewBag.TotalRevenue != null) { decimal.TryParse(ViewBag.TotalRevenue.ToString(), out totalRevenue); }
+
+    bool canCreate = User.IsInRole("Admin") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Create);
+    bool canEdit = User.IsInRole("Admin") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Edit);
+    bool canDelete = User.IsInRole("Admin") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Delete);
+    bool canApprove = User.IsInRole("Admin") || User.IsInRole("Manager");
+    bool canViewFinance = User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Accountant") || User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Approve);
+
+    bool isShowingInvoiced = ViewBag.Status?.ToString() == ((int)OrderStatus.Invoiced).ToString();
+    string currentStatusStr = ViewBag.Status?.ToString(); 
+    int totalColumns = 8 + (canViewFinance ? 1 : 0) + (isShowingInvoiced ? 1 : 0);
+
+    var statusTranslations = new Dictionary<OrderStatus, string> {
+        { OrderStatus.PendingApproval, "Chờ duyệt" }, { OrderStatus.Approved, "Đã duyệt" },
+        { OrderStatus.InProduction, "Đang SX" }, { OrderStatus.Packing, "Đóng gói" },
+        { OrderStatus.Delivered, "Đang Giao" }, { OrderStatus.Invoiced, "Đã xuất HĐ" },
+        { OrderStatus.Completed, "Hoàn Thành" }, { OrderStatus.Canceled, "Huỷ Đơn" }
+    };
+}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<style>
+    :root { --primary: #0ea5e9; --border: #e2e8f0; --bg-body: #f8fafc; --text-main: #1e293b; }
+    body { background-color: var(--bg-body); font-family: 'Inter', sans-serif; color: var(--text-main); }
+
+    .erp-card { background: #fff; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); margin-bottom: 24px; overflow: hidden; }
+    .stat-widget { display: flex; align-items: center; gap: 16px; padding: 20px; border-right: 1px solid var(--border); height: 100%; }
+    .icon-square { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    
+    /* Bảng dữ liệu */
+    .table-erp { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .table-erp th { background: #f8fafc; padding: 12px; font-size: 12px; font-weight: 800; color: #64748b; text-transform: uppercase; border-bottom: 2px solid var(--border); white-space: nowrap; }
+    .table-erp td { padding: 14px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 13.5px; transition: 0.2s; }
+    
+    /* Giao diện Sort & Filter */
+    .sortable-col { cursor: pointer; user-select: none; transition: 0.2s; }
+    .sortable-col:hover { background-color: #e2e8f0; color: var(--primary); }
+    .filter-input { width: 100%; padding: 4px 8px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; color: #334155; }
+    .filter-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 2px #bae6fd; }
+
+    /* 🔥 TÔ MÀU ĐÁNH DẤU CẢ DÒNG (Cố định màu nền) 🔥 */
+    tr.row-completed > td { background-color: #d1fae5 !important; border-bottom-color: #a7f3d0 !important; }
+    tr.row-completed:hover > td { background-color: #a7f3d0 !important; }
+    tr.row-completed .badge-status { border: 1px solid #10b981; color: #065f46; }
+
+    tr.row-invoiced > td { background-color: #e0f2fe !important; border-bottom-color: #bae6fd !important; }
+    tr.row-invoiced:hover > td { background-color: #bae6fd !important; }
+    tr.row-invoiced .badge-status { border: 1px solid #0ea5e9; color: #075985; }
+
+    /* Expand / Detail */
+    .main-row { cursor: pointer; }
+    .main-row:hover td:not(.row-completed td, .row-invoiced td) { background-color: #f1f5f9; }
+    .row-expanded td { background-color: #f8fafc !important; }
+    .chevron-box { color: #94a3b8; transition: 0.3s; font-size: 12px; }
+    .row-expanded .chevron-box { transform: rotate(90deg); color: var(--primary); }
+
+    /* Right Click */
+    .editable-cell { cursor: context-menu; border-bottom: 1px dashed #cbd5e1; transition: 0.2s; display: inline-block; padding-bottom: 2px; }
+    .editable-cell:hover { border-bottom-color: var(--primary); color: var(--primary) !important; }
+    
+    #quickEditMenu { display: none; position: absolute; z-index: 999999; background: #fff; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); border: 1px solid var(--border); min-width: 220px; overflow: hidden;}
+    .ctx-item { padding: 12px 16px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; transition: 0.2s; }
+    .ctx-item:hover { background: #f0f9ff; color: var(--primary); padding-left: 20px; }
+
+    .badge-status { padding: 5px 10px; border-radius: 6px; font-weight: 700; font-size: 11px; background: #fff; border: 1px solid var(--border); }
+    .progress-track { height: 6px; background: #e2e8f0; border-radius: 10px; margin-top: 6px; overflow: hidden; }
+    .progress-bar { height: 100%; border-radius: 10px; }
+</style>
+
+<div class="container-fluid pb-5 py-4">
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <h3 class="fw-800 text-dark mb-1"><i class="fa-solid fa-layer-group text-primary me-2"></i>TRUNG TÂM ĐƠN HÀNG</h3>
+            <div class="text-muted fw-600 small">
+                <span class="text-warning"><i class="fa-solid fa-mouse-pointer me-1"></i> Chuột phải vào ô gạch đứt để sửa nhanh.</span> | 
+                <span class="text-success"><i class="fa-solid fa-sort me-1"></i> Bấm Tiêu đề cột hoặc gõ vào ô tìm kiếm để Lọc.</span>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            @if (canEdit) { 
+                <button type="button" class="btn btn-success rounded-pill px-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#importOrderModal"><i class="fa-solid fa-file-import me-1"></i> Import Excel</button>
+                <a asp-action="BatchInvoice" class="btn btn-info rounded-pill px-4 fw-bold shadow-sm text-white"><i class="fa-solid fa-file-invoice me-1"></i> Xuất HĐ Lô</a> 
+            }
+            @if (canCreate) { <a asp-action="Create" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm"><i class="fa-solid fa-plus me-1"></i> Lên Đơn Mới</a> }
+        </div>
+    </div>
+
+    <div class="erp-card mb-4">
+        <div class="row g-0">
+            <div class="col-md-3"><div class="stat-widget"><div class="icon-square bg-primary bg-opacity-10 text-primary"><i class="fa-solid fa-clipboard-list"></i></div><div><div class="stat-label">TỔNG SỐ ĐƠN</div><div class="h4 fw-800 mb-0">@totalOrders</div></div></div></div>
+            <div class="col-md-3"><div class="stat-widget"><div class="icon-square bg-warning bg-opacity-10 text-warning"><i class="fa-solid fa-hourglass-half"></i></div><div><div class="stat-label">CHỜ DUYỆT</div><div class="h4 fw-800 mb-0">@pendingCount</div></div></div></div>
+            <div class="col-md-3"><div class="stat-widget"><div class="icon-square bg-info bg-opacity-10 text-info"><i class="fa-solid fa-gears"></i></div><div><div class="stat-label">ĐANG SẢN XUẤT</div><div class="h4 fw-800 mb-0">@productionCount</div></div></div></div>
+            @if (canViewFinance) { <div class="col-md-3"><div class="stat-widget border-0"><div class="icon-square bg-success bg-opacity-10 text-success"><i class="fa-solid fa-sack-dollar"></i></div><div><div class="stat-label">TỔNG THEO BỘ LỌC</div><div class="h4 fw-800 text-success mb-0">@totalRevenue.ToString("N0") <span class="fs-6 text-muted fw-normal">₫</span></div></div></div></div> }
+        </div>
+    </div>
+
+    <div class="erp-card p-4 mb-4">
+        <form id="filterForm" asp-action="Index" method="get" class="row g-3 align-items-center">
+            <input type="hidden" name="sortOrder" id="sortOrder" value="@ViewBag.CurrentSort" />
+            <input type="hidden" name="status" id="hdnStatus" value="@ViewBag.Status" />
+
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-light text-muted fw-bold border-end-0"><i class="fa-regular fa-calendar-alt"></i></span>
+                    <input type="text" name="fromDate" class="form-control datepicker border-start-0 fw-bold text-primary" placeholder="Từ ngày" value="@(ViewBag.FromDate != null ? ((DateTime)ViewBag.FromDate).ToString("yyyy-MM-dd") : "")" />
+                    <span class="input-group-text bg-light text-muted border-start-0 border-end-0"><i class="fa-solid fa-arrow-right"></i></span>
+                    <input type="text" name="toDate" class="form-control datepicker border-start-0 fw-bold text-primary" placeholder="Đến ngày" value="@(ViewBag.ToDate != null ? ((DateTime)ViewBag.ToDate).ToString("yyyy-MM-dd") : "")" />
+                </div>
+            </div>
+            <div class="col-md-4">
+                <select name="customerId" class="form-select fw-bold text-secondary">
+                    <option value="">-- Lọc theo tất cả Khách hàng --</option>
+                    @if (customerList != null) { foreach (var item in customerList) { <option value="@item.Value" selected="@(ViewBag.CustomerId?.ToString() == item.Value ? "selected" : null)">@item.Text</option> } }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-dark fw-bold flex-grow-1 shadow-sm"><i class="fa-solid fa-filter me-1"></i> Tải dữ liệu</button>
+                    <button type="submit" asp-action="ExportExcel" data-turbo="false" class="btn btn-outline-success bg-light fw-bold shadow-sm" title="Xuất Excel"><i class="fa-solid fa-file-excel"></i></button>
+                    <a asp-action="Index" class="btn btn-light border fw-bold px-3"><i class="fa-solid fa-rotate-left"></i></a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="erp-card">
+        <div class="table-responsive">
+            <table class="table-erp">
+                <thead>
+                    <tr>
+                        <th width="30" class="text-center"><i class="fa-solid fa-bars text-muted"></i></th>
+                        
+                        <th style="min-width: 120px;">
+                            <div class="sortable-col d-flex justify-content-between align-items-center mb-1" onclick="setSort('code')">
+                                <span>Mã Đơn</span> @Html.Raw(ViewBag.CurrentSort == "code_asc" ? "<i class='fa-solid fa-arrow-up-a-z text-primary'></i>" : ViewBag.CurrentSort == "code_desc" ? "<i class='fa-solid fa-arrow-down-z-a text-primary'></i>" : "<i class='fa-solid fa-sort opacity-25'></i>")
+                            </div>
+                            <input type="text" name="colCode" value="@ViewBag.ColCode" form="filterForm" class="filter-input" placeholder="Lọc mã... (Enter)">
+                        </th>
+                        
+                        <th style="min-width: 160px;">
+                            <div class="sortable-col d-flex justify-content-between align-items-center mb-1" onclick="setSort('cus')">
+                                <span>Khách Hàng</span> @Html.Raw(ViewBag.CurrentSort == "cus_asc" ? "<i class='fa-solid fa-arrow-up-a-z text-primary'></i>" : ViewBag.CurrentSort == "cus_desc" ? "<i class='fa-solid fa-arrow-down-z-a text-primary'></i>" : "<i class='fa-solid fa-sort opacity-25'></i>")
+                            </div>
+                            <input type="text" name="colCustomer" value="@ViewBag.ColCustomer" form="filterForm" class="filter-input" placeholder="Lọc tên... (Enter)">
+                        </th>
+
+                        <th class="text-center" style="min-width: 120px;">
+                            <div class="sortable-col d-flex justify-content-between align-items-center mb-1" onclick="setSort('date')">
+                                <span>Ngày Nhận</span> @Html.Raw(ViewBag.CurrentSort == "date_asc" ? "<i class='fa-solid fa-sort-up text-primary'></i>" : ViewBag.CurrentSort == "date_desc" ? "<i class='fa-solid fa-sort-down text-primary'></i>" : "<i class='fa-solid fa-sort opacity-25'></i>")
+                            </div>
+                            <div class="text-muted fw-normal text-start">/ Hạn giao</div>
+                        </th>
+
+                        <th>Tiến độ xuất kho</th>
+
+                        @if (canViewFinance) { 
+                            <th class="text-end" style="min-width: 120px;">
+                                <div class="sortable-col d-flex justify-content-end align-items-center mb-1 gap-2" onclick="setSort('total')">
+                                    <span>Thành Tiền</span> @Html.Raw(ViewBag.CurrentSort == "total_asc" ? "<i class='fa-solid fa-sort-up text-primary'></i>" : ViewBag.CurrentSort == "total_desc" ? "<i class='fa-solid fa-sort-down text-primary'></i>" : "<i class='fa-solid fa-sort opacity-25'></i>")
+                                </div>
+                                <div class="text-muted fw-normal text-end">Thu nợ</div>
+                            </th> 
+                        }
+
+                        @if (isShowingInvoiced) { <th class="text-center bg-primary bg-opacity-10 text-primary">Ngày Xuất HĐ</th> }
+                        
+                        <th style="min-width: 120px;">Hóa Đơn / Thu</th>
+                        
+                        <th class="text-center" style="min-width: 120px;">
+                            <div class="mb-1">Trạng thái</div>
+                            <select class="filter-input cursor-pointer" onchange="document.getElementById('hdnStatus').value = this.value; document.getElementById('filterForm').submit();">
+                                <option value="">-- Tất cả --</option>
+                                @foreach(var stt in statusTranslations){ <option value="@((int)stt.Key)" selected="@(currentStatusStr == ((int)stt.Key).ToString() ? "selected" : null)">@stt.Value</option> }
+                            </select>
+                        </th>
+
+                        <th class="text-center pe-4"><i class="fa-solid fa-gears text-muted"></i></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model == null || !Model.Any()) { 
+                        <tr><td colspan="@totalColumns" class="text-center py-5 text-muted fw-bold"><i class="fa-solid fa-magnifying-glass fa-3x mb-3 opacity-25 d-block"></i>Không tìm thấy dữ liệu khớp bộ lọc.</td></tr> 
+                    }
+                    else {
+                        @foreach (var item in Model)
+                        {
+                            double totalQty = item.OrderDetails?.Sum(x => x.Quantity) ?? 0;
+                            double shippedQty = item.OrderDetails?.SelectMany(od => od.ShipmentDetails).Sum(sd => sd.QuantityShipped) ?? 0;
+                            double shipPct = totalQty > 0 ? (shippedQty / totalQty) * 100 : 0;
+                            
+                            decimal paidAmount = paymentMap != null && paymentMap.ContainsKey(item.Id) ? paymentMap[item.Id] : 0;
+                            decimal remainAmount = item.TotalAmount - paidAmount;
+
+                            decimal billed = item.InvoiceDetails?.Sum(d => d.BilledAmount) ?? 0;
+                            decimal billPct = item.TotalAmount > 0 ? (billed / item.TotalAmount) * 100 : 0;
+                            var latestInvDate = item.InvoiceDetails?.OrderByDescending(d => d.Invoice.InvoiceDate).FirstOrDefault()?.Invoice.InvoiceDate;
+
+                            string sttName = statusTranslations.ContainsKey(item.Status) ? statusTranslations[item.Status] : item.Status.ToString();
+                            
+                            // 🔥 LOGIC TÌM CLASS TÔ MÀU CẢ DÒNG 🔥
+                            string rowHighlightClass = "";
+                            string badgeColor = "text-secondary";
+                            
+                            if (item.Status == OrderStatus.Completed) { rowHighlightClass = "row-completed"; badgeColor = "text-success"; } 
+                            else if (item.Status == OrderStatus.Invoiced) { rowHighlightClass = "row-invoiced"; badgeColor = "text-primary"; } 
+                            else if (item.Status == OrderStatus.InProduction) badgeColor = "text-info";
+                            else if (item.Status == OrderStatus.PendingApproval) badgeColor = "text-warning";
+                            else if (item.Status == OrderStatus.Canceled) badgeColor = "text-danger";
+
+                            string sttBadge = $"<span class='badge-status {badgeColor}'>{sttName}</span>";
+
+                            // Dòng chính Order
+                            <tr class="main-row @rowHighlightClass" onclick="toggleDetail(@item.Id, this)">
+                                <td class="text-center"><i class="fa-solid fa-chevron-right chevron-box"></i></td>
+                                
+                                <td>
+                                    <div class="fw-800 font-monospace fs-6 mb-1 text-dark">@item.OrderCode</div>
+                                    <div class="editable-cell text-muted small font-monospace" data-id="@item.Id" data-field="PaperOrderCode" data-value="@item.PaperOrderCode">
+                                        <i class="fa-solid fa-paperclip me-1"></i>@(string.IsNullOrEmpty(item.PaperOrderCode) ? "N/A" : item.PaperOrderCode)
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <div class="editable-cell fw-bold text-dark text-truncate" style="max-width: 160px;" data-id="@item.Id" data-field="Customer" data-value="@item.CustomerId">
+                                        @item.Customer?.CompanyName
+                                    </div>
+                                </td>
+
+                                <td class="text-center">
+                                    <div class="editable-cell small fw-700 mb-1 text-dark" data-id="@item.Id" data-field="OrderDate" data-value="@item.OrderDate.ToString("yyyy-MM-dd")">
+                                        <i class="fa-solid fa-calendar-plus text-muted me-1"></i> @item.OrderDate.ToString("dd/MM")
+                                    </div><br/>
+                                    <div class="editable-cell small fw-700 @(item.DeliveryDeadline < DateTime.Now.Date && item.Status != OrderStatus.Completed ? "text-danger" : "text-muted")" data-id="@item.Id" data-field="DeliveryDeadline" data-value="@item.DeliveryDeadline?.ToString("yyyy-MM-dd")">
+                                        <i class="fa-solid fa-clock me-1"></i> @(item.DeliveryDeadline?.ToString("dd/MM") ?? "-/-")
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <div class="d-flex justify-content-between small fw-bold mb-1">
+                                        <span class="text-dark">@shippedQty.ToString("N0") / @totalQty.ToString("N0")</span>
+                                        <span class="text-primary">@shipPct.ToString("0")%</span>
+                                    </div>
+                                    <div class="progress-track"><div class="progress-bar bg-primary" style="width: @shipPct%"></div></div>
+                                </td>
+
+                                @if (canViewFinance) {
+                                    <td class="text-end">
+                                        <div class="fw-800 text-success fs-6 mb-1">@item.TotalAmount.ToString("N0")</div>
+                                        @if (remainAmount > 0) { <div class="small text-danger fw-bold"><i class="fa-solid fa-arrow-turn-down me-1"></i> Còn: @remainAmount.ToString("N0")</div> }
+                                        else { <div class="small text-muted fw-bold"><i class="fa-solid fa-check-double me-1"></i> Thu đủ</div> }
+                                    </td>
+                                }
+
+                                @if (isShowingInvoiced) { <td class="text-center fw-bold text-primary">@(latestInvDate?.ToString("dd/MM/yyyy") ?? "-")</td> }
+
+                                <td>
+                                    @if(billed > 0) {
+                                        <div class="d-flex justify-content-between small fw-bold mb-1"><span class="text-muted">Xuất HĐ:</span><span class="text-dark">@billed.ToString("N0")</span></div>
+                                        <div class="progress-track"><div class="progress-bar bg-warning" style="width: @billPct%"></div></div>
+                                    } else { <div class="small text-muted fw-bold fst-italic opacity-50">Chưa có HĐ</div> }
+                                </td>
+
+                                <td class="text-center">
+                                    <div class="editable-cell" data-id="@item.Id" data-field="Status" data-value="@((int)item.Status)">@Html.Raw(sttBadge)</div>
+                                </td>
+
+                                <td class="text-center pe-4" onclick="event.stopPropagation()">
+                                    <div class="dropdown">
+                                        <button class="btn btn-light btn-sm border bg-white rounded-circle shadow-sm" style="width: 32px; height: 32px;" data-bs-toggle="dropdown"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="border-radius: 10px;">
+                                            @if (item.Status == OrderStatus.PendingApproval && canApprove) { 
+                                                <li><form asp-action="ApproveOrder" method="post"><input type="hidden" name="id" value="@item.Id" /><button class="dropdown-item text-success fw-bold py-2"><i class="fa-solid fa-check-double me-2"></i>Duyệt Đơn</button></form></li><li><hr class="dropdown-divider"></li>
+                                            }
+                                            @if(canEdit && !item.IsLocked && billed < item.TotalAmount) {
+                                                <li><a href="javascript:void(0)" class="dropdown-item py-2 fw-600 text-warning" onclick="openInvoiceModal(@item.Id, @(item.TotalAmount - billed))"><i class="fa-solid fa-file-invoice me-2"></i>Khai báo Hóa đơn</a></li>
+                                            }
+                                            <li><a asp-action="Details" asp-route-id="@item.Id" class="dropdown-item py-2 fw-600"><i class="fa-solid fa-expand text-primary me-2"></i>Chi tiết Đơn</a></li>
+                                            @if (canEdit && !item.IsLocked) { <li><a asp-action="Edit" asp-route-id="@item.Id" class="dropdown-item py-2 fw-600"><i class="fa-solid fa-pen-to-square text-info me-2"></i>Sửa dữ liệu</a></li> }
+                                            @if (canDelete) { <li><hr class="dropdown-divider"></li><li><a asp-action="Delete" asp-route-id="@item.Id" class="dropdown-item text-danger py-2 fw-bold" onclick="return confirm('Xác nhận Xóa?')"><i class="fa-solid fa-trash-can me-2"></i>Xóa Đơn</a></li> }
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <tr id="detail-@item.Id" class="detail-row" style="display: none;">
+                                <td colspan="@totalColumns" class="p-0 border-0">
+                                    <div class="inner-wrapper">
+                                        <div class="row g-4">
+                                            <div class="col-md-5">
+                                                <div class="inner-card">
+                                                    <div class="inner-header text-primary"><i class="fa-solid fa-box-open me-2"></i>Sản Phẩm Đặt Hàng</div>
+                                                    <div style="max-height: 200px; overflow-y: auto;">
+                                                        <table class="table-erp inner-table w-100 mb-0">
+                                                            <tbody>
+                                                                @if(item.OrderDetails != null) { foreach(var d in item.OrderDetails) {
+                                                                    <tr>
+                                                                        <td class="fw-bold text-dark">@d.ProductName <br/><span class="text-muted small fw-normal fst-italic">@d.Notes</span></td>
+                                                                        <td class="text-center fw-bold text-primary" width="50">@d.Quantity</td>
+                                                                    </tr>
+                                                                }}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="col-md-7">
+                                                <div class="inner-card">
+                                                    <div class="inner-header text-warning"><i class="fa-solid fa-file-invoice-dollar me-2"></i>Chứng từ & Ghi chú chung</div>
+                                                    <div class="p-3 bg-white" style="height: 100%;">
+                                                        <div class="text-dark small fw-500 mb-3"><i class="fa-regular fa-comment-dots text-muted me-1"></i> <b>Ghi chú Đơn:</b> @(string.IsNullOrEmpty(item.Notes) ? "Không có" : item.Notes)</div>
+                                                        @if(item.InvoiceDetails != null && item.InvoiceDetails.Any()) {
+                                                            <div class="fw-800 small text-muted text-uppercase mb-2">Lịch sử xuất HĐ:</div>
+                                                            <div class="d-flex flex-wrap gap-2">
+                                                                @foreach(var inv in item.InvoiceDetails.OrderByDescending(x => x.Invoice.InvoiceDate)) {
+                                                                    <div class="border rounded-3 p-2 bg-light d-flex align-items-center gap-3">
+                                                                        <div><div class="fw-bold font-monospace text-dark">@inv.Invoice.InvoiceNumber</div><div class="small text-muted">@inv.Invoice.InvoiceDate.ToString("dd/MM/yyyy")</div></div>
+                                                                        <div class="fw-bold text-success">@inv.BilledAmount.ToString("N0")</div>
+                                                                    </div>
+                                                                }
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="p-4 border-top bg-white d-flex justify-content-between align-items-center">
+            <span class="text-muted fw-bold small">Trang @Model.PageNumber / @Model.PageCount</span>
+            <div class="pagination-sm m-0">
+                @Html.PagedListPager(Model, page => Url.Action("Index", new { page, sortOrder = ViewBag.CurrentSort, colCode = ViewBag.ColCode, colCustomer = ViewBag.ColCustomer, fromDate = ViewBag.FromDate, toDate = ViewBag.ToDate, status = ViewBag.Status, customerId = ViewBag.CustomerId }), new PagedListRenderOptions { LiElementClasses = new string[] { "page-item" }, PageClasses = new string[] { "page-link shadow-sm fw-bold text-primary" }, DisplayLinkToPreviousPage = PagedListDisplayMode.Always, DisplayLinkToNextPage = PagedListDisplayMode.Always })
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="quickEditMenu">
+    <div class="ctx-header"><i class="fa-solid fa-bolt text-warning me-2"></i>CÔNG CỤ SỬA NHANH</div>
+    <div class="ctx-item" id="btnQuickEditAction"><i class="fa-solid fa-pen-to-square text-primary me-3"></i> Sửa giá trị ô này</div>
+    <div class="ctx-item text-danger" onclick="document.getElementById('quickEditMenu').style.display='none'"><i class="fa-solid fa-xmark me-3"></i> Hủy bỏ</div>
+</div>
+
+<div class="modal fade" id="importOrderModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-success text-white border-0">
+                <h6 class="modal-title fw-bold"><i class="fa-solid fa-file-excel me-2"></i> Nhập Đơn hàng từ Excel</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="PreviewImport" method="post" enctype="multipart/form-data">
+                <div class="modal-body bg-light p-4">
+                    <input type="file" name="file" class="form-control bg-white shadow-sm" accept=".xlsx, .xls" required>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-light fw-bold border" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-success fw-bold px-4">Xem Preview Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<script>
+    // --- TÍNH NĂNG GỌI SORT BACKEND ---
+    function setSort(col) {
+        let currentSort = document.getElementById('sortOrder').value;
+        if (currentSort === col + "_asc") document.getElementById('sortOrder').value = col + "_desc";
+        else document.getElementById('sortOrder').value = col + "_asc";
+        document.getElementById('filterForm').submit();
+    }
+
+    // --- DICTIONARY TRẠNG THÁI ---
+    const statusMap = {
+        '@((int)OrderStatus.PendingApproval)': 'Chờ duyệt', '@((int)OrderStatus.Approved)': 'Đã duyệt',
+        '@((int)OrderStatus.InProduction)': 'Đang Sản Xuất', '@((int)OrderStatus.Packing)': 'Đóng gói',
+        '@((int)OrderStatus.Delivered)': 'Đang Giao Hàng', '@((int)OrderStatus.Invoiced)': 'Đã xuất HĐ',
+        '@((int)OrderStatus.Completed)': 'Hoàn Thành', '@((int)OrderStatus.Canceled)': 'Huỷ Đơn'
+    };
+
+    function toggleDetail(id, row) { 
+        var d = document.getElementById('detail-' + id);
+        if (d.style.display === 'none') { d.style.display = 'table-row'; row.classList.add('row-expanded'); } 
+        else { d.style.display = 'none'; row.classList.remove('row-expanded'); } 
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn" });
+        document.body.appendChild(document.getElementById('quickEditMenu'));
+    });
+
+    // --- XỬ LÝ CHUỘT PHẢI (RIGHT CLICK) ---
+    let contextData = { id: 0, field: '', value: '' };
+    const menu = document.getElementById('quickEditMenu');
+
+    document.addEventListener('contextmenu', function(e) {
+        const cell = e.target.closest('.editable-cell');
+        if (cell) {
+            e.preventDefault(); e.stopPropagation(); 
+            contextData.id = cell.getAttribute('data-id');
+            contextData.field = cell.getAttribute('data-field');
+            contextData.value = cell.getAttribute('data-value');
+
+            menu.style.display = 'block';
+            let posX = e.pageX; let posY = e.pageY;
+            if (posX + menu.offsetWidth > document.documentElement.clientWidth + window.scrollX) { posX -= menu.offsetWidth; }
+            if (posY + menu.offsetHeight > document.documentElement.clientHeight + window.scrollY) { posY -= menu.offsetHeight; }
+
+            menu.style.left = posX + 'px'; menu.style.top = posY + 'px';
+        } else { menu.style.display = 'none'; }
+    });
+
+    document.addEventListener('click', (e) => { if (!e.target.closest('#quickEditMenu')) menu.style.display = 'none'; });
+
+    document.getElementById('btnQuickEditAction').addEventListener('click', function() {
+        menu.style.display = 'none'; 
+        const { id, field, value } = contextData;
+        let title = ''; let inputType = 'text'; let inputOptions = null; let htmlContent = '';
+
+        if (field === 'OrderDate' || field === 'DeliveryDeadline') {
+            title = field === 'OrderDate' ? 'Sửa Ngày nhận đơn' : 'Sửa Hạn giao hàng'; inputType = null; 
+            htmlContent = `<input type="text" id="swal-date" class="form-control text-center fw-bold fs-5 text-primary" value="${value}">`;
+        } else if (field === 'PaperOrderCode') { title = 'Sửa PO Gốc'; inputType = 'text';
+        } else if (field === 'Status') { title = 'Đổi Trạng Thái Đơn'; inputType = 'select'; inputOptions = statusMap;
+        } else if (field === 'Customer') { Swal.fire('Thông báo', 'Vui lòng bấm Sửa Đơn để đổi Khách.', 'info'); return; }
+
+        Swal.fire({
+            title: title, input: inputType, inputOptions: inputOptions, inputValue: value, html: htmlContent,
+            showCancelButton: true, confirmButtonText: 'Cập nhật', cancelButtonText: 'Hủy', confirmButtonColor: '#0ea5e9',
+            didOpen: () => { if (field === 'OrderDate' || field === 'DeliveryDeadline') { flatpickr("#swal-date", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", defaultDate: value, locale: "vn", zIndex: 999999 }); } },
+            preConfirm: () => { if (htmlContent) return document.getElementById('swal-date').value; }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.post('/Order/QuickUpdate', { id: id, field: field, value: result.value || result.value === 0 ? result.value : '' }, function(res) {
+                    if (res.success) { location.reload(); } else { Swal.fire('Lỗi', res.message, 'error'); }
+                });
+            }
+        });
+    });
+</script>

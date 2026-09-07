@@ -1,0 +1,127 @@
+﻿@model List<ProductionApp.Web.Controllers.ShipmentImportDto>
+@{
+    ViewData["Title"] = "Kiểm duyệt Dữ liệu Xuất Kho";
+    int total = Model.Count;
+    int valid = Model.Count(x => x.IsValid);
+    int invalid = total - valid;
+}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    body {
+        background-color: #f8fafc;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .table-preview th {
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        font-weight: 800;
+        background: #e2e8f0;
+    }
+
+    .table-preview td {
+        vertical-align: middle;
+        font-size: 0.9rem;
+    }
+
+    .row-error {
+        background-color: #fff1f2 !important;
+        border-left: 4px solid #ef4444;
+    }
+
+    .row-valid {
+        background-color: #fff;
+        border-left: 4px solid #10b981;
+    }
+
+    .error-tag {
+        display: inline-block;
+        background: #ef4444;
+        color: #fff;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        margin: 2px;
+    }
+</style>
+
+<div class="container-fluid py-4" style="max-width: 1600px;">
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="fw-800 text-dark mb-1"><i class="fa-solid fa-microscope text-primary me-2"></i>KIỂM DUYỆT DỮ LIỆU TRƯỚC KHI IMPORT</h4>
+                <div class="small fw-bold">
+                    Tổng: @total dòng | <span class="text-success"><i class="fa-solid fa-check"></i> Hợp lệ: @valid</span> | <span class="text-danger"><i class="fa-solid fa-xmark"></i> Bị lỗi: @invalid</span>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <a asp-action="Index" class="btn btn-light border fw-bold px-4 rounded-pill">Hủy bỏ</a>
+                <form asp-action="ConfirmImport" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="jsonData" value='@System.Text.Json.JsonSerializer.Serialize(Model)' />
+                    <button type="submit" class="btn btn-success fw-bold px-4 rounded-pill shadow-sm" @(valid == 0 ? "disabled" : "")>
+                        <i class="fa-solid fa-cloud-arrow-up me-2"></i> LƯU @valid DÒNG HỢP LỆ
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        @if (invalid > 0)
+        {
+            <div class="alert alert-warning m-3 border-warning fw-bold small"><i class="fa-solid fa-triangle-exclamation me-1"></i> Các dòng bị lỗi sẽ tự động bị bỏ qua và không được lưu vào hệ thống.</div>
+        }
+
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 70vh;">
+                <table class="table table-hover mb-0 table-preview">
+                    <thead class="sticky-top shadow-sm">
+                        <tr>
+                            <th width="50" class="text-center">Dòng</th>
+                            <th>Mã Phiếu</th>
+                            <th>Khách Hàng / PO</th>
+                            <th>Sản Phẩm</th>
+                            <th class="text-center bg-primary text-white">SỐ LƯỢNG</th>
+                            <th class="text-center">Thông tin Mở Rộng</th>
+                            <th width="250">Trạng Thái / Lỗi (Nếu có)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr class="@(item.IsValid ? "row-valid" : "row-error")">
+                                <td class="text-center fw-bold text-muted">@item.RowIndex</td>
+                                <td class="fw-bold text-dark font-monospace">@item.ShipmentCode</td>
+                                <td>
+                                    <div class="fw-bold text-primary">@item.CustomerName</div>
+                                    <div class="small text-muted font-monospace"><i class="fa-solid fa-hashtag"></i> @item.OrderCode</div>
+                                </td>
+                                <td class="fw-bold text-dark">@item.ProductName</td>
+                                <td class="text-center fw-900 text-primary fs-5 bg-primary bg-opacity-10">@item.Quantity</td>
+                                <td class="text-center small">
+                                    <div><i class="fa-regular fa-calendar me-1"></i> @item.ShipmentDate.ToString("dd/MM/yyyy")</div>
+                                    <div class="text-muted"><i class="fa-solid fa-truck me-1"></i> @(string.IsNullOrEmpty(item.Vehicle) ? "Kho" : item.Vehicle)</div>
+                                </td>
+                                <td>
+                                    @if (item.IsValid)
+                                    {
+                                        <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i> Hợp lệ, sẵn sàng lưu</span>
+                                    }
+                                    else
+                                    {
+                                        foreach (var err in item.Errors)
+                                        {
+
+                                            <span class="error-tag">@err</span>
+                                        }
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

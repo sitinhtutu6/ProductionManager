@@ -1,0 +1,416 @@
+﻿@model ProductionApp.Web.Models.ViewModels.BomCreateVM
+@{
+    ViewData["Title"] = "Thiết lập BOM";
+    // Đón nhận dữ liệu vật tư kèm giá từ ViewBag
+    var materialsRawJson = ViewBag.MaterialsJson as string ?? "[]";
+    var matNames = ViewBag.MatNames as Dictionary<int, string>;
+    var matUnits = ViewBag.MatUnits as Dictionary<int, string>;
+
+    string exactMatch = Model.ProductId > 0 ? $"{Model.ProductId}|{ViewBag.SelectedVariant}" : "";
+    var prodList = ViewBag.ProductsList as List<SelectListItem>;
+
+    var serverSummary = new Dictionary<string, (string Unit, double Value, decimal TotalPrice)>();
+}
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<style>
+    .bom-row {
+        transition: all 0.2s;
+        border-left: 4px solid transparent;
+    }
+
+        .bom-row:hover {
+            background-color: #f8f9fa;
+            border-left-color: #0d6efd;
+        }
+
+    .form-control-xs {
+        padding: 0.25rem 0.4rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .sticky-summary {
+        position: sticky;
+        top: 20px;
+        z-index: 99;
+    }
+
+    .select2-container .select2-selection--single {
+        height: 42px !important;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: bold;
+    }
+
+    .suggestion-box {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        max-height: 250px;
+        overflow-y: auto;
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 0 0 8px 8px;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        z-index: 1000;
+        display: none;
+    }
+
+    .suggestion-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 0.9rem;
+    }
+
+        .suggestion-item:hover {
+            background-color: #e0f2fe;
+            color: #0284c7;
+        }
+
+    .input-locked {
+        cursor: not-allowed !important;
+        opacity: 0.6;
+        background-color: #e9ecef !important;
+    }
+
+    .price-tag {
+        font-size: 0.75rem;
+        color: #64748b;
+        font-style: italic;
+        display: block;
+        margin-top: 2px;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <form asp-action="Create" method="post" id="bomForm">
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger shadow-sm mb-4">
+                <h6 class="fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-2"></i> Lỗi dữ liệu:</h6>
+                <div asp-validation-summary="All" class="mb-0 small fw-bold"></div>
+            </div>
+        }
+
+        <div class="row g-4">
+            <div class="col-lg-9">
+                <div class="card shadow border-0 rounded-3">
+                    <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold text-uppercase"><i class="fa-solid fa-pen-ruler me-2"></i> THIẾT LẬP BOM & GIÁ VỐN</h5>
+                        <span class="badge bg-white text-primary rounded-pill px-3"><i class="fa-solid fa-cube me-1"></i> <span id="rowCount">@Model.Items.Count</span> Items</span>
+                    </div>
+
+                    <div class="card-body bg-light p-3">
+                        <div class="bg-white p-3 rounded-3 shadow-sm mb-3 border-start border-4 border-warning">
+                            <div class="row align-items-center">
+                                <div class="col-md-7">
+                                    <label class="fw-bold text-muted small mb-1">📦 Sản Phẩm Cần Thiết Lập BOM <span class="text-danger">*</span></label>
+                                    <select id="cbProductSelect" name="cbProductSelect" class="form-select fw-bold text-primary">
+                                        <option value="">-- Tìm tên Sản phẩm hoặc Chi tiết --</option>
+                                        @if (prodList != null)
+                                        {
+                                            foreach (var item in prodList)
+                                            {
+                                                <option value="@item.Value" selected="@(item.Value == exactMatch)">@item.Text</option>
+                                            }
+                                        }
+                                    </select>
+                                    <input type="hidden" asp-for="ProductId" id="realProductId" />
+                                </div>
+                                <div class="col-md-5">
+                                    <div class="alert alert-info mb-0 py-2 small border-0">
+                                        <i class="fa-solid fa-lightbulb text-warning me-1"></i> <b>UX:</b> Chọn Vật tư trước để mở khóa nhập Kích thước & Số lượng.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-3 shadow-sm">
+                            <div class="table-responsive" style="min-height: 450px;">
+                                <table class="table table-bordered mb-0 align-middle">
+                                    <thead class="bg-light text-secondary small text-center">
+                                        <tr>
+                                            <th style="min-width: 220px;">📦 Vật tư</th>
+                                            <th style="min-width: 150px;">🧩 Bộ phận</th>
+                                            <th style="min-width: 180px;">📏 Quy cách (DxRxC)</th>
+                                            <th style="min-width: 160px;">🔢 SL & HS</th>
+                                            <th style="min-width: 120px;">📝 Ghi chú</th>
+                                            <th style="min-width: 120px;">📊 Tiêu hao & Tiền</th>
+                                            <th style="width: 40px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="bomBody">
+                                        @for (int i = 0; i < Model.Items.Count; i++)
+                                        {
+                                            int mId = Model.Items[i].MaterialId;
+                                            string stateAttr = mId > 0 ? "" : "readonly";
+                                            string stateClass = mId > 0 ? "" : "input-locked";
+
+                                            <tr class="bom-row">
+                                                <td class="p-2 position-relative">
+                                                    <input type="hidden" name="Items.Index" value="@i" />
+                                                    <div class="input-group input-group-sm">
+                                                        <span class="input-group-text bg-white"><i class="fa-solid fa-search"></i></span>
+                                                        <input type="text" id="searchMat-@i" class="form-control border-start-0 fw-bold" placeholder="Gõ tìm vật tư..." onkeyup="filterMaterials(this, @i)" autocomplete="off" value="@(mId > 0 && matNames.ContainsKey(mId) ? matNames[mId] : "")">
+                                                        <span class="input-group-text bg-light text-muted fw-bold" id="lblUnit-@i" style="width: 50px; justify-content:center;">@(mId > 0 && matUnits.ContainsKey(mId) ? matUnits[mId] : "ĐVT")</span>
+                                                        <input type="hidden" name="Items[@i].MaterialId" id="matId-@i" value="@(mId > 0 ? mId.ToString() : "")">
+                                                    </div>
+                                                    <div id="suggest-@i" class="suggestion-box"></div>
+                                                </td>
+                                                <td class="p-2">
+                                                    <input type="text" name="Items[@i].ComponentName" value="@Model.Items[i].ComponentName" class="form-control form-control-sm fw-bold text-primary @stateClass" placeholder="Bộ phận..." @stateAttr>
+                                                </td>
+                                                <td class="p-2">
+                                                    <div class="d-flex align-items-center gap-1">
+                                                        <input type="number" step="any" name="Items[@i].Length" value="@(Model.Items[i].Length == 0 ? "" : Model.Items[i].Length.ToString())" class="form-control form-control-xs @stateClass" placeholder="D" oninput="calcRow(this)" @stateAttr>
+                                                        <input type="number" step="any" name="Items[@i].Width" value="@(Model.Items[i].Width == 0 ? "" : Model.Items[i].Width.ToString())" class="form-control form-control-xs @stateClass" placeholder="R" oninput="calcRow(this)" @stateAttr>
+                                                        <input type="number" step="any" name="Items[@i].Height" value="@(Model.Items[i].Height == 0 ? "" : Model.Items[i].Height.ToString())" class="form-control form-control-xs @stateClass" placeholder="C" oninput="calcRow(this)" @stateAttr>
+                                                    </div>
+                                                </td>
+                                                <td class="p-2">
+                                                    <div class="d-flex gap-1">
+                                                        <input type="number" step="any" name="Items[@i].CutQuantity" value="@(Model.Items[i].CutQuantity == 0 ? "" : Model.Items[i].CutQuantity.ToString())" class="form-control form-control-xs fw-bold @stateClass" placeholder="SL" oninput="calcRow(this)" @stateAttr>
+                                                        <input type="number" step="any" name="Items[@i].Coefficient" value="@(Model.Items[i].Coefficient == 0 ? "1" : Model.Items[i].Coefficient.ToString())" class="form-control form-control-xs text-danger fw-bold @stateClass" placeholder="HS" oninput="calcRow(this)" @stateAttr>
+                                                    </div>
+                                                </td>
+                                                <td class="p-2">
+                                                    <input type="text" name="Items[@i].Note" value="@Model.Items[i].Note" class="form-control form-control-sm text-muted small @stateClass" placeholder="Ghi chú..." @stateAttr>
+                                                </td>
+                                                <td class="p-2 text-end bg-light bg-opacity-50">
+                                                    <div class="fw-bold text-success" id="preview-@i">0</div>
+                                                    <span class="price-tag" id="price-@i">0 ₫</span>
+                                                </td>
+                                                <td class="p-2 text-center">
+                                                    <button type="button" class="btn btn-sm btn-link text-danger" onclick="removeRow(this)"><i class="fa-solid fa-trash"></i></button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="p-3 text-center border-top bg-light">
+                                <button type="button" class="btn btn-white border-dashed text-primary fw-bold w-100 py-2" onclick="addRow()">
+                                    <i class="fa-solid fa-plus-circle me-2"></i> THÊM DÒNG VẬT TƯ MỚI
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3">
+                <div class="sticky-summary">
+                    <div class="card shadow-lg border-0 rounded-3 mb-3 overflow-hidden">
+                        <div class="card-header bg-success text-white py-3">
+                            <h6 class="m-0 fw-bold text-uppercase text-center"><i class="fa-solid fa-calculator me-2"></i> TỔNG HỢP VẬT TƯ</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-striped mb-0">
+                                <thead class="bg-light text-muted small">
+                                    <tr><th class="ps-3">Tên Vật Tư</th><th class="text-end pe-3">Nhu Cầu</th></tr>
+                                </thead>
+                                <tbody id="summaryTableBody">
+                                    <tr><td colspan="2" class="text-center text-muted py-4 small fst-italic">Đang chờ dữ liệu...</td></tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-danger border-top-2">
+                                        <td class="ps-3 fw-bold py-3">TỔNG GIÁ VỐN (EST):</td>
+                                        <td class="text-end pe-3 fw-800 text-danger fs-5 py-3" id="totalEstimatedCost">0 ₫</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm border-0 rounded-3">
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary fw-bold py-2 rounded-pill shadow"><i class="fa-solid fa-save me-2"></i> LƯU ĐỊNH MỨC</button>
+                                <a asp-action="Index" class="btn btn-light fw-bold py-2 rounded-pill border">Hủy bỏ</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Dữ liệu vật tư kèm giá nhận từ Controller
+    const materialsData = @Html.Raw(materialsRawJson);
+    let rowIndex = @Model.Items.Count;
+
+    $(document).ready(function () {
+        $('#cbProductSelect').select2({ placeholder: "-- Tìm tên Sản phẩm --", allowClear: true });
+
+        // Tính toán lại toàn bộ bảng khi vừa load (trường hợp Edit)
+        document.querySelectorAll('.bom-row').forEach((r, i) => {
+            let input = r.querySelector('input[name*=".Length"]');
+            if (input) calcRow(input);
+        });
+    });
+
+    // --- HÀM TÌM KIẾM VẬT TƯ THÔNG MINH ---
+    function filterMaterials(input, index) {
+        document.getElementById(`matId-${index}`).value = "";
+        toggleRowInputs(index, false); // Khóa lại nếu chưa chọn
+
+        let filter = input.value.toLowerCase().trim();
+        let box = document.getElementById(`suggest-${index}`);
+        box.innerHTML = '';
+        if (filter.length < 1) { box.style.display = 'none'; return; }
+
+        let matches = materialsData.filter(m => m.Name.toLowerCase().includes(filter));
+        if (matches.length > 0) {
+            matches.forEach(m => {
+                let div = document.createElement('div');
+                div.className = 'suggestion-item';
+                div.innerHTML = `<strong>${m.Name}</strong> <small class="text-muted">(${m.Unit}) - Giá: ${m.CostPrice.toLocaleString('vi-VN')}đ</small>`;
+                div.onclick = () => selectMaterial(index, m.Id, m.Name, m.Unit);
+                box.appendChild(div);
+            });
+            box.style.display = 'block';
+        } else { box.style.display = 'none'; }
+    }
+
+    function selectMaterial(index, id, name, unit) {
+        document.getElementById(`searchMat-${index}`).value = name;
+        document.getElementById(`searchMat-${index}`).style.border = "1px solid #198754";
+        document.getElementById(`matId-${index}`).value = id;
+        document.getElementById(`lblUnit-${index}`).innerText = unit || "Cái";
+        document.getElementById(`suggest-${index}`).style.display = 'none';
+
+        toggleRowInputs(index, true); // Mở khóa
+        calcRow(document.getElementById(`searchMat-${index}`));
+    }
+
+    function toggleRowInputs(index, isEnabled) {
+        let row = document.getElementById(`matId-${index}`).closest('tr');
+        row.querySelectorAll('input:not([id^="searchMat"])').forEach(inp => {
+            inp.readOnly = !isEnabled;
+            if (isEnabled) inp.classList.remove('input-locked');
+            else { inp.classList.add('input-locked'); inp.value = ''; }
+        });
+    }
+
+    // --- HÀM TÍNH TOÁN REAL-TIME (QUAN TRỌNG) ---
+    function calcRow(el) {
+        let row = el.closest('tr');
+        let idx = row.querySelector('input[name="Items.Index"]').value;
+        let matId = parseInt(document.getElementById(`matId-${idx}`).value);
+
+        let l = parseFloat(row.querySelector('input[name*=".Length"]').value) || 0;
+        let w = parseFloat(row.querySelector('input[name*=".Width"]').value) || 0;
+        let h = parseFloat(row.querySelector('input[name*=".Height"]').value) || 0;
+        let cutQty = parseFloat(row.querySelector('input[name*=".CutQuantity"]').value) || 0;
+        let coef = parseFloat(row.querySelector('input[name*=".Coefficient"]').value) || 1;
+
+        let unit = document.getElementById(`lblUnit-${idx}`).innerText.toLowerCase().trim().replace("³", "3").replace("²", "2");
+        let actualQty = 0;
+        let unitText = unit;
+
+        // Thuật toán tính tiêu hao đồng bộ với Backend
+        if (l > 0 && w > 0 && h > 0 && (unit.includes("m3") || unit.includes("khối"))) {
+            actualQty = (l * w * h / 1000000000.0) * cutQty * coef;
+            unitText = "m³";
+        } else if (l > 0 && w > 0 && (unit.includes("m2") || unit.includes("vuông"))) {
+            actualQty = (l * w / 1000000.0) * cutQty * coef;
+            unitText = "m²";
+        } else if (l > 0 && (unit === "m" || unit.includes("mét"))) {
+            actualQty = (l / 1000.0) * cutQty * coef;
+            unitText = "m";
+        } else {
+            actualQty = cutQty * coef;
+        }
+
+        // Hiển thị tiêu hao
+        document.getElementById(`preview-${idx}`).innerText = actualQty < 1 ? actualQty.toFixed(5) : actualQty.toFixed(2);
+
+        // Tính tiền Real-time
+        let matInfo = materialsData.find(m => m.Id === matId);
+        let price = matInfo ? matInfo.CostPrice : 0;
+        let lineTotal = actualQty * price;
+        document.getElementById(`price-${idx}`).innerText = lineTotal.toLocaleString('vi-VN') + ' ₫';
+        document.getElementById(`price-${idx}`).setAttribute('data-value', lineTotal); // Lưu để sum
+
+        updateTotalSummary();
+    }
+
+    function updateTotalSummary() {
+        let summary = {};
+        let grandTotal = 0;
+
+        document.querySelectorAll('.bom-row').forEach(row => {
+            let idx = row.querySelector('input[name="Items.Index"]').value;
+            let matId = parseInt(document.getElementById(`matId-${idx}`).value);
+            if (!matId) return;
+
+            let matName = document.getElementById(`searchMat-${idx}`).value;
+            let qty = parseFloat(document.getElementById(`preview-${idx}`).innerText) || 0;
+            let unit = document.getElementById(`lblUnit-${idx}`).innerText;
+            let cost = parseFloat(document.getElementById(`price-${idx}`).getAttribute('data-value')) || 0;
+
+            if (summary[matName]) { summary[matName].qty += qty; summary[matName].cost += cost; }
+            else { summary[matName] = { qty: qty, unit: unit, cost: cost }; }
+
+            grandTotal += cost;
+        });
+
+        let html = '';
+        for (let name in summary) {
+            let icon = summary[name].unit.includes("m3") ? 'fa-cube text-primary' : 'fa-screwdriver-wrench text-warning';
+            html += `<tr><td class="ps-3 small fw-bold text-secondary"><i class="fa-solid ${icon} me-1"></i> ${name}</td>
+                         <td class="text-end pe-3 fw-bold">${summary[name].qty < 1 ? summary[name].qty.toFixed(5) : summary[name].qty.toFixed(2)} <small>${summary[name].unit}</small></td></tr>`;
+        }
+
+        document.getElementById('summaryTableBody').innerHTML = html || '<tr><td colspan="2" class="text-center py-4 small fst-italic">Trống</td></tr>';
+        document.getElementById('totalEstimatedCost').innerText = grandTotal.toLocaleString('vi-VN') + ' ₫';
+        document.getElementById('rowCount').innerText = document.querySelectorAll('.bom-row').length;
+    }
+
+    function addRow() {
+        let tbody = document.getElementById('bomBody');
+        let tr = document.createElement('tr');
+        tr.className = 'bom-row';
+        tr.innerHTML = `
+                <td class="p-2 position-relative">
+                    <input type="hidden" name="Items.Index" value="${rowIndex}" />
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="fa-solid fa-search"></i></span>
+                        <input type="text" id="searchMat-${rowIndex}" class="form-control border-start-0 fw-bold border-danger" placeholder="Tìm vật tư..." onkeyup="filterMaterials(this, ${rowIndex})" autocomplete="off">
+                        <span class="input-group-text bg-light text-muted fw-bold" id="lblUnit-${rowIndex}" style="width: 50px; justify-content:center;">ĐVT</span>
+                        <input type="hidden" name="Items[${rowIndex}].MaterialId" id="matId-${rowIndex}">
+                    </div>
+                    <div id="suggest-${rowIndex}" class="suggestion-box"></div>
+                </td>
+                <td class="p-2"><input type="text" name="Items[${rowIndex}].ComponentName" class="form-control form-control-sm fw-bold input-locked" placeholder="..." readonly></td>
+                <td class="p-2"><div class="d-flex align-items-center gap-1">
+                    <input type="number" step="any" name="Items[${rowIndex}].Length" class="form-control form-control-xs input-locked" oninput="calcRow(this)" readonly>
+                    <input type="number" step="any" name="Items[${rowIndex}].Width" class="form-control form-control-xs input-locked" oninput="calcRow(this)" readonly>
+                    <input type="number" step="any" name="Items[${rowIndex}].Height" class="form-control form-control-xs input-locked" oninput="calcRow(this)" readonly>
+                </div></td>
+                <td class="p-2"><div class="d-flex gap-1">
+                    <input type="number" step="any" name="Items[${rowIndex}].CutQuantity" class="form-control form-control-xs fw-bold input-locked" oninput="calcRow(this)" readonly>
+                    <input type="number" step="any" name="Items[${rowIndex}].Coefficient" value="1" class="form-control form-control-xs text-danger fw-bold input-locked" oninput="calcRow(this)" readonly>
+                </div></td>
+                <td class="p-2"><input type="text" name="Items[${rowIndex}].Note" class="form-control form-control-sm text-muted input-locked" readonly></td>
+                <td class="p-2 text-end bg-light bg-opacity-50"><div class="fw-bold text-success" id="preview-${rowIndex}">0</div><span class="price-tag" id="price-${rowIndex}">0 ₫</span></td>
+                <td class="p-2 text-center"><button type="button" class="btn btn-sm btn-link text-danger" onclick="removeRow(this)"><i class="fa-solid fa-trash"></i></button></td>
+            `;
+        tbody.appendChild(tr);
+        rowIndex++;
+        updateTotalSummary();
+    }
+
+    function removeRow(btn) { btn.closest('tr').remove(); updateTotalSummary(); }
+
+    document.addEventListener('click', e => { if (!e.target.closest('.position-relative')) document.querySelectorAll('.suggestion-box').forEach(b => b.style.display = 'none'); });
+</script>

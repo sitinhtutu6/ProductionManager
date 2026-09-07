@@ -1,0 +1,292 @@
+﻿@{
+    ViewData["Title"] = "Import Lịch Sử Giao Dịch Mua/Gia Công";
+}
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+    body {
+        background-color: #f4f6f8;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .erp-card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+
+    .upload-zone {
+        border: 2px dashed #f97316;
+        border-radius: 12px;
+        padding: 40px 20px;
+        text-align: center;
+        background-color: #fff7ed;
+        cursor: pointer;
+        transition: 0.3s;
+    }
+
+        .upload-zone:hover {
+            background-color: #ffedd5;
+            border-color: #ea580c;
+        }
+
+    .preview-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .preview-table th {
+            background: #f97316;
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
+            padding: 12px;
+            border: 1px solid #ea580c;
+            text-transform: uppercase;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .preview-table td {
+            padding: 10px 12px;
+            font-size: 13px;
+            color: #1e293b;
+            border: 1px solid #e2e8f0;
+            vertical-align: middle;
+        }
+
+    .row-valid td {
+        background-color: #f8fafc;
+    }
+
+    .row-invalid td {
+        background-color: #fef2f2;
+    }
+
+    .type-px {
+        color: #0ea5e9;
+        font-weight: 700;
+    }
+
+    .type-pn {
+        color: #10b981;
+        font-weight: 700;
+    }
+
+    .error-list {
+        color: #dc2626;
+        font-size: 12px;
+        font-weight: 600;
+        margin: 0;
+        padding-left: 15px;
+    }
+</style>
+
+<div class="container-fluid py-4 px-2 px-lg-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-800 text-dark mb-0 fs-5"><i class="fa-solid fa-clock-rotate-left text-warning me-2"></i>Nhập Lịch Sử Giao Dịch (PX / PN)</h4>
+            <p class="text-muted small mb-0 mt-1">PX = Xuất đặt hàng | PN = Nhập lấy hàng về. Hệ thống tự tổng hợp thành Đơn và Nhập kho.</p>
+        </div>
+        <button class="btn btn-warning fw-bold text-dark shadow-sm rounded-pill px-4" onclick="downloadTemplate()">
+            <i class="fa-solid fa-download me-1"></i> Tải File Mẫu
+        </button>
+    </div>
+
+    <div class="erp-card" id="uploadCard">
+        <div class="p-4">
+            <div class="upload-zone" onclick="document.getElementById('excelFile').click()">
+                <i class="fa-solid fa-file-excel fa-3x text-warning mb-3"></i>
+                <h5 class="fw-bold text-dark mb-1">Tải lên file Lịch sử Giao dịch</h5>
+                <input type="file" id="excelFile" accept=".xlsx, .xls" style="display: none;" onchange="handleFileUpload(event)" />
+            </div>
+        </div>
+    </div>
+
+    <div class="erp-card d-none" id="previewCard">
+        <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold text-dark mb-0"><i class="fa-solid fa-list-check me-2"></i>Dữ liệu bóc tách</h6>
+            <div>
+                <span class="badge bg-success px-3 py-2 fs-6">Hợp lệ: <span id="validCount">0</span></span>
+                <span class="badge bg-danger px-3 py-2 fs-6">Lỗi: <span id="invalidCount">0</span></span>
+            </div>
+        </div>
+
+        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+            <table class="preview-table" id="previewTable">
+                <thead>
+                    <tr>
+                        <th class="text-center" width="50">K/Tra</th>
+                        <th>Dòng</th>
+                        <th>Mã phiếu xuất/nhập</th>
+                        <th>Ngày xuất/nhập</th>
+                        <th>Mã sản phẩm</th>
+                        <th>Tên sản phẩm</th>
+                        <th>Số đơn hàng</th>
+                        <th>ĐVT</th>
+                        <th class="text-end">Số lượng</th>
+                        <th>Nhà Cung Cấp</th>
+                        <th class="text-end">Đơn Giá</th>
+                        <th>Ghi chú</th>
+                        <th width="250">Lý do lỗi</th>
+                    </tr>
+                </thead>
+                <tbody id="previewBody"></tbody>
+            </table>
+        </div>
+
+        <div class="p-3 bg-white border-top d-flex justify-content-between align-items-center">
+            <button class="btn btn-light border fw-bold px-4" onclick="resetUpload()"> Hủy bỏ</button>
+            <button class="btn btn-primary fw-bold px-5 d-none" id="btnConfirmImport" onclick="confirmImport()">
+                <i class="fa-solid fa-floppy-disk me-1"></i> Xử lý & Đồng bộ Kho
+            </button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        let validatedData = [];
+
+        function downloadTemplate() {
+        var ws = XLSX.utils.aoa_to_sheet([
+        ["Mã phiếu xuất/nhập", "Ngày xuất/nhập", "Mã sản phẩm", "Tên sản phẩm", "Số đơn hàng", "Đơn vị tính", "Số lượng", "Nhà Cung Cấp", "Đơn Giá", "Ghi chú"],
+        ["PX-0001", "25/08/2026", "MD-GHE-CHANGHETRUOCSAERO", "Chân ghế trước SAERO", "CTV-15.26", "Thanh", "800", "Cty A", "50000", ""],
+        ["PX-0002", "25/08/2026", "MD-GHE-CHANGHETRUOCSAERO", "Chân ghế trước SAERO", "CTV-16.26", "Thanh", "1000", "Cty A", "50000", ""],
+        ["PN-0001", "01/09/2026", "MD-GHE-CHANGHETRUOCSAERO", "Chân ghế trước SAERO", "CTV-15.26", "Thanh", "808", "Cty A", "50000", ""],
+        ["PN-0002", "01/09/2026", "MD-GHE-CHANGHETRUOCSAERO", "Chân ghế trước SAERO", "CTV-16.26", "Thanh", "200", "Cty A", "50000", ""]
+        ]);
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "LichSuGiaoDich");
+        XLSX.writeFile(wb, "Template_LichSuGiaoDich.xlsx");
+        }
+
+        function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+
+        let rawRows = [];
+        for (let i = 1; i < jsonData.length; i++) {
+        let r = jsonData[i];
+        if (!r || r.length === 0 || !r[0]) continue;
+        rawRows.push({
+        TransCode: (r[0] || "").toString(), TransDate: (r[1] || "").toString(),
+        ItemCode: (r[2] || "").toString(), ItemName: (r[3] || "").toString(),
+        OrderCode: (r[4] || "").toString(), Unit: (r[5] || "").toString(),
+        Quantity: (r[6] || "0").toString(), SupplierName: (r[7] || "").toString(),
+        UnitPrice: (r[8] || "0").toString(), Note: (r[9] || "").toString()
+        });
+        }
+        validateWithServer(rawRows);
+        };
+        reader.readAsArrayBuffer(file);
+        }
+
+        function validateWithServer(rawRows) {
+        Swal.fire({ title: 'Đang soi lỗi từng dòng...', didOpen: () => Swal.showLoading() });
+
+        fetch('@Url.Action("ValidateImport", "PurchaseOrder")', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rawRows)
+        })
+        .then(async res => { if (!res.ok) throw new Error(await res.text()); return res.json(); })
+        .then(data => {
+        Swal.close(); validatedData = data; renderPreviewTable();
+        })
+        .catch(err => {
+        console.error(err);
+        Swal.fire("Lỗi Máy Chủ", "Nhấn F12 sang tab Console để xem chi tiết.", "error");
+        });
+        }
+
+        function renderPreviewTable() {
+        document.getElementById("uploadCard").classList.add("d-none");
+        document.getElementById("previewCard").classList.remove("d-none");
+        const tbody = document.getElementById("previewBody"); tbody.innerHTML = "";
+        let validCount = 0, invalidCount = 0;
+
+        validatedData.forEach(row => {
+        const isValid = row.IsValid ?? row.isValid;
+        const errors = row.Errors || row.errors || [];
+        if (isValid) validCount++; else invalidCount++;
+
+        const tr = document.createElement("tr");
+        tr.className = isValid ? "row-valid" : "row-invalid";
+
+        const iconHtml = isValid ? `<i class="fa-solid fa-check text-success"></i>` : `<i class="fa-solid fa-xmark text-danger"></i>`;
+        let errHtml = isValid ? "" : `<ul class="error-list">${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
+
+        const tCode = (row.TransCode ?? row.transCode ?? "").toString();
+        const codeClass = tCode.toUpperCase().startsWith("PX") ? "type-px" : "type-pn";
+
+        tr.innerHTML = `
+        <td class="text-center">${iconHtml}</td>
+        <td class="text-muted">${row.RowIndex ?? row.rowIndex}</td>
+        <td class="${codeClass}">${tCode}</td>
+        <td>${row.TransDate ?? row.transDate}</td>
+        <td class="fw-bold">${row.ItemCode ?? row.itemCode}</td>
+        <td>${row.ItemName ?? row.itemName}</td>
+        <td class="fw-bold text-primary">${row.OrderCode ?? row.orderCode}</td>
+        <td>${row.Unit ?? row.unit}</td>
+        <td class="text-end fw-bold">${row.Quantity ?? row.quantity}</td>
+        <td>${row.SupplierName ?? row.supplierName}</td>
+        <td class="text-end">${row.UnitPrice ?? row.unitPrice}</td>
+        <td>${row.Note ?? row.note}</td>
+        <td>${errHtml}</td>
+        `;
+        tbody.appendChild(tr);
+        });
+
+        document.getElementById("validCount").innerText = validCount;
+        document.getElementById("invalidCount").innerText = invalidCount;
+        const btn = document.getElementById("btnConfirmImport");
+        validCount > 0 ? btn.classList.remove("d-none") : btn.classList.add("d-none");
+        }
+
+        function confirmImport() {
+        const validRows = validatedData.filter(r => (r.IsValid ?? r.isValid));
+        Swal.fire({
+        title: 'Xác nhận Đồng bộ?',
+        text: `Hệ thống sẽ tổng hợp ${validRows.length} giao dịch thành các Đơn Hàng Mua, đồng thời sinh Phiếu Nhập Kho cho các dòng 'PN'.`,
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#0ea5e9', confirmButtonText: 'Đồng ý'
+        }).then((result) => {
+        if (result.isConfirmed) {
+        Swal.fire({ title: 'Đang ghi sổ kho...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        fetch('@Url.Action("ExecuteImport", "PurchaseOrder")', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(validRows)
+        })
+        .then(async res => { if (!res.ok) throw new Error(await res.text()); return res.json(); })
+        .then(res => {
+        if (res.success) Swal.fire("Thành công!", res.message, "success").then(() => window.location.href = "/PurchaseOrder/Index");
+        else Swal.fire("Lỗi hệ thống", res.message, "error");
+        })
+        .catch(err => { console.error(err); Swal.fire("Lỗi Lưu DB", "Nhấn F12 xem chi tiết.", "error"); });
+        }
+        });
+        }
+
+        function resetUpload() {
+        document.getElementById("excelFile").value = "";
+        document.getElementById("uploadCard").classList.remove("d-none");
+        document.getElementById("previewCard").classList.add("d-none");
+        validatedData = [];
+        }
+    </script>
+}

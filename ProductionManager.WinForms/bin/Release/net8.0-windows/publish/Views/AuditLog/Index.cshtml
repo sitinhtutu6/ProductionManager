@@ -1,0 +1,161 @@
+﻿@model IEnumerable<ProductionManager.Data.AuditLog>
+@{
+    ViewData["Title"] = "Nhật ký hệ thống (Audit Log)";
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+    .page-bg { background: #f8f9fa; min-height: 100vh; padding-bottom: 3rem; }
+    .glass-panel { background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-radius: 12px; }
+    .table-custom thead th { background-color: #f1f5f9; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 0.8rem; border-bottom: 2px solid #e2e8f0; }
+    
+    /* Code block format */
+    pre { background-color: #1e293b; color: #a5b4fc; padding: 10px; border-radius: 8px; font-size: 0.85rem; max-height: 300px; overflow-y: auto; margin: 0; }
+    .json-key { color: #93c5fd; }
+    .json-value { color: #86efac; }
+    .json-string { color: #fca5a5; }
+</style>
+
+<div class="page-bg">
+    <div class="container-fluid pt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h3 class="fw-bold text-dark mb-1"><i class="fa-solid fa-user-secret text-secondary me-2"></i>NHẬT KÝ HỆ THỐNG</h3>
+                <span class="text-muted small">Theo dõi mọi vết tích thêm, sửa, xóa dữ liệu của người dùng</span>
+            </div>
+        </div>
+
+        <div class="glass-panel p-3 mb-4 border-top border-4 border-secondary">
+            <form method="get" asp-action="Index" class="row g-2 align-items-end">
+                <div class="col-md-2">
+                    <label class="small fw-bold text-muted mb-1">Từ ngày</label>
+                    <input type="text" name="fromDate" class="form-control datepicker bg-white" placeholder="dd/mm/yyyy" value="@(ViewBag.FromDate?.ToString("yyyy-MM-dd"))" />
+                </div>
+                <div class="col-md-2">
+                    <label class="small fw-bold text-muted mb-1">Đến ngày</label>
+                    <input type="text" name="toDate" class="form-control datepicker bg-white" placeholder="dd/mm/yyyy" value="@(ViewBag.ToDate?.ToString("yyyy-MM-dd"))" />
+                </div>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted mb-1">Tài khoản User</label>
+                    <input type="text" name="userName" class="form-control" placeholder="Tên user..." value="@ViewBag.UserName" />
+                </div>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted mb-1">Bảng dữ liệu (Table)</label>
+                    <input type="text" name="tableName" class="form-control" placeholder="VD: Shipments, Orders..." value="@ViewBag.TableName" />
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-dark w-100 fw-bold"><i class="fa-solid fa-filter me-1"></i> Lọc Log</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="glass-panel overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-custom table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4" width="150">Thời gian</th>
+                            <th>Tài khoản</th>
+                            <th>Hành động</th>
+                            <th>Bảng / Record ID</th>
+                            <th class="text-end pe-4">Chi tiết</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr><td colspan=\"5\" class="text-center py-5 text-muted fst-italic">Không tìm thấy nhật ký thao tác nào.</td></tr>
+                        }
+                        @foreach (var item in Model)
+                        {
+                            // Đổi màu badge theo hành động
+                            string badgeClass = item.Action == "Added" ? "bg-success" : 
+                                                (item.Action == "Modified" ? "bg-warning text-dark" : "bg-danger");
+                            
+                            string actionText = item.Action == "Added" ? "Thêm mới" : 
+                                                (item.Action == "Modified" ? "Cập nhật" : "Xóa");
+
+                            <tr style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#log_@item.Id">
+                                <td class="ps-4">
+                                    <div class="fw-bold text-dark">@item.Timestamp.ToString("dd/MM/yyyy")</div>
+                                    <small class="text-muted">@item.Timestamp.ToString("HH:mm:ss")</small>
+                                </td>
+                                <td>
+                                    <span class="fw-bold text-primary"><i class="fa-solid fa-user-circle me-1"></i>@item.UserName</span>
+                                </td>
+                                <td>
+                                    <span class="badge @badgeClass shadow-sm px-3 py-2">@actionText</span>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">@item.TableName</div>
+                                    <span class="small text-muted border px-1 rounded bg-light">ID: @item.RecordId</span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button">
+                                        Xem <i class="fa-solid fa-chevron-down ms-1"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            
+                            <tr class="collapse bg-light" id="log_@item.Id">
+                                <td colspan="5" class="p-0 border-0">
+                                    <div class="p-3 m-2 rounded shadow-sm bg-white border">
+                                        <div class="row g-3">
+                                            @if (!string.IsNullOrEmpty(item.OldValues))
+                                            {
+                                                <div class="col-md-6">
+                                                    <span class="badge bg-danger mb-2 d-inline-block">Dữ liệu CŨ (Trước khi sửa/xóa)</span>
+                                                    <pre><code class="json-content">@item.OldValues</code></pre>
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrEmpty(item.NewValues))
+                                            {
+                                                <div class="col-md-6">
+                                                    <span class="badge bg-success mb-2 d-inline-block">Dữ liệu MỚI (Vừa thêm/sửa)</span>
+                                                    <pre><code class="json-content">@item.NewValues</code></pre>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Khởi tạo lịch
+        flatpickr(".datepicker", {
+            altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", allowInput: true, locale: "vn"
+        });
+
+        // Hàm làm đẹp JSON (Pretty Print)
+        document.querySelectorAll('.json-content').forEach(function(el) {
+            try {
+                let obj = JSON.parse(el.innerText);
+                let pretty = JSON.stringify(obj, null, 4);
+                
+                // Tô màu syntax đơn giản
+                pretty = pretty.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                    let cls = 'json-value';
+                    if (/^"/.test(match)) {
+                        if (/:$/.test(match)) { cls = 'json-key'; } 
+                        else { cls = 'json-string'; }
+                    }
+                    return '<span class="' + cls + '">' + match + '</span>';
+                });
+                
+                el.innerHTML = pretty;
+            } catch (e) {
+                // Nếu lỗi parse, giữ nguyên text
+            }
+        });
+    });
+</script>

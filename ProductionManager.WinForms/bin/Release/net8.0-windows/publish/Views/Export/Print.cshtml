@@ -1,0 +1,147 @@
+﻿@model ProductionManager.Data.ExportShipment
+@{
+    Layout = null; 
+}
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>In Hồ Sơ: @Model.ShipmentCode</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" />
+    <style>
+        body { background: #525659; font-family: 'Times New Roman', serif; }
+        .page {
+            background: white; width: 210mm; min-height: 297mm; display: block; margin: 20px auto;
+            padding: 20mm; box-shadow: 0 0 10px rgba(0,0,0,0.3); position: relative;
+        }
+        .header-title { text-transform: uppercase; font-weight: bold; font-size: 24px; text-align: center; margin-bottom: 5px; }
+        .section-header { 
+            background: #eee; padding: 5px 10px; font-weight: bold; border-left: 5px solid #000; 
+            margin: 20px 0 10px 0; text-transform: uppercase; font-size: 14px;
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #333; padding: 8px; font-size: 14px; }
+        th { background-color: #f9f9f9; text-align: center; font-weight: bold; }
+        
+        /* Cấu hình khi in ra giấy */
+        @@media print {
+            body { background: white; margin: 0; }
+            .page { margin: 0; box-shadow: none; width: 100%; border: none; padding: 0; }
+            .no-print { display: none !important; }
+            @@page { margin: 20mm; size: A4; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="text-center py-3 no-print fixed-top bg-dark">
+        <button onclick="window.print()" class="btn btn-primary fw-bold">🖨️ IN NGAY</button>
+        <button onclick="window.close()" class="btn btn-secondary ms-2">Đóng</button>
+    </div>
+    <div style="height: 60px;" class="no-print"></div>
+
+    <div class="page">
+        <div class="d-flex justify-content-between border-bottom pb-3 mb-4">
+            <div>
+                <h5 class="fw-bold text-uppercase">Công Ty TNHH Sản Xuất ABC</h5>
+                <div class="small">📍 Địa chỉ: KCN VSIP, Bình Dương</div>
+                <div class="small">📞 Hotline: 0909 123 456</div>
+            </div>
+            <div class="text-end">
+                <div class="border border-dark p-2 fw-bold d-inline-block">@Model.ShipmentCode</div>
+                <div class="small mt-1 fst-italic">Ngày in: @DateTime.Now.ToString("dd/MM/yyyy HH:mm")</div>
+            </div>
+        </div>
+
+        <div class="header-title">PHIẾU THEO DÕI XUẤT KHẨU</div>
+        <div class="text-center fst-italic mb-4">(Export Shipment Profile)</div>
+
+        <div class="section-header">I. THÔNG TIN CHUNG</div>
+        <div class="row">
+            <div class="col-6 mb-2"><strong>Khách hàng:</strong> @Model.Customer?.CompanyName</div>
+            <div class="col-6 mb-2"><strong>Ngày tạo:</strong> @Model.CreatedDate.ToString("dd/MM/yyyy")</div>
+            <div class="col-6 mb-2"><strong>Trạng thái:</strong> @(Model.ProgressPercent == 100 ? "Hoàn tất" : $"Đang xử lý ({Model.ProgressPercent}%)")</div>
+            <div class="col-6 mb-2"><strong>Người phụ trách:</strong> Admin</div>
+        </div>
+
+        <div class="section-header">II. THÔNG TIN VẬN CHUYỂN</div>
+        <table class="table table-bordered border-dark">
+            <tr>
+                <th width="20%">Số Booking</th>
+                <td width="30%" class="fw-bold">@(Model.BookingNumber ?? "---")</td>
+                <th width="20%">Tên Tàu</th>
+                <td width="30%">@(Model.VesselName ?? "---")</td>
+            </tr>
+            <tr>
+                <th>Container</th>
+                <td>@(Model.ContainerNumber ?? "---")</td>
+                <th>Số Seal</th>
+                <td>@(Model.SealNumber ?? "---")</td>
+            </tr>
+            <tr>
+                <th>Ngày đi (ETD)</th>
+                <td>@(Model.ETD?.ToString("dd/MM/yyyy") ?? "---")</td>
+                <th>Ngày đến (ETA)</th>
+                <td>@(Model.ETA?.ToString("dd/MM/yyyy") ?? "---")</td>
+            </tr>
+        </table>
+
+        <div class="section-header">III. CHI TIẾT ĐƠN HÀNG</div>
+        <table class="table table-bordered border-dark">
+            <thead>
+                <tr>
+                    <th style="width: 50px;">STT</th>
+                    <th>Mã Đơn Hàng</th>
+                    <th>Giá Trị</th>
+                    <th>Ghi Chú</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{ int stt = 1; decimal totalVal = 0; }
+                @foreach (var item in Model.ShipmentOrders)
+                {
+                    totalVal += item.Order.TotalAmount;
+                    <tr>
+                        <td class="text-center">@(stt++)</td>
+                        <td class="fw-bold">@item.Order.OrderCode</td>
+                        <td class="text-end">@item.Order.TotalAmount.ToString("N0") đ</td>
+                        <td></td>
+                    </tr>
+                }
+                @if (!Model.ShipmentOrders.Any())
+                {
+                    <tr><td colspan="4" class="text-center fst-italic py-3">Không có đơn hàng nào trong lô này.</td></tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr class="bg-light">
+                    <td colspan="2" class="text-end fw-bold">TỔNG CỘNG:</td>
+                    <td class="text-end fw-bold">@totalVal.ToString("N0") đ</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <div class="row mt-5 pt-4 text-center">
+            <div class="col-4">
+                <strong>Người lập phiếu</strong><br>
+                <small class="fst-italic">(Ký & ghi rõ họ tên)</small>
+            </div>
+            <div class="col-4">
+                <strong>Bộ phận Logistics</strong><br>
+                <small class="fst-italic">(Ký & ghi rõ họ tên)</small>
+            </div>
+            <div class="col-4">
+                <strong>Giám đốc duyệt</strong><br>
+                <small class="fst-italic">(Ký & đóng dấu)</small>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tự động bật cửa sổ in khi trang load xong
+        window.onload = function() { window.print(); }
+    </script>
+</body>
+</html>

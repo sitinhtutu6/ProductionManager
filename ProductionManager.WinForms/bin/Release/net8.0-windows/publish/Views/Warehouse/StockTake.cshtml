@@ -1,0 +1,140 @@
+﻿@model ProductionApp.Web.Models.StockTakeViewModel
+@{
+    ViewData["Title"] = "Kiểm kê kho định kỳ";
+     ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Kho Vật Tư", Url.Action("Index", "Warehouse")), 
+        ("Kiểm kê ", "") 
+    };
+    var dateVal = Model.Date.ToString("yyyy-MM-dd"); // Format chuẩn cho input
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<style>
+    .category-header { background-color: #f1f5f9; font-weight: bold; color: #475569; }
+</style>
+
+<div class="container-fluid mt-4">
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold"><i class="fa-solid fa-clipboard-check me-2"></i> KIỂM KÊ KHO ĐỊNH KỲ</h5>
+            <a href="/Warehouse" class="btn btn-sm btn-light fw-bold text-primary">Quay lại</a>
+        </div>
+        <div class="card-body bg-light">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="fw-bold small text-muted">Ngày kiểm kê</label>
+                    <input type="text" id="checkDate" class="form-control datepicker fw-bold" value="@dateVal" />
+                </div>
+                <div class="col-md-8">
+                    <label class="fw-bold small text-muted">Ghi chú / Đợt kiểm kê</label>
+                    <input type="text" id="checkNote" class="form-control" placeholder="Ví dụ: Kiểm kê cuối tháng 12..." />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover mb-0 align-middle">
+                    <thead class="table-dark text-center">
+                        <tr>
+                            <th>Mã VT</th>
+                            <th>Tên Vật tư</th>
+                            <th style="width: 150px;">Tồn Hệ thống</th>
+                            <th style="width: 150px;" class="bg-warning text-dark">Thực tế</th>
+                            <th style="width: 150px;">Chênh lệch</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockTableBody">
+                        @{ var groupedItems = Model.Items.GroupBy(x => x.Category ?? "Chưa phân loại"); }
+                        @foreach (var group in groupedItems)
+                        {
+                            <tr class="category-header">
+                                <td colspan="5" class="ps-3"><i class="fa-solid fa-folder-open me-2"></i> @group.Key</td>
+                            </tr>
+                            @foreach (var item in group)
+                            {
+                                <tr data-id="@item.WarehouseItemId">
+                                    <td class="fw-bold ps-4">@item.ItemCode</td>
+                                    <td>@item.ItemName</td>
+                                    <td class="text-center bg-light">
+                                        <span class="system-stock fw-bold">@item.SystemStock</span>
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.01" class="form-control text-center fw-bold text-primary real-stock"
+                                               value="@item.RealStock" oninput="calculateDiff(this)" />
+                                    </td>
+                                    <td class="text-center fw-bold diff-val text-muted">0</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer bg-white py-3 text-end">
+            <button onclick="submitStockTake()" class="btn btn-primary btn-lg fw-bold px-5 shadow">
+                <i class="fa-solid fa-save me-2"></i> XÁC NHẬN CÂN BẰNG KHO
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        flatpickr(".datepicker", {
+            dateFormat: "Y-m-d", // Gửi đi yyyy-mm-dd
+            altInput: true,
+            altFormat: "d/m/Y",  // Hiển thị dd/mm/yyyy
+            locale: "vn",
+            allowInput: true
+        });
+        // Tính toán chênh lệch ban đầu
+        document.querySelectorAll('.real-stock').forEach(input => calculateDiff(input));
+    });
+
+    function calculateDiff(input) {
+        let row = input.closest('tr');
+        let system = parseFloat(row.querySelector('.system-stock').innerText) || 0;
+        let real = parseFloat(input.value || 0);
+        let diff = real - system;
+        let diffCell = row.querySelector('.diff-val');
+        diffCell.innerText = diff > 0 ? "+" + diff : diff;
+        diffCell.className = "text-center fw-bold diff-val " + (diff > 0 ? "text-success" : (diff < 0 ? "text-danger" : "text-muted"));
+    }
+
+    function submitStockTake() {
+        let items = [];
+        document.querySelectorAll('#stockTableBody tr[data-id]').forEach(row => {
+            items.push({
+                WarehouseItemId: parseInt(row.getAttribute('data-id')),
+                SystemStock: parseFloat(row.querySelector('.system-stock').innerText),
+                RealStock: parseFloat(row.querySelector('.real-stock').value || 0)
+            });
+        });
+
+        let payload = {
+            Date: document.getElementById('checkDate').value, // Lấy giá trị Y-m-d từ input gốc của Flatpickr
+            Note: document.getElementById('checkNote').value,
+            Items: items
+        };
+
+        Swal.fire({ title: 'Đang xử lý...', didOpen: () => Swal.showLoading() });
+        fetch('/Warehouse/SaveBulkStockTake', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) Swal.fire("Thành công", res.message, "success").then(() => location.href = "/Warehouse");
+            else Swal.fire("Lỗi", res.message, "error");
+        });
+    }
+</script>

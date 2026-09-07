@@ -1,0 +1,99 @@
+﻿@using ProductionApp.Web.Models.ViewModels
+@using ProductionManager.Data
+@using ProductionApp.Web.Constants
+@model ImportViewModel
+
+@{
+    ViewData["Title"] = "Import Dữ Liệu Sổ Quỹ";
+}
+
+<div class="container py-4" style="max-width: 800px;">
+    <div class="card shadow border-0">
+        <div class="card-header bg-white py-3">
+            <h5 class="fw-bold text-primary mb-0"><i class="fa-solid fa-file-import me-2"></i>NHẬP DỮ LIỆU TỪ EXCEL</h5>
+        </div>
+        <div class="card-body p-4">
+
+            <div class="alert alert-warning border-warning shadow-sm mb-4">
+                <h6 class="fw-bold text-dark mb-1"><i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>Cập nhật Biểu mẫu Excel mới!</h6>
+                <p class="mb-0 small text-dark">Hệ thống vừa được nâng cấp tính năng <strong>Phân bổ chi phí nhiều tháng (P&L)</strong>. Cột <strong>"Số tháng PB"</strong> đã được thêm vào file mẫu. Vui lòng tải lại File mẫu mới nhất trước khi Import để tránh lỗi sai lệch cột!</p>
+            </div>
+
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger shadow-sm">
+                    <ul class="mb-0 ps-3">
+                        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                        {
+                            <li>@error.ErrorMessage</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <form asp-action="Import" enctype="multipart/form-data" method="post" id="importForm">
+                @Html.AntiForgeryToken()
+
+                <div class="mb-4">
+                    <label class="fw-bold mb-2">Bạn muốn nhập dữ liệu vào sổ nào?</label>
+                    <div class="d-flex gap-3">
+                        <label class="btn btn-outline-success flex-fill fw-bold py-3 @(Model.TargetMethod == PaymentMethod.Cash ? "active" : "")">
+                            <input type="radio" name="TargetMethod" value="@PaymentMethod.Cash" class="btn-check" onchange="updateTemplateLink(this)" @(Model.TargetMethod == PaymentMethod.Cash ? "checked" : "")>
+                            <i class="fa-solid fa-money-bill-wave me-2"></i> Sổ Tiền Mặt
+                        </label>
+                        <label class="btn btn-outline-primary flex-fill fw-bold py-3 @(Model.TargetMethod == PaymentMethod.Transfer ? "active" : "")">
+                            <input type="radio" name="TargetMethod" value="@PaymentMethod.Transfer" class="btn-check" onchange="updateTemplateLink(this)" @(Model.TargetMethod == PaymentMethod.Transfer ? "checked" : "")>
+                            <i class="fa-solid fa-building-columns me-2"></i> Sổ Ngân Hàng
+                        </label>
+                    </div>
+                    <small class="text-muted fst-italic mt-2 d-block">* Hệ thống sẽ tự động gán toàn bộ dữ liệu trong file vào loại sổ bạn chọn.</small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="fw-bold mb-2">Chế độ nhập liệu:</label>
+                    <select asp-for="Mode" class="form-select bg-light fw-bold">
+                        <option value="@ImportMode.Append">➕ Nối tiếp (Giữ dữ liệu cũ, thêm mới vào sau)</option>
+
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <option value="@ImportMode.Overwrite">⚠️ Ghi đè (Tự động Backup & Xóa sạch dữ liệu CỦA SỔ ĐANG CHỌN)</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Mode" class="text-danger"></span>
+                </div>
+
+                <div class="mb-4">
+                    <label class="fw-bold mb-2">Chọn file Excel (*.xlsx):</label>
+                    <input asp-for="File" type="file" class="form-control border-primary" accept=".xlsx" required />
+                </div>
+
+                <hr />
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="@Url.Action("DownloadTemplate", new { method = Model.TargetMethod })" id="btnTemplate" class="text-decoration-none fw-bold text-success">
+                        <i class="fa-solid fa-download me-1"></i> Tải file mẫu <span id="lblTemplateType">Tiền mặt</span>
+                    </a>
+
+                    <div>
+                        <a asp-action="Index" class="btn btn-light fw-bold me-2 border">Quay lại</a>
+                        <button type="submit" class="btn btn-primary fw-bold px-4 shadow-sm">
+                            <i class="fa-solid fa-upload me-2"></i> TIẾN HÀNH IMPORT
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function updateTemplateLink(radio) {
+        const method = radio.value;
+        const isCash = method === '@PaymentMethod.Cash';
+        document.getElementById('lblTemplateType').innerText = isCash ? "Tiền mặt" : "Ngân hàng";
+        const baseUrl = '@Url.Action("DownloadTemplate")';
+        document.getElementById('btnTemplate').href = `${baseUrl}?method=${method}`;
+        document.querySelectorAll('.btn-outline-success, .btn-outline-primary').forEach(el => el.classList.remove('active'));
+        radio.closest('label').classList.add('active');
+    }
+</script>

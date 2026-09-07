@@ -1,0 +1,569 @@
+﻿@model IEnumerable<ProductionManager.Data.PurchaseOrder>
+@using ProductionManager.Data
+@{
+    ViewData["Title"] = "Quản lý Đơn Đặt Hàng";
+}
+
+<meta name="turbo-visit-control" content="reload">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn3.devexpress.com/jslib/23.1.6/css/dx.light.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+    body {
+        background-color: #f4f6f8;
+        font-family: 'Inter', sans-serif;
+        overflow: hidden;
+    }
+
+    .misa-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 90px);
+        margin-bottom: 0;
+    }
+
+    .misa-toolbar {
+        background: #fff;
+        padding: 16px 24px;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 16px 16px 0 0;
+        flex-wrap: wrap;
+        gap: 12px;
+        flex-shrink: 0;
+        z-index: 10;
+    }
+
+        .misa-toolbar h5 {
+            font-size: 18px;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+    .btn-misa-primary {
+        background-color: #0ea5e9;
+        color: #fff;
+        border: none;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 8px 18px;
+        border-radius: 8px;
+        transition: 0.2s;
+        box-shadow: 0 2px 4px rgba(14, 165, 233, 0.2);
+    }
+
+        .btn-misa-primary:hover {
+            background-color: #0284c7;
+            color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(14, 165, 233, 0.3);
+        }
+
+    .btn-misa-outline {
+        background-color: #fff;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 8px 18px;
+        border-radius: 8px;
+        transition: 0.2s;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+        .btn-misa-outline:hover {
+            background-color: #f8fafc;
+            color: #0f172a;
+            border-color: #94a3b8;
+        }
+
+    .view-switch {
+        background: #f1f5f9;
+        padding: 4px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+    }
+
+        .view-switch .btn {
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 16px;
+            border-radius: 8px;
+            border: none;
+            color: #64748b;
+            transition: 0.2s;
+        }
+
+            .view-switch .btn:hover {
+                color: #0f172a;
+            }
+
+        .view-switch .btn-check:checked + .btn {
+            background-color: #fff;
+            color: #0ea5e9;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            border: 1px solid #e2e8f0;
+        }
+
+    /* ==================================================
+           TÙY CHỈNH LƯỚI DATAGRID
+           ================================================== */
+    .dx-datagrid {
+        font-family: 'Inter', sans-serif !important;
+        color: #1e293b;
+        border-radius: 0 0 16px 16px;
+        border: none !important;
+    }
+
+    .dx-datagrid-headers {
+        background-color: #e0f2fe !important;
+        border-bottom: 2px solid #7dd3fc !important;
+    }
+
+        .dx-datagrid-headers .dx-datagrid-text-content {
+            color: #0369a1 !important;
+            font-size: 12.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+    .dx-datagrid-content .dx-datagrid-table .dx-row > td {
+        padding: 14px 16px !important;
+        font-size: 13.5px;
+        vertical-align: middle;
+        border-bottom: 1px solid #e2e8f0;
+        border-right: none !important;
+        border-left: none !important;
+        transition: background-color 0.15s ease;
+    }
+
+    .dx-datagrid-rowsview .dx-row.dx-row-alt > td {
+        background-color: #fafbfd !important;
+    }
+
+    .dx-datagrid-rowsview .dx-row.dx-data-row:hover > td {
+        background-color: #f0f9ff !important;
+        cursor: pointer;
+    }
+
+        .dx-datagrid-rowsview .dx-row.dx-data-row:hover > td:first-child {
+            box-shadow: inset 4px 0 0 0 #0ea5e9;
+        }
+
+    .dx-datagrid-group-panel {
+        background-color: #fff;
+        padding: 16px 24px !important;
+        font-weight: 600;
+        font-size: 13px;
+        color: #64748b;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .dx-group-row {
+        background-color: #f8fafc !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .dx-datagrid-search-panel {
+        border-radius: 8px;
+        border-color: #cbd5e1;
+    }
+
+        .dx-datagrid-search-panel.dx-state-focused {
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 2px rgba(14,165,233,0.1);
+        }
+
+    #gridContainer {
+        flex-grow: 1;
+        width: 100%;
+        min-height: 0;
+    }
+</style>
+
+@{
+    // 1. DỮ LIỆU DẠNG TỔNG HỢP (MASTER) - BỔ SUNG LinkedOrderCode
+    var orderData = Model.Select(item => new
+    {
+        Id = item.Id,
+        POCode = item.POCode ?? "",
+        InvoiceNumber = item.InvoiceNumber ?? "",
+        IsDebtFinalized = item.IsDebtFinalized,
+        OrderDate = item.OrderDate.ToString("yyyy-MM-dd"),
+        SupplierName = (item.Type == ProductionManager.Data.POType.Outsourcing ? "[Gia công] " : "") + (item.SupplierName ?? ""),
+        FinalTotal = item.FinalTotal,
+        DepositAmount = item.DepositAmount,
+        RemainingAmount = item.RemainingAmount,
+
+        PaymentStatusStr = item.PaymentStatusPO == PaymentStatusPO.Paid ? "Trả đủ" : (item.PaymentStatusPO == PaymentStatusPO.Deposited ? "Đã cọc" : "Chưa trả"),
+        StatusStr = item.Status == POStatus.Completed ? "Xong" : (item.Status == POStatus.Cancelled ? "Đã hủy" : (item.Status == POStatus.Partial ? "Đang giao" : "Chờ giao")),
+
+        CanEdit = (!item.IsDebtFinalized && item.Status != ProductionManager.Data.POStatus.Completed && item.Status != ProductionManager.Data.POStatus.Cancelled),
+        ProductListStr = item.Details != null ? string.Join(", ", item.Details.Select(d => d.WarehouseItem?.Name)) : "",
+
+        Details = item.Details?.Select(d => new
+        {
+            Name = d.WarehouseItem?.Name ?? "N/A",
+            Unit = d.WarehouseItem?.Unit ?? "-",
+            LinkedOrderCode = d.LinkedOrderCode ?? "", // 🔥 Bổ sung mã đơn hàng SX
+            Ordered = d.QuantityOrdered,
+            Received = d.QuantityReceived,
+            Bad = d.QuantityBad,
+            Remain = d.QuantityOrdered - d.QuantityReceived - d.QuantityBad
+        })
+    }).ToList();
+
+    // 2. DỮ LIỆU DẠNG CHI TIẾT (FLAT DETAILS) - BỔ SUNG LinkedOrderCode
+    var flatDetailsData = Model.Where(m => m.Details != null).SelectMany(item => item.Details.Select(d => new
+    {
+        Id = d.Id,
+        POId = item.Id,
+        POCode = item.POCode ?? "",
+        OrderDate = item.OrderDate.ToString("yyyy-MM-dd"),
+        SupplierName = item.SupplierName ?? "",
+        ProductName = d.WarehouseItem?.Name ?? "N/A",
+        LinkedOrderCode = d.LinkedOrderCode ?? "", // 🔥 Bổ sung mã đơn hàng SX
+        Unit = d.WarehouseItem?.Unit ?? "-",
+        Ordered = d.QuantityOrdered,
+        UnitPrice = d.UnitPrice,
+        LineTotal = (decimal)d.QuantityOrdered * d.UnitPrice,
+        Received = d.QuantityReceived,
+        Remain = d.QuantityOrdered - d.QuantityReceived - d.QuantityBad,
+        StatusStr = item.Status == POStatus.Completed ? "Xong" : (item.Status == POStatus.Cancelled ? "Đã hủy" : (item.Status == POStatus.Partial ? "Đang giao" : "Chờ giao"))
+    })).ToList();
+
+    var jsonOptions = new System.Text.Json.JsonSerializerOptions
+    {
+        PropertyNamingPolicy = null,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+    var masterJsonString = System.Text.Json.JsonSerializer.Serialize(orderData, jsonOptions);
+    var detailJsonString = System.Text.Json.JsonSerializer.Serialize(flatDetailsData, jsonOptions);
+}
+
+<div class="container-fluid py-3 px-2 px-lg-4">
+    <div class="misa-card">
+        <div class="misa-toolbar">
+            <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-list-check text-primary fa-lg"></i>
+                    <h5>Đơn Mua Hàng</h5>
+                </div>
+
+                <div class="btn-group view-switch shadow-sm" role="group">
+                    <input type="radio" class="btn-check" name="viewMode" id="viewMaster" value="master" checked onchange="switchViewMode()">
+                    <label class="btn" for="viewMaster"><i class="fa-solid fa-layer-group me-1"></i> Tổng Hợp</label>
+
+                    <input type="radio" class="btn-check" name="viewMode" id="viewDetail" value="detail" onchange="switchViewMode()">
+                    <label class="btn" for="viewDetail"><i class="fa-solid fa-table-list me-1"></i> Chi Tiết</label>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <a asp-action="Import" class="btn-misa-outline" data-turbo="false">
+                    <i class="fa-solid fa-file-import me-1 text-success"></i> Import Excel
+                </a>
+                <a asp-action="CostOverview" class="btn-misa-outline" data-turbo="false">
+                    <i class="fa-solid fa-chart-pie me-1 text-info"></i> Phân tích Chi phí
+                </a>
+                <a asp-action="DebtFinalization" class="btn-misa-outline" data-turbo="false">
+                    <i class="fa-solid fa-file-invoice-dollar me-1 text-warning"></i> Chốt Công Nợ
+                </a>
+                <a asp-action="Create" class="btn-misa-primary" data-turbo="false">
+                    <i class="fa-solid fa-plus me-1"></i> Lập đơn mới
+                </a>
+            </div>
+        </div>
+
+        <div id="gridContainer">
+            <div class="text-center py-5 text-muted" id="loadingIndicator">
+                <i class="fa-solid fa-circle-notch fa-spin fa-2x mb-2 text-primary"></i>
+                <p class="small fw-500">Đang tải dữ liệu...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script id="po-master-json" type="application/json">
+        @Html.Raw(masterJsonString)
+    </script>
+    <script id="po-detail-json" type="application/json">
+        @Html.Raw(detailJsonString)
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/7.10.1/polyfill.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn3.devexpress.com/jslib/23.1.6/js/dx.all.js"></script>
+
+    <script>
+        const rawMasterData = JSON.parse(document.getElementById("po-master-json").textContent);
+        const rawDetailData = JSON.parse(document.getElementById("po-detail-json").textContent);
+
+        function initDataGrid() {
+        if (typeof DevExpress === 'undefined') {
+        setTimeout(initDataGrid, 100); return;
+        }
+        document.getElementById("loadingIndicator").style.display = "none";
+        switchViewMode();
+        }
+
+        function switchViewMode() {
+        let mode = document.querySelector('input[name="viewMode"]:checked').value;
+        let container = document.getElementById("gridContainer");
+
+        if (DevExpress.ui.dxDataGrid.getInstance(container)) {
+        DevExpress.ui.dxDataGrid.getInstance(container).dispose();
+        }
+        container.innerHTML = "";
+
+        if (mode === 'master') {
+        renderMasterGrid(container);
+        } else {
+        renderDetailGrid(container);
+        }
+        }
+
+        const commonExportConfig = {
+        enabled: true, formats: ['xlsx', 'pdf'], allowExportSelectedData: false
+        };
+        const commonOnExporting = function (e) {
+        if (e.format === 'xlsx') {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('DanhSach');
+        e.cancel = DevExpress.excelExporter.exportDataGrid({
+        component: e.component, worksheet: worksheet, autoFilterEnabled: true
+        }).then(() => workbook.xlsx.writeBuffer())
+        .then(buffer => saveAs(new Blob([buffer], { type: 'application/octet-stream' }), 'BaoCao_DonHang.xlsx'));
+        } else if (e.format === 'pdf') {
+        const doc = new jspdf.jsPDF('landscape');
+        e.cancel = DevExpress.pdfExporter.exportDataGrid({ jsPDFDocument: doc, component: e.component })
+        .then(() => doc.save('BaoCao_DonHang.pdf'));
+        }
+        };
+
+        function renderMasterGrid(container) {
+        new DevExpress.ui.dxDataGrid(container, {
+        dataSource: rawMasterData,
+        keyExpr: "Id",
+        showBorders: false,
+        rowAlternationEnabled: true,
+        hoverStateEnabled: true,
+        allowColumnResizing: true, allowColumnReordering: true, columnAutoWidth: true,
+        groupPanel: { visible: true, emptyPanelText: "Kéo tiêu đề cột vào đây để gom nhóm" },
+        filterRow: { visible: true }, headerFilter: { visible: true },
+        searchPanel: { visible: true, width: 280, placeholder: "Tìm kiếm từ khóa..." },
+        paging: { pageSize: 50 }, pager: { showPageSizeSelector: true, allowedPageSizes: [20, 50, 100], showInfo: true, showNavigationButtons: true },
+        export: commonExportConfig, onExporting: commonOnExporting,
+
+        columns: [
+        {
+        dataField: "POCode", caption: "Mã Chứng Từ", width: 140,
+        cellTemplate: function (cellElement, options) {
+        let d = options.data;
+        let html = `<div class="fw-bold text-primary">${options.value || ""}</div>`;
+        if (d && d.IsDebtFinalized && d.InvoiceNumber) {
+        html += `<div class="text-muted small" style="font-size:11px;"><i class="fa-solid fa-file-invoice me-1"></i>${d.InvoiceNumber}</div>`;
+        }
+        let el = cellElement[0] || cellElement;
+        el.innerHTML = html;
+        }
+        },
+        { dataField: "OrderDate", caption: "Ngày Đặt", dataType: "date", format: "dd/MM/yyyy", sortOrder: "desc", width: 110 },
+        {
+        dataField: "SupplierName", caption: "Nhà Cung Cấp",
+        cellTemplate: function (cellElement, options) {
+        let el = cellElement[0] || cellElement;
+        el.innerHTML = `<div class="fw-bold text-dark">${options.value || ""}</div>`;
+        }
+        },
+        { dataField: "ProductListStr", caption: "Danh sách SP (Để lọc)", visible: false },
+        { dataField: "FinalTotal", caption: "Tổng Tiền", dataType: "number", format: "#,##0", alignment: "right", cssClass: "fw-bold text-dark" },
+        { dataField: "DepositAmount", caption: "Đã Cọc", dataType: "number", format: "#,##0", alignment: "right", cssClass: "text-muted" },
+        {
+        dataField: "RemainingAmount", caption: "Còn Nợ", dataType: "number", alignment: "right", width: 120,
+        cellTemplate: function (cellElement, options) {
+        let val = options.value || 0;
+        let color = val < 0 ? "text-danger" : "text-success";
+        let el = cellElement[0] || cellElement;
+        el.innerHTML = `<div class="fw-bold ${color}">${val.toLocaleString('en-US')}</div>`;
+        }
+        },
+        {
+        dataField: "PaymentStatusStr", caption: "Thanh Toán", alignment: "center", width: 110,
+        cellTemplate: function (cellElement, options) {
+        let val = options.value || "Chưa trả";
+        let color = val === "Trả đủ" ? "#10b981" : (val === "Đã cọc" ? "#f59e0b" : "#6b7280");
+        let el = cellElement[0] || cellElement;
+        el.innerHTML = `<span style="color: ${color}; font-weight: 600; font-size: 12px; border: 1px solid ${color}; padding: 2px 8px; border-radius: 4px; background: ${color}10;">${val}</span>`;
+        }
+        },
+        {
+        dataField: "StatusStr", caption: "Trạng Thái", alignment: "center", width: 110,
+        cellTemplate: function (cellElement, options) {
+        let val = options.value || "Chờ giao";
+        let color = val === "Xong" ? "#059669" : (val === "Đã hủy" ? "#374151" : (val === "Đang giao" ? "#d97706" : "#0ea5e9"));
+        let el = cellElement[0] || cellElement;
+        el.innerHTML = `<span style="color: #fff; font-weight: 600; font-size: 12px; padding: 4px 12px; border-radius: 4px; background: ${color}; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">${val}</span>`;
+        }
+        },
+        {
+        caption: "Thao tác", alignment: "center", allowGrouping: false, allowSorting: false, allowFiltering: false, fixed: true, fixedPosition: "right", width: 120,
+        allowExporting: false,
+        cellTemplate: function (cellElement, options) {
+        let d = options.data;
+        if (!d) return;
+        let buttons = `<div class="d-flex justify-content-center gap-3">
+        <a href="/PurchaseOrder/Details/${d.Id}" data-turbo="false" class="text-primary" title="Xem chi tiết"><i class="fa-solid fa-eye fs-6"></i></a>`;
+        if (d.CanEdit) {
+        buttons += `<a href="/PurchaseOrder/Edit/${d.Id}" data-turbo="false" class="text-warning" title="Sửa"><i class="fa-solid fa-pen fs-6"></i></a>
+        <a href="/Warehouse/ImportExport?type=Import&poId=${d.Id}" data-turbo="false" class="text-success" title="Nhập kho"><i class="fa-solid fa-arrow-right-to-bracket fs-6"></i></a>`;
+        }
+        buttons += `</div>`;
+        let el = cellElement[0] || cellElement;
+        el.innerHTML = buttons;
+        }
+        }
+        ],
+        summary: {
+        groupItems: [
+        { column: "FinalTotal", summaryType: "sum", valueFormat: "#,##0", displayFormat: "Tổng: {0}", showInGroupFooter: false },
+        { column: "RemainingAmount", summaryType: "sum", valueFormat: "#,##0", displayFormat: "Còn nợ: {0}", showInGroupFooter: false }
+        ],
+        totalItems: [
+        { column: "POCode", summaryType: "count", displayFormat: "Tổng: {0} đơn" },
+        { column: "FinalTotal", summaryType: "sum", valueFormat: "#,##0", displayFormat: "{0}" },
+        { column: "RemainingAmount", summaryType: "sum", valueFormat: "#,##0", displayFormat: "{0}" }
+        ]
+        },
+        masterDetail: {
+        enabled: true,
+        template: function (container, options) {
+        let d = options.data;
+        let details = d.Details || [];
+        let html = `
+        <div class="px-4 py-3 bg-white border-top border-bottom" style="border-left: 4px solid #0ea5e9;">
+        <h6 class="fw-bold text-dark mb-3 fs-6"><i class="fa-solid fa-box-open text-primary me-2"></i>Chi tiết vật tư: ${d.POCode}</h6>
+        <table class="table table-sm align-middle text-center mb-0 border" style="font-size: 13px; border-radius: 8px; overflow: hidden;">
+        <thead style="background: #f1f5f9; color: #475569;">
+        <tr>
+        <th class="text-start ps-3 py-2">Tên Vật Tư</th>
+        <!-- 🔥 BỔ SUNG CỘT ĐƠN HÀNG SẢN XUẤT -->
+        <th>Đơn Hàng SX</th>
+        <th>ĐVT</th>
+        <th>SL Đặt</th>
+        <th>Đã Nhận</th>
+        <th>Còn Thiếu</th>
+        </tr>
+        </thead>
+        <tbody>`;
+
+        if (details.length === 0) { html += `<tr><td colspan="6" class="py-3 text-muted fst-italic">Không có chi tiết</td></tr>`; }
+        else {
+        details.forEach(detail => {
+        let r = detail.Remain > 0 ? detail.Remain.toLocaleString() : "Đủ";
+        let rc = detail.Remain > 0 ? "text-danger fw-bold bg-danger bg-opacity-10" : "text-muted";
+
+        // 🔥 Hiển thị Badge cho Đơn Hàng SX
+        let orderCodeHtml = detail.LinkedOrderCode ? `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1">${detail.LinkedOrderCode}</span>` : `<span class="text-muted small fst-italic">Dùng chung</span>`;
+
+        html += `
+        <tr>
+        <td class="text-start fw-bold text-dark ps-3 py-2">${detail.Name}</td>
+        <td>${orderCodeHtml}</td>
+        <td><span class="badge bg-light text-secondary border px-2">${detail.Unit}</span></td>
+        <td class="fw-bold text-primary">${detail.Ordered}</td>
+        <td class="fw-bold text-success">${detail.Received}</td>
+        <td class="${rc}">${r}</td>
+        </tr>`;
+        });
+        }
+        html += `</tbody></table></div>`;
+        let el = container[0] || container;
+        el.innerHTML = html;
+        }
+        }
+        });
+        }
+
+        // 2. LƯỚI CHI TIẾT (FLAT DETAIL VIEW)
+        function renderDetailGrid(container) {
+        new DevExpress.ui.dxDataGrid(container, {
+        dataSource: rawDetailData,
+        keyExpr: "Id",
+        showBorders: false,
+        rowAlternationEnabled: true,
+        hoverStateEnabled: true,
+        allowColumnResizing: true, allowColumnReordering: true, columnAutoWidth: true,
+        groupPanel: { visible: true, emptyPanelText: "Kéo tiêu đề cột vào đây để gom nhóm (Ví dụ: Kéo 'Mã Đơn Hàng' hoặc 'Tên Vật Tư')" },
+        filterRow: { visible: true }, headerFilter: { visible: true },
+        searchPanel: { visible: true, width: 280, placeholder: "Tìm kiếm từ khóa..." },
+        paging: { pageSize: 50 }, pager: { showPageSizeSelector: true, allowedPageSizes: [20, 50, 100], showInfo: true, showNavigationButtons: true },
+        export: commonExportConfig, onExporting: commonOnExporting,
+
+        columns: [
+        { dataField: "POCode", caption: "Mã Nhập Hàng", width: 140, cssClass: "fw-bold text-primary" },
+        { dataField: "OrderDate", caption: "Ngày Đặt", dataType: "date", format: "dd/MM/yyyy", sortOrder: "desc", width: 110 },
+        { dataField: "SupplierName", caption: "Nhà Cung Cấp" },
+        { dataField: "ProductName", caption: "Tên Vật Tư / Hàng Hóa", cssClass: "fw-bold text-dark" },
+
+        // 🔥 BỔ SUNG CỘT ĐƠN HÀNG SẢN XUẤT CHO BẢNG PHẲNG
+        {
+        dataField: "LinkedOrderCode", caption: "Đơn Hàng SX", width: 130, alignment: "center",
+        cellTemplate: function (cellElement, options) {
+        let val = options.value;
+        let html = val ? `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1">${val}</span>` : `<span class="text-muted small fst-italic">Dùng chung</span>`;
+        let cell = cellElement[0] || cellElement;
+        cell.innerHTML = html;
+        }
+        },
+
+        { dataField: "Unit", caption: "ĐVT", alignment: "center", width: 70 },
+        { dataField: "Ordered", caption: "SL Đặt", dataType: "number", alignment: "right", cssClass: "fw-bold text-primary" },
+        { dataField: "UnitPrice", caption: "Đơn Giá", dataType: "number", format: "#,##0", alignment: "right" },
+        { dataField: "LineTotal", caption: "Thành Tiền", dataType: "number", format: "#,##0", alignment: "right", cssClass: "fw-bold text-dark" },
+        { dataField: "Received", caption: "Đã Nhận", dataType: "number", alignment: "right", cssClass: "fw-bold text-success" },
+        {
+        dataField: "Remain", caption: "Còn Thiếu", dataType: "number", alignment: "right",
+        cellTemplate: function (cellElement, options) {
+        let val = options.value || 0;
+        let text = val > 0 ? val.toLocaleString() : "Đủ";
+        let color = val > 0 ? "text-danger" : "text-muted";
+        let el = cellElement[0] || cellElement;
+        el.innerHTML = `<span class="fw-bold ${color}">${text}</span>`;
+        }
+        },
+        { dataField: "StatusStr", caption: "Trạng Thái Nhập", alignment: "center", width: 120 }
+        ],
+        summary: {
+        groupItems: [
+        { column: "LineTotal", summaryType: "sum", valueFormat: "#,##0", displayFormat: "Cộng tiền: {0}", showInGroupFooter: false }
+        ],
+        totalItems: [
+        { column: "POCode", summaryType: "count", displayFormat: "Tổng: {0} dòng" },
+        { column: "Ordered", summaryType: "sum", valueFormat: "#,##0", displayFormat: "{0}" },
+        { column: "LineTotal", summaryType: "sum", valueFormat: "#,##0", displayFormat: "{0}" }
+        ]
+        }
+        });
+        }
+
+        document.addEventListener("DOMContentLoaded", initDataGrid);
+        document.addEventListener("turbo:load", initDataGrid);
+        if (document.readyState === "complete" || document.readyState === "interactive") { setTimeout(initDataGrid, 100); }
+    </script>
+}

@@ -1,0 +1,128 @@
+﻿@{
+    ViewData["Title"] = "Tổng quan";
+
+    int pendingOrders = ViewBag.PendingOrders ?? 0;
+    int totalOrders = ViewBag.TotalOrders ?? 0;
+    int lowStockItems = ViewBag.LowStockItems ?? 0;
+    int totalProducts = ViewBag.TotalProducts ?? 0;
+}
+
+<div class="container-fluid pt-2 pb-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3 class="fw-bold text-dark"><i class="fa-solid fa-chart-pie text-primary me-2"></i> Tổng quan hệ thống</h3>
+            <p class="text-muted">Xin chào! Dưới đây là tóm tắt tình hình sản xuất và kinh doanh hôm nay.</p>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100 overflow-hidden rounded-4">
+                <div class="card-body position-relative p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="text-muted fw-bold text-uppercase mb-1">Đơn hàng chờ</h6>
+                            <h2 class="fw-bolder mb-0 text-dark">@pendingOrders</h2>
+                        </div>
+                        <div class="bg-warning bg-opacity-10 p-3 rounded-circle text-warning">
+                            <i class="fa-solid fa-clock fs-3"></i>
+                        </div>
+                    </div>
+                    <a href="@Url.Action("Index", "Order")" class="text-decoration-none text-warning fw-bold small">Xem chi tiết <i class="fa-solid fa-arrow-right ms-1"></i></a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100 overflow-hidden rounded-4">
+                <div class="card-body position-relative p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="text-muted fw-bold text-uppercase mb-1">Tổng sản phẩm</h6>
+                            <h2 class="fw-bolder mb-0 text-dark">@totalProducts</h2>
+                        </div>
+                        <div class="bg-primary bg-opacity-10 p-3 rounded-circle text-primary">
+                            <i class="fa-solid fa-boxes-stacked fs-3"></i>
+                        </div>
+                    </div>
+                    <a href="@Url.Action("Index", "Product")" class="text-decoration-none text-primary fw-bold small">Quản lý kho <i class="fa-solid fa-arrow-right ms-1"></i></a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100 overflow-hidden rounded-4">
+                <div class="card-body position-relative p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="text-muted fw-bold text-uppercase mb-1">Cảnh báo tồn kho</h6>
+                            <h2 class="fw-bolder mb-0 text-danger">@lowStockItems</h2>
+                        </div>
+                        <div class="bg-danger bg-opacity-10 p-3 rounded-circle text-danger">
+                            <i class="fa-solid fa-triangle-exclamation fs-3"></i>
+                        </div>
+                    </div>
+                    <a href="@Url.Action("Index", "Warehouse")" class="text-decoration-none text-danger fw-bold small">Nhập kho ngay <i class="fa-solid fa-arrow-right ms-1"></i></a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100 overflow-hidden rounded-4">
+                <div class="card-body position-relative p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="text-muted fw-bold text-uppercase mb-1">Tổng đơn hàng</h6>
+                            <h2 class="fw-bolder mb-0 text-success">@totalOrders</h2>
+                        </div>
+                        <div class="bg-success bg-opacity-10 p-3 rounded-circle text-success">
+                            <i class="fa-solid fa-check-to-slot fs-3"></i>
+                        </div>
+                    </div>
+                    <a href="@Url.Action("Index", "Order")" class="text-decoration-none text-success fw-bold small">Xem tất cả <i class="fa-solid fa-arrow-right ms-1"></i></a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                    <h5 class="fw-bold"><i class="fa-solid fa-chart-line text-primary me-2"></i> Hoạt động gần đây</h5>
+                </div>
+                <div class="card-body p-4 d-flex align-items-center justify-content-center" style="min-height: 300px; background-color: #f8f9fa; border-radius: 12px; margin: 0 1.5rem 1.5rem 1.5rem;">
+                    <div class="text-center text-muted">
+                        <i class="fa-solid fa-chart-column fs-1 mb-2 text-light"></i>
+                        <p class="mb-0">Khu vực hiển thị biểu đồ thống kê</p>
+                        <small>(Bạn có thể nhúng thư viện Chart.js vào đây)</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                    <h5 class="fw-bold"><i class="fa-solid fa-bolt text-warning me-2"></i> Truy cập nhanh</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="d-grid gap-3">
+                        <a href="@Url.Action("Create", "Order")" class="btn btn-outline-primary text-start p-3 fw-bold rounded-3 shadow-sm">
+                            <i class="fa-solid fa-cart-plus me-2"></i> Tạo đơn hàng mới
+                        </a>
+                        <a href="@Url.Action("Index", "Product")" class="btn btn-outline-success text-start p-3 fw-bold rounded-3 shadow-sm">
+                            <i class="fa-solid fa-box-open me-2"></i> Thêm sản phẩm
+                        </a>
+                        <a href="@Url.Action("Index", "Customer")" class="btn btn-outline-info text-start p-3 fw-bold rounded-3 shadow-sm">
+                            <i class="fa-solid fa-user-plus me-2"></i> Thêm khách hàng
+                        </a>
+                        <a href="@Url.Action("Index", "Export")" class="btn btn-outline-secondary text-start p-3 fw-bold rounded-3 shadow-sm">
+                            <i class="fa-solid fa-truck-ramp-box me-2"></i> Lệnh xuất kho
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,77 @@
+﻿@model List<ProductionApp.Web.Controllers.OrderController.OrderImportPreviewModel>
+@{
+    ViewData["Title"] = "Kiểm tra dữ liệu đơn hàng";
+}
+
+<div class="container-fluid py-4">
+    <div class="card shadow border-0 rounded-4 overflow-hidden">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-0 fw-800 text-primary"><i class="fa-solid fa-file-circle-check me-2"></i> PREVIEW ĐƠN HÀNG TRƯỚC KHI LƯU</h5>
+                <small class="text-muted">Dữ liệu Số lượng hệ thống sẽ lấy từ cột <b>Tổng Cộng</b>. Các cột phụ sẽ được nối vào Ghi chú.</small>
+            </div>
+            <div class="d-flex gap-2">
+                <a asp-action="Index" class="btn btn-light border fw-bold px-4 rounded-pill">Hủy bỏ</a>
+                <form asp-action="ConfirmImport" method="post">
+                    <input type="hidden" name="jsonData" value='@System.Text.Json.JsonSerializer.Serialize(Model)' />
+                    <button type="submit" class="btn btn-success fw-bold px-4 rounded-pill shadow" @(Model.All(x => x.IsDuplicate) ? "disabled" : "")>
+                        <i class="fa-solid fa-cloud-arrow-up me-2"></i> LƯU VÀO HỆ THỐNG
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 70vh;">
+                <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                    <thead class="bg-light sticky-top shadow-sm">
+                        <tr class="text-center text-muted">
+                            <th class="ps-4">Mã Đơn</th>
+                            <th>Khách Hàng</th>
+                            <th>Tên Sản Phẩm</th>
+                            <th>SL Tự Nhiên</th>
+                            <th>SL Màu</th>
+                            <th class="bg-info bg-opacity-10 text-primary">TỔNG CỘNG</th>
+                            <th>Loại Gỗ</th>
+                            <th>Ngày Giao</th>
+                            <th>Ngày Nhận</th>
+                            <th class="pe-4">Trạng thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr class="@(item.IsDuplicate ? "table-warning" : (!item.CustomerExists ? "table-danger" : ""))">
+                                <td class="ps-4 fw-bold font-monospace">@item.OrderCode</td>
+                                <td>@item.CustomerName @if (!item.CustomerExists)
+                                    {
+                                        <span class="badge bg-danger">Khách mới</span>
+                                    }</td>
+                                <td>@item.ProductName</td>
+                                <td class="text-center">@item.NaturalQtyStr</td>
+                                <td class="text-center">@item.ColorQtyStr</td>
+                                <td class="text-center fw-bold text-primary bg-info bg-opacity-10 fs-6">@item.TotalQty</td>
+                                <td class="text-center">@item.WoodType</td>
+                                <td class="text-center fw-600 text-danger">@item.Deadline?.ToString("dd/MM/yyyy")</td>
+                                <td class="text-center fw-600">@item.OrderDate.ToString("dd/MM/yyyy")</td>
+                                <td class="pe-4">
+                                    @if (item.IsDuplicate)
+                                    {
+                                        <span class="text-danger small fw-bold"><i class="fa-solid fa-copy"></i> Trùng mã</span>
+                                    }
+                                    else if (!item.CustomerExists)
+                                    {
+                                        <span class="text-danger small fw-bold"><i class="fa-solid fa-user-slash"></i> Sai khách</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-success small fw-bold"><i class="fa-solid fa-check"></i> Hợp lệ</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,273 @@
+﻿@using ProductionApp.Web.Models
+@using System.Text
+@model PermissionViewModel
+
+@{
+    ViewData["Title"] = "Phân quyền: " + Model.RoleName;
+
+    // --- LOGIC MAP DỮ LIỆU ---
+    var permissionMap = new Dictionary<string, int>();
+    var distinctModules = new List<string>();
+    var standardActions = new[] { "View", "Create", "Edit", "Delete" }; // 4 quyền chuẩn
+
+    for (int i = 0; i < Model.RoleClaims.Count; i++)
+    {
+        var parts = Model.RoleClaims[i].Value.Split('.');
+        if (parts.Length >= 3)
+        {
+            string module = parts[1];
+            string action = parts[2];
+            string key = $"{module}.{action}";
+
+            if (!permissionMap.ContainsKey(key)) permissionMap.Add(key, i);
+            if (!distinctModules.Contains(module)) distinctModules.Add(module);
+        }
+    }
+}
+
+<style>
+    .perm-card {
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        border: 1px solid #eef2f6;
+        overflow: hidden;
+    }
+
+    /* Sticky Header: Giữ tiêu đề bảng khi cuộn */
+    .table-perm thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background-color: #f8f9fa;
+        color: #495057;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        padding: 16px;
+        border-bottom: 2px solid #e9ecef;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .table-perm td {
+        vertical-align: middle;
+        padding: 14px 16px;
+        border-bottom: 1px solid #f1f3f5;
+    }
+
+    .table-perm tr:hover {
+        background-color: #f8faff;
+    }
+
+    .table-perm tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* Custom Switches - Màu sắc định danh */
+    .form-switch .form-check-input {
+        width: 3em;
+        height: 1.5em;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    /* View: Xanh Dương */
+    .sw-view:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    /* Create: Xanh Lá */
+    .sw-create:checked {
+        background-color: #198754;
+        border-color: #198754;
+    }
+    /* Edit: Vàng Cam */
+    .sw-edit:checked {
+        background-color: #ffc107;
+        border-color: #ffc107;
+    }
+    /* Delete: Đỏ */
+    .sw-delete:checked {
+        background-color: #dc3545;
+        border-color: #dc3545;
+    }
+    /* Approve/Other: Tím */
+    .sw-other:checked {
+        background-color: #6f42c1;
+        border-color: #6f42c1;
+    }
+
+    .module-icon {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        margin-right: 12px;
+    }
+</style>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center">
+            <div class="bg-primary text-white rounded-4 d-flex align-items-center justify-content-center shadow-sm" style="width: 50px; height: 50px;">
+                <i class="fa-solid fa-sliders fs-4"></i>
+            </div>
+            <div class="ms-3">
+                <h4 class="fw-bold mb-0 text-dark">@Model.RoleName</h4>
+                <div class="text-muted small">Cập nhật quyền hạn cho vai trò này</div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a asp-action="Index" class="btn btn-light border fw-bold rounded-pill px-3">
+                <i class="fa-solid fa-arrow-left me-1"></i> Quay lại
+            </a>
+            <button type="submit" form="permissionForm" class="btn btn-primary fw-bold px-4 rounded-pill shadow">
+                <i class="fa-solid fa-floppy-disk me-2"></i> LƯU THAY ĐỔI
+            </button>
+        </div>
+    </div>
+
+    <div class="perm-card">
+        <form id="permissionForm" asp-action="UpdatePermission" method="post">
+            <input asp-for="RoleId" type="hidden" />
+            <input asp-for="RoleName" type="hidden" />
+
+            <div class="table-responsive" style="max-height: 75vh;">
+                <table class="table mb-0 table-perm">
+                    <thead>
+                        <tr>
+                            <th class="text-start ps-4" style="width: 25%">Chức năng (Module)</th>
+                            <th class="text-center" style="width: 12%">Xem (View)</th>
+                            <th class="text-center" style="width: 12%">Thêm (Create)</th>
+                            <th class="text-center" style="width: 12%">Sửa (Edit)</th>
+                            <th class="text-center" style="width: 12%">Xóa (Delete)</th>
+                            <th class="text-start ps-4" style="width: 27%">Mở rộng (Approve/Upload...)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var module in distinctModules)
+                        {
+                            // --- Cấu hình Icon/Màu sắc cho sinh động ---
+                            string icon = "fa-cube";
+                            string colorClass = "bg-light text-secondary";
+                            string vnName = module;
+
+                            switch (module)
+                            {
+                                case "Products": vnName = "Sản phẩm"; icon = "fa-box"; colorClass = "bg-success-subtle text-success"; break;
+                                case "Orders": vnName = "Đơn hàng"; icon = "fa-cart-shopping"; colorClass = "bg-primary-subtle text-primary"; break;
+                                case "Customers": vnName = "Khách hàng"; icon = "fa-users"; colorClass = "bg-info-subtle text-info"; break;
+                                case "Warehouse": vnName = "Kho Vật tư"; icon = "fa-warehouse"; colorClass = "bg-warning-subtle text-warning"; break;
+                                case "Documents": vnName = "Tài liệu"; icon = "fa-folder-open"; colorClass = "bg-danger-subtle text-danger"; break;
+                                case "Users": vnName = "Tài khoản"; icon = "fa-user-gear"; colorClass = "bg-dark-subtle text-dark"; break;
+                                case "Roles": vnName = "Phân quyền"; icon = "fa-shield-halved"; colorClass = "bg-secondary-subtle text-secondary"; break;
+                                case "Plans": vnName = "Kế hoạch SX"; icon = "fa-calendar-days"; colorClass = "bg-primary-subtle text-primary"; break;
+                            }
+
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="module-icon @colorClass">
+                                            <i class="fa-solid @icon"></i>
+                                        </div>
+                                        <span class="fw-bold text-dark">@vnName</span>
+                                    </div>
+                                </td>
+
+                                @RenderSwitchCell(permissionMap, module, "View", Model.RoleClaims, Html, "sw-view")
+                                @RenderSwitchCell(permissionMap, module, "Create", Model.RoleClaims, Html, "sw-create")
+                                @RenderSwitchCell(permissionMap, module, "Edit", Model.RoleClaims, Html, "sw-edit")
+                                @RenderSwitchCell(permissionMap, module, "Delete", Model.RoleClaims, Html, "sw-delete")
+
+                                <td class="ps-4">
+                                    @{
+                                        // Lọc các quyền KHÔNG phải 4 quyền chuẩn
+                                        var extraActions = Model.RoleClaims
+                                        .Where(c => c.Value.StartsWith($"Permissions.{module}.")
+                                        && !standardActions.Any(s => c.Value.EndsWith($".{s}")))
+                                        .ToList();
+                                    }
+                                    @if (extraActions.Any())
+                                    {
+                                        <div class="d-flex flex-wrap gap-3">
+                                            @foreach (var claim in extraActions)
+                                            {
+                                                var parts = claim.Value.Split('.');
+                                                var rawAction = parts.Last();
+                                                var display = rawAction == "Approve" ? "Duyệt" :
+                                                (rawAction == "Upload" ? "Tải lên" : rawAction);
+                                                var index = Model.RoleClaims.IndexOf(claim);
+
+                                                <div class="form-check form-switch d-flex align-items-center mb-0">
+                                                    <input type="hidden" name="RoleClaims[@index].Type" value="@claim.Type" />
+                                                    <input type="hidden" name="RoleClaims[@index].Value" value="@claim.Value" />
+                                                    <input type="checkbox" class="form-check-input sw-other shadow-none me-2" style="width: 2.5em;"
+                                                           name="RoleClaims[@index].Selected" value="true" @(claim.Selected ? "checked" : "") />
+                                                    <label class="form-check-label small fw-bold text-purple pt-1">@display</label>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="p-3 bg-light border-top d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-sm btn-outline-dark rounded-pill px-3 fw-bold" onclick="toggleAll(true)">
+                    <i class="fa-solid fa-check-double me-1"></i> Chọn tất cả
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold" onclick="toggleAll(false)">
+                    <i class="fa-solid fa-xmark me-1"></i> Bỏ chọn
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function toggleAll(state) {
+        document.querySelectorAll('.form-check-input').forEach(cb => cb.checked = state);
+    }
+</script>
+
+@{
+    // Helper function để render code HTML cho ô switch (giúp code chính gọn hơn)
+    Microsoft.AspNetCore.Html.IHtmlContent RenderSwitchCell(
+        Dictionary<string, int> map,
+        string module,
+        string action,
+        List<RoleClaimsViewModel> claims,
+        Microsoft.AspNetCore.Mvc.Rendering.IHtmlHelper html,
+        string cssClass)
+    {
+        string key = $"{module}.{action}";
+        var sb = new StringBuilder();
+
+        if (map.ContainsKey(key))
+        {
+            int index = map[key];
+            var claim = claims[index];
+            string chk = claim.Selected ? "checked" : "";
+
+            sb.Append("<td class='text-center'>");
+            sb.Append($"<input type='hidden' name='RoleClaims[{index}].Type' value='{claim.Type}' />");
+            sb.Append($"<input type='hidden' name='RoleClaims[{index}].Value' value='{claim.Value}' />");
+            // Checkbox switch
+            sb.Append($"<div class='form-check form-switch d-flex justify-content-center'>");
+            sb.Append($"<input type='checkbox' class='form-check-input {cssClass} shadow-none' name='RoleClaims[{index}].Selected' value='true' {chk} />");
+            sb.Append("</div></td>");
+        }
+        else
+        {
+            // Nếu module không có quyền này (VD: Document không có Edit) -> hiện dấu gạch
+            sb.Append("<td class='text-center'><i class='fa-solid fa-minus text-muted opacity-25'></i></td>");
+        }
+        return html.Raw(sb.ToString());
+    }
+}

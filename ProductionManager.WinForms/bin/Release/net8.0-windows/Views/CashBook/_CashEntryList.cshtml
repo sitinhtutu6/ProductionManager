@@ -1,0 +1,108 @@
+﻿@using ProductionManager.Data
+@model IEnumerable<CashEntry>
+
+@{
+    decimal openBalance = ViewBag.OpenBalance != null ? (decimal)ViewBag.OpenBalance : 0;
+    decimal runningBalance = openBalance;
+    
+    PaymentMethod? currentMethod = ViewBag.CurrentMethod as PaymentMethod?;
+    string modeTitle = "TỔNG QUỸ";
+    if (currentMethod == PaymentMethod.Cash) modeTitle = "QUỸ TIỀN MẶT";
+    else if (currentMethod == PaymentMethod.Transfer) modeTitle = "QUỸ NGÂN HÀNG";
+}
+
+<table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+    <thead class="text-muted small text-uppercase">
+        <tr>
+            <th class="text-center bg-light">#</th>
+            <th class="bg-light" style="min-width: 90px;">Ngày CT</th>
+            <th class="bg-light">Số Phiếu</th>
+            <th class="text-center bg-light">Phân loại</th>
+            <th class="text-center bg-light">Hình thức</th>
+            <th class="text-center bg-light">Hạch toán P&L</th>
+            <th class="bg-light" style="min-width: 200px;">Nội dung</th>
+            <th class="bg-light">Đối tượng</th>
+            <th class="text-end text-success bg-light">Thu (+In)</th>
+            <th class="text-end text-danger bg-light">Chi (-Out)</th>
+            <th class="text-end fw-bold bg-light">Tồn quỹ</th>
+            <th class="text-center bg-light" style="width: 50px;"><i class="fa-solid fa-ellipsis"></i></th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr class="bg-warning bg-opacity-10">
+            <td colspan="8" class="text-end fst-italic text-muted small"><i class="fa-solid fa-clock-rotate-left me-1"></i> Số dư đầu kỳ (@modeTitle):</td>
+            <td></td>
+            <td></td>
+            <td class="text-end fw-bold text-dark fs-6">@openBalance.ToString("N0")</td>
+            <td></td>
+        </tr>
+
+        @if (Model != null && Model.Any())
+        {
+            int stt = 1;
+            foreach (var item in Model)
+            {
+                if (item.Type == TransactionType.Receipt) { runningBalance += item.Amount; } 
+                else { runningBalance -= item.Amount; }
+
+                <tr class="context-menu-row" data-id="@item.Id" title="Click chuột phải để thao tác">
+                    <td class="text-center text-muted small">@stt</td>
+                    <td class="text-nowrap">@item.TransactionDate.ToString("dd/MM/yyyy")</td>
+                    <td>
+                        <div class="fw-bold text-primary">@item.VoucherCode</div>
+                        @if (!string.IsNullOrEmpty(item.PaperVoucherNumber))
+                        {
+                            <small class="text-muted fst-italic d-block" style="font-size: 0.75rem"><i class="fa-solid fa-note-sticky me-1"></i>@item.PaperVoucherNumber</small>
+                        }
+                    </td>
+                    <td class="text-center">
+                        @if (item.Category == EntryCategory.Loan)
+                        {
+                            if (item.Type == TransactionType.Receipt)
+                            {
+                                if (item.ParentId == null) { <span class="badge bg-danger text-white">VAY NỢ</span> }
+                                else { <span class="badge bg-success text-white">THU NỢ</span> }
+                            }
+                            else
+                            {
+                                if (item.ParentId == null) { <span class="badge bg-primary text-white">CHO VAY</span> }
+                                else { <span class="badge bg-warning text-dark">TRẢ GỐC</span> }
+                            }
+                        }
+                        else { <span class="badge bg-light text-secondary border">Kinh doanh</span> }
+                    </td>
+                    <td class="text-center">
+                        @if (item.Method == PaymentMethod.Cash) { <i class="fa-solid fa-money-bill-1-wave text-success fs-6" title="Tiền mặt"></i> }
+                        else if (item.Method == PaymentMethod.Transfer) { <i class="fa-solid fa-building-columns text-primary fs-6" title="Chuyển khoản"></i> }
+                    </td>
+                    <td class="text-center">
+                        @if (item.CostCategoryId != null && item.CostCategory != null && item.CostCategory.Section != PnlSection.Exclude)
+                        {
+                            string bg = item.CostCategory.Section == PnlSection.Salary ? "bg-primary" : 
+                                        (item.CostCategory.Section == PnlSection.Utilities ? "bg-warning text-dark" : "bg-danger");
+                            <div class="badge @bg rounded-pill px-2">@item.CostCategory.Name</div>
+                            @if(item.ForMonth.HasValue) {
+                                <div class="small fw-bold text-muted mt-1" style="font-size: 0.7rem;">Tháng @item.ForMonth/@item.ForYear</div>
+                            }
+                        }
+                        else
+                        {
+                            <span class="text-muted opacity-25">-</span>
+                        }
+                    </td>
+                    <td class="text-truncate" style="max-width: 250px;" title="@item.Description">@item.Description</td>
+                    <td class="fw-bold text-dark small">@item.TargetName</td>
+                    <td class="text-end text-success fw-bold">@(item.Type == TransactionType.Receipt ? item.Amount.ToString("N0") : "-")</td>
+                    <td class="text-end text-danger fw-bold">@(item.Type == TransactionType.Payment ? item.Amount.ToString("N0") : "-")</td>
+                    <td class="text-end fw-bold text-dark">@runningBalance.ToString("N0")</td>
+                    <td class="text-center text-muted"><i class="fa-solid fa-ellipsis-vertical"></i></td>
+                </tr>
+                stt++;
+            }
+        }
+        else
+        {
+            <tr><td colspan="12" class="text-center py-5 text-muted fst-italic">Không tìm thấy dữ liệu phù hợp.</td></tr>
+        }
+    </tbody>
+</table>

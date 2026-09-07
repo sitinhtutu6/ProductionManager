@@ -1,0 +1,216 @@
+﻿@{
+    ViewData["Title"] = "Xuất Hóa Đơn Lô";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)> {
+        ("Đơn Hàng", Url.Action("Index", "Order")), ("Xuất Hóa Đơn Mới", "") 
+    };
+}
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<style>
+    .sticky-menu { position: sticky; top: 20px; z-index: 10; }
+    .table-erp thead th { background: #f8fafc; color: #475569; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; padding: 15px 12px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+    .table-erp tbody td { padding: 12px; vertical-align: middle; }
+    .row-selectable { cursor: pointer; transition: background-color 0.2s; }
+    .row-selectable:hover { background-color: #f1f5f9; }
+</style>
+
+<div class="container-fluid py-4" style="max-width: 1500px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="text-primary fw-bold mb-1"><i class="fa-solid fa-file-invoice me-2"></i>Lập Hóa Đơn Bán Hàng</h3>
+            <p class="text-muted small mb-0">Xuất hóa đơn cho nhiều đơn hàng của cùng 1 Khách hàng.</p>
+        </div>
+        <a href="/Invoice/Index" class="btn btn-info fw-bold rounded-pill px-4 shadow-sm text-white">
+            <i class="fa-solid fa-magnifying-glass me-2"></i> Tra cứu Hóa đơn
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8 col-xl-9">
+            <div class="card shadow-sm border-0 rounded-4 h-100">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold text-dark mb-0"><i class="fa-solid fa-list-check me-2 text-primary"></i>CHỌN ĐƠN HÀNG XUẤT HĐ</h6>
+                </div>
+                <div class="table-responsive" style="min-height: 500px;">
+                    <table class="table table-hover align-middle mb-0 table-erp">
+                        <thead>
+                            <tr>
+                                <th class="text-center" width="50"><input type="checkbox" id="checkAll" class="form-check-input" onchange="toggleAll(this)"></th>
+                                <th>Mã Đơn</th>
+                                <th>Ngày Đặt</th>
+                                <th class="text-end">Tổng Tiền</th>
+                                <th class="text-end">Đã Xuất HĐ</th>
+                                <th class="text-end text-success pe-4" width="180">Số Tiền Xuất Lần Này</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orderTableBody">
+                            <tr><td colspan="6" class="text-center py-5 text-muted"><i class="fa-solid fa-users fa-3x mb-3 text-light"></i><br>Vui lòng chọn Khách hàng ở menu bên phải.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 col-xl-3">
+            <div class="card shadow-sm border-0 rounded-4 bg-light sticky-menu">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold text-dark mb-4 border-bottom pb-3"><i class="fa-solid fa-sliders me-2 text-primary"></i>THÔNG TIN HÓA ĐƠN</h6>
+
+                    <div class="mb-4">
+                        <label class="fw-bold text-primary mb-2 text-uppercase small">1. Chọn Khách Hàng (*)</label>
+                        <select id="customerId" class="form-select shadow-sm"></select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="fw-bold text-dark mb-1 small">Số Hóa Đơn Đỏ (*)</label>
+                        <input type="text" id="invoiceNo" class="form-control fw-bold shadow-sm" placeholder="VD: 0001234" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="fw-bold text-dark mb-1 small">Ngày Xuất Hóa Đơn (*)</label>
+                        <input type="text" id="invoiceDate" class="form-control datepicker bg-white shadow-sm" value="@DateTime.Now.ToString("yyyy-MM-dd")" required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="fw-bold text-dark mb-1 small">File Hóa Đơn Điện Tử (PDF/XML)</label>
+                        <input type="file" id="invoiceFile" class="form-control form-control-sm shadow-sm" accept=".pdf,.xml,.zip">
+                    </div>
+
+                    <div class="bg-success bg-opacity-10 border border-success border-opacity-50 rounded-3 p-3 mb-4 text-center">
+                        <span class="fw-bold text-success text-uppercase small d-block mb-1">Tổng Tiền Hóa Đơn Này</span>
+                        <span class="fs-3 fw-bold text-success" id="sumTotal">0 ₫</span>
+                    </div>
+
+                    <button class="btn btn-primary btn-lg w-100 fw-bold shadow-sm rounded-pill" onclick="submitBatchInvoice()">
+                        <i class="fa-solid fa-cloud-arrow-up me-2"></i> LƯU HÓA ĐƠN
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <script>
+        const custList = @Html.Raw(ViewBag.CustomersJson ?? "[]");
+
+        $(document).ready(function () {
+            flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn" });
+
+            let custSelect = $('#customerId');
+            custSelect.append(new Option("-- Gõ tìm Khách hàng --", ""));
+            custList.forEach(c => { 
+                let id = c.Id || c.id;
+                let text = c.Text || c.text;
+                custSelect.append(new Option(text, id)); 
+            });
+            
+            custSelect.select2({ theme: 'bootstrap-5' });
+            custSelect.on('change', loadOrders);
+        });
+
+        function loadOrders() {
+            let custId = $('#customerId').val();
+            let tbody = document.getElementById("orderTableBody");
+            
+            if (!custId) { 
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted"><i class="fa-solid fa-users fa-3x mb-3 text-light"></i><br>Vui lòng chọn Khách hàng.</td></tr>`; 
+                calcSum(); return; 
+            }
+            
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>`;
+
+            fetch(`/Order/GetUninvoicedOrders?customerId=${custId}`)
+                .then(async res => {
+                    if (!res.ok) throw new Error("Lỗi Server 500");
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5"><i class="fa-regular fa-face-smile fa-3x mb-3 text-success opacity-50"></i><br><span class="fw-bold text-success">Khách hàng này đã xuất đủ 100% hóa đơn.</span></td></tr>`;
+                    } else {
+                        let html = '';
+                        data.forEach((o, index) => {
+                            html += `<tr class="row-selectable">
+                                <td class="text-center" onclick="toggleRowCheckbox(this)">
+                                    <input type="checkbox" class="form-check-input chk-order" value="${o.id}" data-idx="${index}" onchange="calcSum(); event.stopPropagation();">
+                                </td>
+                                <td class="fw-bold text-primary font-monospace" onclick="toggleRowCheckbox(this.parentElement)">${o.orderCode}</td>
+                                <td class="small text-muted fw-bold" onclick="toggleRowCheckbox(this.parentElement)">${o.orderDate}</td>
+                                <td class="text-end fw-bold text-dark" onclick="toggleRowCheckbox(this.parentElement)">${o.totalAmount.toLocaleString('vi-VN')}</td>
+                                <td class="text-end fw-bold text-warning" onclick="toggleRowCheckbox(this.parentElement)">${o.billedAmount.toLocaleString('vi-VN')}</td>
+                                <td class="pe-4">
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" id="billAmt_${index}" class="form-control text-end fw-bold text-success" value="${o.remainAmount}" max="${o.remainAmount}" oninput="calcSum()">
+                                        <button class="btn btn-outline-secondary" title="Max" onclick="document.getElementById('billAmt_${index}').value = ${o.remainAmount}; calcSum();"><i class="fa-solid fa-arrow-up"></i></button>
+                                    </div>
+                                </td>
+                            </tr>`;
+                        });
+                        tbody.innerHTML = html;
+                        document.getElementById('checkAll').checked = false;
+                    }
+                    calcSum();
+                }).catch(err => {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-danger"><i class="fa-solid fa-triangle-exclamation fa-3x mb-3"></i><br><span class="fw-bold">Lỗi lấy dữ liệu.</span></td></tr>`;
+                });
+        }
+
+        function toggleRowCheckbox(td) { let chk = $(td).parent().find('.chk-order'); chk.prop('checked', !chk.prop('checked')); calcSum(); }
+        function toggleAll(source) { $('.chk-order').prop('checked', source.checked); calcSum(); }
+        
+        function calcSum() { 
+            let sumTotal = 0;
+            $('.chk-order:checked').each(function() { 
+                let idx = $(this).data('idx');
+                let amt = parseFloat(document.getElementById(`billAmt_${idx}`).value) || 0;
+                sumTotal += amt; 
+            }); 
+            document.getElementById("sumTotal").innerText = sumTotal.toLocaleString('vi-VN') + " ₫";
+        }
+
+        function submitBatchInvoice() {
+            let invoiceNo = document.getElementById("invoiceNo").value.trim();
+            let invoiceDate = document.getElementById("invoiceDate").value;
+            let fileInput = document.getElementById("invoiceFile");
+
+            if (!invoiceNo) { Swal.fire("Lỗi", "Vui lòng nhập Số Hóa Đơn!", "warning"); return; }
+
+            let items = [];
+            $('.chk-order:checked').each(function() { 
+                let id = parseInt($(this).val());
+                let idx = $(this).data('idx');
+                let amt = parseFloat(document.getElementById(`billAmt_${idx}`).value) || 0;
+                if (amt > 0) items.push({ OrderId: id, BilledAmount: amt });
+            });
+
+            if (items.length === 0) { Swal.fire("Cảnh báo", "Vui lòng tick chọn đơn hàng và nhập số tiền lớn hơn 0!", "warning"); return; }
+
+            let formData = new FormData();
+            formData.append("dataJson", JSON.stringify(items));
+            formData.append("invoiceNumber", invoiceNo);
+            formData.append("invoiceDate", invoiceDate);
+            if (fileInput.files.length > 0) formData.append("invoiceFile", fileInput.files[0]);
+
+            Swal.fire({ title: 'Đang xuất hóa đơn...', didOpen: () => Swal.showLoading() });
+            
+            fetch('/Order/ProcessBatchInvoice', {
+                method: 'POST', body: formData
+            }).then(res => res.json()).then(res => {
+                if (res.success) { 
+                    Swal.fire("Thành công", res.message, "success").then(() => window.location.href = "/Invoice/Index"); 
+                } else { 
+                    Swal.fire("Lỗi", res.message, "error"); 
+                }
+            });
+        }
+    </script>
+}

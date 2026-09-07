@@ -1,0 +1,338 @@
+﻿@model ProductionApp.Web.Models.ViewModels.MasterPlanVM
+@{
+    ViewData["Title"] = "Kế hoạch Vật tư (MRP)";
+    var fDate = Model?.FromDate.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd");
+    var tDate = Model?.ToDate.ToString("yyyy-MM-dd") ?? DateTime.Now.AddDays(30).ToString("yyyy-MM-dd");
+}
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/rowgroup/1.4.1/css/rowGroup.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/rowgroup/1.4.1/js/dataTables.rowGroup.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<style>
+    body {
+        background-color: #f8fafc;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .erp-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    /* Làm đẹp DataTables Search Box */
+    .dataTables_wrapper .row {
+        margin-bottom: 15px;
+        align-items: center;
+    }
+
+    .dataTables_filter input {
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        padding: 6px 12px;
+    }
+
+        .dataTables_filter input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            outline: none;
+        }
+
+    /* Bảng dữ liệu */
+    .table-erp thead th {
+        background: #f1f5f9 !important;
+        color: #475569;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        font-weight: 700;
+        vertical-align: middle;
+        cursor: pointer;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .table-erp tbody td {
+        vertical-align: middle;
+        border-bottom: 1px dashed #e2e8f0;
+        font-size: 0.9rem;
+    }
+
+    .num-cell {
+        font-family: 'Consolas', monospace;
+        font-size: 0.95rem;
+    }
+
+    /* CSS cho dòng Header Nhóm (Đơn hàng) */
+    table.dataTable tr.group-header td {
+        background-color: #e0e7ff !important;
+        border-top: 2px solid #c7d2fe !important;
+        border-bottom: 2px solid #c7d2fe !important;
+        transition: background-color 0.2s;
+        color: #3730a3;
+    }
+
+    table.dataTable tr.group-header:hover td {
+        background-color: #c7d2fe !important;
+    }
+
+    .toggle-icon {
+        font-size: 1.1rem;
+        vertical-align: middle;
+        transition: 0.2s;
+    }
+</style>
+
+<div class="container-fluid pt-4 px-4 pb-5">
+
+    @if (Model == null)
+    {
+        <div class="alert alert-warning shadow-sm rounded-3"><i class="fa-solid fa-triangle-exclamation me-2"></i> Không có dữ liệu.</div>
+        return;
+    }
+
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <h4 class="fw-bold text-dark mb-1"><i class="fa-solid fa-calculator text-primary me-2"></i>KẾ HOẠCH VẬT TƯ (MRP)</h4>
+            <div class="text-muted small">Phân tích nhu cầu nguyên vật liệu tự động dựa trên Đơn hàng & Định mức BOM</div>
+        </div>
+    </div>
+
+    <div class="erp-card p-3 mb-4">
+        <form asp-action="MasterPlan" method="get" class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex gap-2 align-items-center">
+                <div class="btn-group shadow-sm">
+                    <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="setPeriod('next7days')">7 Ngày Tới</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="setPeriod('next30days')">30 Ngày Tới</button>
+                </div>
+                <div class="input-group input-group-sm shadow-sm" style="width: 320px;">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-regular fa-calendar text-primary"></i></span>
+                    <input type="text" name="fromDate" id="fromDate" class="form-control border-start-0 datepicker bg-white" value="@fDate" required placeholder="Hạn giao từ">
+                    <span class="input-group-text bg-light border-start-0 border-end-0 text-muted"><i class="fa-solid fa-arrow-right"></i></span>
+                    <input type="text" name="toDate" id="toDate" class="form-control border-start-0 datepicker bg-white" value="@tDate" required placeholder="Hạn giao đến">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm fw-bold shadow-sm px-4"><i class="fa-solid fa-bolt text-warning me-1"></i> Chạy Kế Hoạch</button>
+            </div>
+
+            <button type="submit" asp-action="ExportExcel" class="btn btn-success fw-bold shadow-sm px-4 rounded-pill">
+                <i class="fa-solid fa-file-excel me-2"></i> Tải Excel
+            </button>
+        </form>
+    </div>
+
+    @if (Model.Warnings != null && Model.Warnings.Any())
+    {
+        <div class="alert alert-danger shadow-sm mb-4 rounded-3 border-0 border-start border-4 border-danger">
+            <h6 class="fw-bold text-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i>Cảnh báo thiếu dữ liệu (Hệ thống sẽ bỏ qua các dòng này)</h6>
+            <ul class="mb-0 small">
+                @foreach (var w in Model.Warnings)
+                {
+                    <li>@w</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <ul class="nav nav-pills mb-3 gap-2" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-bold rounded-pill px-4 shadow-sm border" id="pills-aggregate-tab" data-bs-toggle="pill" data-bs-target="#pills-aggregate" type="button" role="tab"><i class="fa-solid fa-cubes-stacked me-2"></i>TỔNG HỢP TOÀN XƯỞNG</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-bold rounded-pill px-4 shadow-sm border" id="pills-detail-tab" data-bs-toggle="pill" data-bs-target="#pills-detail" type="button" role="tab"><i class="fa-solid fa-list-check me-2"></i>CHI TIẾT THEO ĐƠN HÀNG</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="pills-tabContent">
+        <div class="tab-pane fade show active" id="pills-aggregate" role="tabpanel">
+            <div class="erp-card p-4">
+                <div class="table-responsive">
+                    <table class="table table-hover table-erp w-100" id="aggregateTable">
+                        <thead>
+                            <tr>
+                                <th>Tên Vật Tư 📦</th>
+                                <th class="text-center">ĐVT</th>
+                                <th class="text-center text-primary">Tổng Cần Dùng 🎯</th>
+                                <th class="text-center text-secondary">Tồn Kho Hiện Tại 🏢</th>
+                                <th class="text-center">Trạng Thái Kho ⚖️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.AggregatedMaterials.Any())
+                            {
+                                foreach (var item in Model.AggregatedMaterials)
+                                {
+                                    bool isMissing = item.Missing > 0;
+                                    string rowClass = isMissing ? "bg-danger bg-opacity-10" : "";
+
+                                    <tr class="@rowClass">
+                                        <td class="fw-bold text-dark">@item.MaterialName</td>
+                                        <td class="text-center text-muted small fw-bold">@item.Unit</td>
+                                        <td class="text-center fw-bold text-primary num-cell fs-6">@item.TotalNeeded.ToString("N2")</td>
+                                        <td class="text-center fw-bold text-secondary num-cell fs-6">@item.CurrentStock.ToString("N2")</td>
+                                        <td class="text-center">
+                                            @if (isMissing)
+                                            {
+                                                <span class="badge bg-danger px-3 py-2 shadow-sm" style="font-size:0.8rem;">
+                                                    <i class="fa-solid fa-cart-shopping me-1"></i> Mua thêm @item.Missing.ToString("N2")
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2" style="font-size:0.8rem;">
+                                                    <i class="fa-solid fa-check me-1"></i> Đủ sản xuất
+                                                </span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-detail" role="tabpanel">
+            <div class="erp-card p-4">
+                <div class="table-responsive">
+                    <table class="table table-hover table-erp w-100" id="detailTable">
+                        <thead>
+                            <tr>
+                                <th>Thông tin Đơn hàng (Ẩn)</th>
+                                <th width="30%">Sản Phẩm Đặt 🛋️</th>
+                                <th>Nguyên Liệu Phân Bổ (BOM) 🧱</th>
+                                <th class="text-end">Khối Lượng Cần 📐</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Orders.Any())
+                            {
+                                foreach (var order in Model.Orders)
+                                {
+                                    // Tạo chuỗi Nhóm
+                                    string badgeColor = order.ProgressColor.Replace("bg-", ""); // Xử lý class màu
+                                    string groupTitle = $"Mã Đơn: {order.OrderCode} &nbsp;|&nbsp; Khách Hàng: {order.CustomerName} &nbsp;|&nbsp; Hẹn Giao: {order.DeliveryDate:dd/MM/yyyy}";
+
+                                    if (order.BomRequirements.Any())
+                                    {
+                                        foreach (var req in order.BomRequirements)
+                                        {
+                                            <tr>
+                                                <td>@groupTitle</td>
+                                                <td class="fw-bold text-primary">
+                                                    <i class="fa-solid fa-caret-right text-muted me-2"></i>@req.ProductName
+                                                </td>
+                                                <td class="fw-bold text-dark">@req.MaterialName</td>
+                                                <td class="text-end fw-bold num-cell text-danger fs-6">
+                                                    @req.QuantityNeeded.ToString("N2") <span class="badge bg-light text-secondary border fw-normal ms-1">@req.Unit</span>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        // 1. Khởi tạo Flatpickr
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn", allowInput: true });
+
+        // 2. DataTables cho Bảng Tổng hợp
+        if (document.getElementById('aggregateTable')) {
+            $('#aggregateTable').DataTable({
+                "language": { "search": "🔍 Tìm kiếm vật tư:", "lengthMenu": "Hiển thị _MENU_ dòng", "info": "Hiển thị _START_ - _END_ / _TOTAL_ vật tư", "infoEmpty": "Không có dữ liệu", "zeroRecords": "Không tìm thấy" },
+                "ordering": true,
+                "pageLength": 50
+            });
+        }
+
+        // 3. DataTables cho Bảng Chi tiết (Có Row Grouping)
+        if (document.getElementById('detailTable')) {
+            $('#detailTable').DataTable({
+                "language": { "search": "🔍 Tìm kiếm sản phẩm / vật tư:", "lengthMenu": "Hiển thị _MENU_ dòng", "info": "Hiển thị _START_ - _END_ / _TOTAL_ dòng", "infoEmpty": "Không có dữ liệu", "zeroRecords": "Không tìm thấy" },
+                "ordering": false, // Tắt sort để giữ đúng thứ tự đơn hàng
+                "pageLength": 100,
+                "columnDefs": [{ "visible": false, "targets": 0 }], // Ẩn cột Nhóm
+
+                // Thuật toán gộp nhóm nguyên bản (Giống trang Báo cáo Tồn Kho)
+                "drawCallback": function (settings) {
+                    var api = this.api();
+                    var rows = api.rows({ page: 'current' }).nodes();
+                    var last = null;
+                    var currentGroupId = '';
+
+                    api.column(0, { page: 'current' }).data().each(function (group, i) {
+                        if (last !== group) {
+                            currentGroupId = 'group-order-' + i;
+
+                            $(rows).eq(i).before(
+                                '<tr class="group-header" data-group="' + currentGroupId + '" style="cursor: pointer;">' +
+                                '<td colspan="3" class="fw-bold text-uppercase py-3">' +
+                                '<i class="fa-regular fa-square-minus me-2 toggle-icon"></i>' +
+                                group +
+                                '</td>' +
+                                '</tr>'
+                            );
+                            last = group;
+                        }
+                        $(rows).eq(i).addClass(currentGroupId + '-row detail-row');
+                    });
+                }
+            });
+
+            // Sự kiện Click để Đóng/Mở nhóm Đơn hàng
+            $('#detailTable tbody').on('click', 'tr.group-header', function () {
+                var groupId = $(this).data('group');
+                var $rows = $('.' + groupId + '-row');
+                var $icon = $(this).find('.toggle-icon');
+
+                if ($rows.is(':visible')) {
+                    $rows.hide();
+                    $icon.removeClass('fa-square-minus').addClass('fa-square-plus text-muted');
+                } else {
+                    $rows.show();
+                    $icon.removeClass('fa-square-plus text-muted').addClass('fa-square-minus');
+                }
+            });
+        }
+    });
+
+    // Hàm chọn khoảng thời gian nhanh (Cho MRP ưu tiên xem tương lai)
+    function setPeriod(type) {
+        const today = new Date();
+        let from = new Date();
+        let to = new Date();
+
+        if (type === 'next7days') {
+            to.setDate(today.getDate() + 7);
+        } else if (type === 'next30days') {
+            to.setDate(today.getDate() + 30);
+        }
+
+        const formatDate = (date) => {
+            var d = new Date(date), month = '' + (d.getMonth() + 1), day = '' + d.getDate(), year = d.getFullYear();
+            if (month.length < 2) month = '0' + month;
+            if (day.length < 2) day = '0' + day;
+            return [year, month, day].join('-');
+        }
+
+        document.getElementById('fromDate')._flatpickr.setDate(formatDate(from));
+        document.getElementById('toDate')._flatpickr.setDate(formatDate(to));
+    }
+</script>

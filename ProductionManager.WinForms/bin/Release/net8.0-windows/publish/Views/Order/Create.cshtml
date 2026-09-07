@@ -1,0 +1,436 @@
+﻿@model ProductionManager.Data.Order
+@{
+    ViewData["Title"] = "Tạo đơn hàng mới";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Quản lý Đơn hàng", Url.Action("Index", "Order")), 
+        ("Tạo Đơn Mới", "") 
+    };
+    var productListJson = System.Text.Json.JsonSerializer.Serialize(ViewBag.ProductList);
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<style>
+    /* 1. GLOBAL */
+    body { background-color: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .validation-summary-valid { display: none; }
+
+    /* 2. HEADER */
+    .pro-header {
+        background: #fff; padding: 15px 0; margin-bottom: 25px;
+        position: sticky; top: 0; z-index: 900;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03); border-bottom: 1px solid #e2e8f0;
+    }
+
+    /* 3. CARD CHÍNH */
+    .card-pro {
+        background: #fff; border: none; border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.02); height: 100%;
+        display: flex; flex-direction: column; overflow: visible; /* Để dropdown không bị che */
+    }
+    .card-pro-header {
+        padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+        font-weight: 700; color: #475569; text-transform: uppercase; font-size: 0.8rem;
+    }
+
+    /* 4. BẢNG HIỂN THỊ (VIEW ONLY) */
+    .table-custom thead th {
+        background-color: #f1f5f9; color: #64748b; font-weight: 700;
+        font-size: 0.75rem; text-transform: uppercase; padding: 12px 15px; border-bottom: 2px solid #e2e8f0;
+    }
+    .table-custom tbody td {
+        padding: 12px 15px; vertical-align: middle; border-bottom: 1px dashed #e2e8f0; color: #334155;
+    }
+    /* Input trong bảng chỉ để hiển thị/sửa nhẹ, không viền cho đẹp */
+    .input-clean {
+        border: none; background: transparent; width: 100%;
+        font-weight: 600; color: #334155; outline: none;
+    }
+    .input-clean:focus { background: #fff; box-shadow: 0 0 0 2px #e2e8f0; border-radius: 4px; }
+
+    /* 5. 🔥 PANEL NHẬP LIỆU RIÊNG BIỆT (KHÔNG DÍNH VÀO TABLE) 🔥 */
+    .add-panel-container {
+        background-color: #fff;
+        border-top: 2px solid #e2e8f0;
+        padding: 20px;
+        border-radius: 0 0 12px 12px;
+        box-shadow: 0 -5px 15px rgba(0,0,0,0.01);
+    }
+    
+    .input-label {
+        font-size: 0.7rem; font-weight: 700; color: #64748b; 
+        text-transform: uppercase; margin-bottom: 6px; display: block;
+    }
+
+    /* Ô nhập liệu chuẩn */
+    .form-control-custom {
+        border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px;
+        font-weight: 600; font-size: 0.95rem; width: 100%; transition: 0.2s;
+    }
+    .form-control-custom:focus {
+        border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); outline: none;
+    }
+
+    /* Ô tìm kiếm đặc biệt */
+    .search-wrapper { position: relative; width: 100%; }
+    .search-icon {
+        position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+        color: #6366f1; font-size: 1.1rem; pointer-events: none;
+    }
+    #txtSearch { padding-left: 40px; } /* Chừa chỗ cho icon */
+
+    /* Danh sách gợi ý (Dropdown) */
+    #suggestionList {
+        display: none; position: absolute; top: 100%; left: 0; width: 100%;
+        max-height: 350px; overflow-y: auto;
+        background: white; border: 1px solid #cbd5e1; border-radius: 8px;
+        box-shadow: 0 10px 40px -5px rgba(0, 0, 0, 0.15); 
+        z-index: 1050; /* Cao hơn mọi thứ */
+        margin-top: 5px;
+    }
+    .suggest-item {
+        padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f1f5f9;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .suggest-item:hover { background-color: #f0fdf4; color: #15803d; }
+    
+    /* Nút thêm */
+    .btn-add-item {
+        height: 45px; width: 100%; border-radius: 8px; font-weight: 800;
+        text-transform: uppercase; font-size: 0.9rem;
+        background: #6366f1; color: white; border: none;
+        box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+        transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-add-item:hover { background: #4f46e5; transform: translateY(-2px); }
+    .btn-add-item:active { transform: translateY(0); }
+
+    /* CARD TỔNG TIỀN */
+    .total-card {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border-radius: 16px; padding: 25px; margin-top: 20px;
+        color: white; text-align: right;
+        box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.4);
+        position: relative; overflow: hidden;
+    }
+</style>
+
+<form asp-action="Create" enctype="multipart/form-data" id="createForm" method="post">
+
+    <div class="pro-header">
+        <div class="container-fluid px-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-primary bg-opacity-10 p-2 rounded-circle text-primary">
+                        <i class="fa-solid fa-cart-plus fa-lg"></i>
+                    </div>
+                    <div>
+                        <h5 class="fw-bold mb-0 text-dark">Tạo Đơn Hàng</h5>
+                        <small class="text-muted">Nhập thông tin & thêm sản phẩm</small>
+                    </div>
+                </div>
+                <div>
+                    <a asp-action="Index" class="btn btn-light border fw-bold text-secondary me-2 shadow-sm rounded-pill px-4">Hủy bỏ</a>
+                    <button type="submit" class="btn btn-primary fw-bold px-5 shadow-sm rounded-pill">
+                        <i class="fa-solid fa-check me-2"></i> HOÀN TẤT
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid px-4 pb-5">
+        <div asp-validation-summary="All" class="alert alert-danger mb-4 shadow-sm" role="alert"></div>
+
+        <div class="row g-4">
+            <div class="col-lg-3">
+                <div class="card-pro h-100">
+                    <div class="card-pro-header"><i class="fa-regular fa-id-card me-2"></i>Thông tin chung</div>
+                    <div class="p-4">
+                        <div class="mb-3">
+                            <label class="input-label">Mã đơn hàng <span class="text-danger">*</span></label>
+                            <input asp-for="OrderCode" class="form-control fw-bold text-primary" placeholder="VD: DH-001" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="input-label">Khách hàng <span class="text-danger">*</span></label>
+                            <select asp-for="CustomerId" class="form-select fw-bold" asp-items="ViewBag.CustomerId"></select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="input-label">Ngày giao <span class="text-danger">*</span></label>
+                            <input asp-for="DeliveryDeadline" type="text" class="form-control fw-bold datepicker" 
+                                   placeholder="dd/mm/yyyy" value="@DateTime.Now.ToString("yyyy-MM-dd")" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="input-label">File đính kèm</label>
+                            <input type="file" name="designFile" class="form-control form-control-sm" />
+                        </div>
+                        <div class="mb-0">
+                            <label class="input-label">Ghi chú</label>
+                            <textarea asp-for="Notes" class="form-control" rows="4"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-9">
+                <div class="card-pro mb-3">
+                    <div class="card-pro-header d-flex justify-content-between align-items-center">
+                        <span>📦 Danh sách sản phẩm</span>
+                        <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3" id="itemCountBadge">0 sản phẩm</span>
+                    </div>
+
+                    <div class="table-responsive flex-grow-1" style="min-height: 150px;">
+                        <table class="table table-custom mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 35%">Sản phẩm / Quy cách</th>
+                                    <th style="width: 10%" class="text-center">SL</th>
+                                    <th style="width: 10%" class="text-center">VAT %</th>
+                                    <th style="width: 20%" class="text-end">Đơn giá</th>
+                                    <th style="width: 20%" class="text-end">Thành tiền</th>
+                                    <th style="width: 5%"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyDetails">
+                                </tbody>
+                        </table>
+                        <div id="emptyState" class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-basket-shopping fa-2x mb-2 opacity-25"></i>
+                            <div>Chưa có sản phẩm nào. Hãy thêm bên dưới.</div>
+                        </div>
+                    </div>
+
+                    <div class="add-panel-container">
+                        <div class="row g-3 align-items-end">
+                            
+                            <div class="col-md-5">
+                                <label class="input-label">1. Tìm & Chọn sản phẩm</label>
+                                <div class="search-wrapper">
+                                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                                    <input type="text" id="txtSearch" class="form-control-custom" 
+                                           placeholder="Gõ tên để tìm..." autocomplete="off">
+                                    <div id="suggestionList"></div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="input-label">2. Quy cách (Nếu có)</label>
+                                <input type="text" id="txtSpecs" class="form-control-custom text-muted fst-italic bg-light" 
+                                       placeholder="Dài x Rộng x Cao..." />
+                            </div>
+
+                            <div class="col-md-1">
+                                <label class="input-label text-center">3. SL</label>
+                                <input type="number" id="txtQty" class="form-control-custom text-center" value="1" min="1" />
+                            </div>
+
+                            <div class="col-md-1">
+                                <label class="input-label text-center">4. VAT</label>
+                                <input type="number" id="txtVat" class="form-control-custom text-center text-danger" value="0" min="0" max="100" />
+                            </div>
+
+                            <div class="col-md-2">
+                                <button type="button" class="btn-add-item" onclick="addQuickProduct()">
+                                    <i class="fa-solid fa-plus-circle fa-lg"></i> THÊM
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <input type="hidden" id="txtPrice" value="0" />
+                    </div>
+                </div>
+
+                <div class="row justify-content-end">
+                    <div class="col-md-5">
+                        <div class="total-card">
+                            <div style="font-size: 0.9rem; font-weight: 600; opacity: 0.9;">TỔNG THANH TOÁN (VAT)</div>
+                            <div style="font-size: 2.5rem; font-weight: 800; line-height: 1.1;" id="grandTotalDisplay">0 ₫</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        var products = @Html.Raw(productListJson);
+
+        document.addEventListener("DOMContentLoaded", function () {
+            
+            // 1. Kích hoạt Flatpickr
+            flatpickr(".datepicker", {
+                altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d",
+                allowInput: true, locale: "vn", defaultDate: new Date()
+            });
+
+            // 2. LOGIC TÌM KIẾM
+            const searchInput = document.getElementById('txtSearch');
+            const suggestionList = document.getElementById('suggestionList');
+
+            searchInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                if (query.length === 0) { suggestionList.style.display = 'none'; return; }
+
+                const matches = products.filter(p => p.ProductName.toLowerCase().includes(query));
+                
+                if (matches.length > 0) {
+                    let html = '';
+                    matches.forEach(p => {
+                        const dataJson = JSON.stringify(p).replace(/"/g, '&quot;');
+                        const icon = p.Type === 'PARENT' ? '📦' : '🔹';
+                        
+                        html += `
+                            <div class="suggest-item" onclick="selectProduct('${dataJson}')">
+                                <div>
+                                    <span class="me-2">${icon}</span>
+                                    <strong>${p.ProductName}</strong>
+                                    <div class="small text-muted ps-4">${p.Specs || ''}</div>
+                                </div>
+                                <div class="fw-bold text-success">${p.DefaultPrice.toLocaleString()}</div>
+                            </div>
+                        `;
+                    });
+                    suggestionList.innerHTML = html;
+                    suggestionList.style.display = 'block';
+                } else {
+                    suggestionList.style.display = 'none';
+                }
+            });
+
+            // Ẩn khi click ra ngoài
+            document.addEventListener('click', (e) => {
+                if (!searchInput.contains(e.target) && !suggestionList.contains(e.target)) {
+                    suggestionList.style.display = 'none';
+                }
+            });
+
+            // Enter Navigation
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (suggestionList.style.display === 'block' && suggestionList.children.length > 0) {
+                        suggestionList.children[0].click();
+                    } else {
+                        document.getElementById('txtQty').focus();
+                    }
+                }
+            });
+
+            document.getElementById('txtQty').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); addQuickProduct(); }
+            });
+        });
+
+        // 3. CHỌN SẢN PHẨM
+        window.selectProduct = function(jsonString) {
+            const p = JSON.parse(jsonString);
+            
+            document.getElementById('txtSearch').value = p.ProductName;
+            document.getElementById('txtSpecs').value = p.Specs || '';
+            document.getElementById('txtPrice').value = p.DefaultPrice || 0;
+            
+            document.getElementById('suggestionList').style.display = 'none';
+            document.getElementById('txtQty').select(); 
+        };
+
+        // 4. THÊM VÀO BẢNG
+        function addQuickProduct() {
+            const name = document.getElementById('txtSearch').value.trim();
+            if (!name) { 
+                document.getElementById('txtSearch').focus();
+                alert('⚠️ Vui lòng chọn sản phẩm!'); 
+                return; 
+            }
+
+            const qty = parseFloat(document.getElementById('txtQty').value) || 1;
+            const specs = document.getElementById('txtSpecs').value;
+            const price = parseFloat(document.getElementById('txtPrice').value) || 0;
+            const vat = parseFloat(document.getElementById('txtVat').value) || 0;
+
+            appendRow(name, specs, qty, price, vat);
+
+            // Reset
+            document.getElementById('txtSearch').value = '';
+            document.getElementById('txtQty').value = 1;
+            document.getElementById('txtSpecs').value = '';
+            document.getElementById('txtPrice').value = 0;
+            document.getElementById('txtVat').value = 0;
+            
+            document.getElementById('txtSearch').focus();
+        }
+
+        // 5. RENDER DÒNG
+        function appendRow(name, specs, qty, price, vat = 0) {
+            document.getElementById('emptyState').style.display = 'none';
+            var tbody = document.getElementById('tbodyDetails');
+            var uId = "NEW_" + Date.now() + Math.floor(Math.random() * 1000);
+            
+            var tr = document.createElement('tr');
+            tr.className = "item-row animate__animated animate__fadeIn";
+            
+            tr.innerHTML = `
+                <input type="hidden" name="OrderDetails.Index" value="${uId}" />
+                <input type="hidden" name="OrderDetails[${uId}].Id" value="0" />
+
+                <td class="ps-3">
+                    <input type="text" name="OrderDetails[${uId}].ProductName" value="${name}" 
+                           class="input-clean text-primary fw-bold" required />
+                    <input type="text" name="OrderDetails[${uId}].Specifications" value="${specs}" 
+                           class="input-clean text-muted fst-italic small" placeholder="Quy cách..." />
+                </td>
+                <td class="text-center">
+                    <input type="number" name="OrderDetails[${uId}].Quantity" value="${qty}" 
+                           class="input-clean text-center fw-bold qty-input" min="1" oninput="calculateTotal()" />
+                </td>
+                <td class="text-center">
+                    <input type="number" name="OrderDetails[${uId}].VatPercent" value="${vat}" 
+                           class="input-clean text-center text-danger vat-input" min="0" max="100" oninput="calculateTotal()" />
+                </td>
+                <td>
+                    <input type="number" name="OrderDetails[${uId}].UnitPrice" value="${price}" 
+                           class="input-clean text-end price-input" oninput="calculateTotal()" />
+                </td>
+                <td class="text-end align-middle">
+                    <span class="fw-bold row-total">0</span>
+                </td>
+                <td class="text-center align-middle">
+                    <a href="javascript:void(0)" class="text-danger opacity-50 hover-opacity-100" onclick="removeRow(this)">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </a>
+                </td>
+            `;
+            tbody.appendChild(tr);
+            calculateTotal();
+        }
+
+        function removeRow(el) { 
+            if (confirm('Xóa dòng này?')) { 
+                el.closest('tr').remove(); 
+                calculateTotal();
+                if(document.querySelectorAll('.item-row').length === 0) {
+                    document.getElementById('emptyState').style.display = 'block';
+                }
+            } 
+        }
+
+        function calculateTotal() {
+            var grandTotal = 0; var count = 0;
+            document.querySelectorAll('.item-row').forEach(row => {
+                var q = parseFloat(row.querySelector('.qty-input').value) || 0;
+                var p = parseFloat(row.querySelector('.price-input').value) || 0;
+                var v = parseFloat(row.querySelector('.vat-input').value) || 0;
+                var t = (q * p) * (1 + v/100);
+                
+                row.querySelector('.row-total').innerText = t.toLocaleString('vi-VN');
+                grandTotal += t; count++;
+            });
+            document.getElementById('grandTotalDisplay').innerText = grandTotal.toLocaleString('vi-VN') + " ₫";
+            document.getElementById('itemCountBadge').innerText = count + " sản phẩm";
+        }
+    </script>
+}

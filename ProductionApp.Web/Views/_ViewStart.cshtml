@@ -1,0 +1,13 @@
+﻿@* @{
+    Layout = "_Layout";
+} *@
+@{
+    if (Context.Request.Headers["Sec-Fetch-Dest"] == "iframe")
+    {
+        Layout = null; 
+    }
+    else
+    {
+        Layout = "_Layout"; 
+    }
+}

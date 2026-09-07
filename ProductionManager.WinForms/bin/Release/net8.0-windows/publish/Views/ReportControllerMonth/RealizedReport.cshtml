@@ -1,0 +1,352 @@
+﻿@model ProductionApp.Web.Models.ViewModels.MonthlyRealizedReportVM
+@using ProductionManager.Data
+@{
+    ViewData["Title"] = $"Báo Cáo Thực Chứng Tháng {Model.Month}/{Model.Year}";
+    var company = ViewBag.CompanyInfo as CompanyConfig ?? new CompanyConfig();
+}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    .progress-xl { height: 35px; border-radius: 8px; font-weight: bold; font-size: 1rem; box-shadow: inset 0 1px 2px rgba(0,0,0,.1); }
+    .card-realized { border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 25px; }
+    .stat-label { font-size: 0.9rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-value { font-size: 1.5rem; font-weight: 800; color: #0f172a; font-family: 'Consolas', monospace; }
+    
+    /* Làm đẹp nút Switch */
+    .form-switch .form-check-input { width: 2.5em; height: 1.25em; cursor: pointer; }
+    .form-switch .form-check-label { cursor: pointer; padding-top: 2px; }
+
+    @Html.Raw("@media print {")
+        @Html.Raw("@page { margin: 10mm 15mm; size: A4 portrait; }")
+        header, footer, nav, .navbar, .sidebar, .main-header, .app-header { display: none !important; }
+        body { background: white !important; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .container, .container-fluid, main, .pb-3 { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+        .bg-light { background-color: white !important; }
+        .card-realized { border: 1px solid #ddd !important; box-shadow: none !important; page-break-inside: avoid; margin-bottom: 15px !important; }
+        .no-print, form, .btn, .form-switch { display: none !important; }
+        .print-only-header { display: block !important; text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .progress-bar { color: white !important; font-size: 0.85rem !important; }
+        .bg-success { background-color: #198754 !important; }
+        .bg-warning { background-color: #ffc107 !important; color: #000 !important; }
+        .bg-primary { background-color: #0d6efd !important; }
+        .bg-secondary { background-color: #6c757d !important; }
+        /* Đảm bảo biểu đồ in ra không bị vỡ */
+        canvas { max-width: 100% !important; height: auto !important; }
+    @Html.Raw("}")
+    .print-only-header { display: none; }
+</style>
+
+<div class="container-fluid py-4 bg-light min-vh-100">
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <div>
+            <h3 class="fw-bold text-dark mb-1"><i class="fa-solid fa-chart-pie text-primary me-2"></i>BÁO CÁO THỰC CHỨNG</h3>
+            <span class="text-muted small">Phân tích chênh lệch Hóa Đơn & Tồn Kho tháng @Model.Month/@Model.Year</span>
+        </div>
+        
+        <div class="d-flex gap-3 align-items-center">
+            
+            <div class="form-check form-switch fs-5 mb-0">
+                <input class="form-check-input shadow-sm" type="checkbox" id="viewModeSwitch" onchange="toggleViewMode()">
+                <label class="form-check-label fw-bold text-primary small ms-1" for="viewModeSwitch" id="viewModeLabel">
+                    <i class="fa-solid fa-chart-column me-1"></i> Biểu Đồ Thông Minh
+                </label>
+            </div>
+
+            <div class="vr mx-1"></div>
+
+            <form method="get" class="d-flex gap-2 bg-white p-2 rounded-3 shadow-sm border m-0">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light fw-bold text-muted border-0"><i class="fa-solid fa-calendar-day me-1"></i> Kỳ</span>
+                    <select name="month" class="form-select fw-bold border-0 bg-light text-primary" onchange="this.form.submit()">
+                        @for(int i=1; i<=12; i++) { <option value="@i" selected="@(Model.Month == i)">Tháng @i</option> }
+                    </select>
+                    <select name="year" class="form-select fw-bold border-0 bg-light text-primary" onchange="this.form.submit()">
+                        @for(int i=DateTime.Now.Year - 2; i<=DateTime.Now.Year; i++) { <option value="@i" selected="@(Model.Year == i)">Năm @i</option> }
+                    </select>
+                </div>
+            </form>
+
+            <a href="@Url.Action("ExportRealizedExcel", new { month = Model.Month, year = Model.Year })" class="btn btn-success fw-bold shadow-sm d-flex align-items-center">
+                <i class="fa-solid fa-file-excel me-2"></i> Xuất Excel
+            </a>
+            
+            <button onclick="window.print()" class="btn btn-danger fw-bold shadow-sm d-flex align-items-center">
+                <i class="fa-solid fa-file-pdf me-2"></i> In PDF
+            </button>
+        </div>
+    </div>
+
+    <div class="print-only-header">
+        <h2 class="fw-bold mb-1" style="font-size: 22px;">@(company.CompanyName?.ToUpper() ?? "TÊN CÔNG TY")</h2>
+        <h3 class="fw-bold mt-3 mb-1" style="font-size: 18px;">BÁO CÁO THỰC CHỨNG (DOANH THU & CHI PHÍ THỰC TẾ)</h3>
+        <p class="fst-italic mb-2">Kỳ báo cáo: Tháng @Model.Month năm @Model.Year</p>
+    </div>
+
+    <div id="classic-view">
+        <div class="row justify-content-center m-0">
+            <div class="col-xl-12 px-0">
+                
+                <div class="card card-realized">
+                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                        <h5 class="fw-bold text-primary mb-0"><i class="fa-solid fa-file-invoice me-2"></i>1. DOANH THU ĐÃ GIAO HÀNG & TIẾN ĐỘ XUẤT HÓA ĐƠN</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4 border-end">
+                                <div class="stat-label">Tổng Doanh thu đã giao (Đủ SL)</div>
+                                <div class="stat-value text-primary">@Model.TotalDeliveredRevenue.ToString("N0") <small class="text-muted fs-6">đ</small></div>
+                            </div>
+                            <div class="col-md-4 border-end">
+                                <div class="stat-label">Thực xuất Hóa Đơn (Billed)</div>
+                                <div class="stat-value text-success">@Model.BilledRevenue.ToString("N0") <small class="text-muted fs-6">đ</small></div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-label">Chưa xuất Hóa Đơn (Unbilled)</div>
+                                <div class="stat-value text-warning">@Model.UnbilledRevenue.ToString("N0") <small class="text-muted fs-6">đ</small></div>
+                            </div>
+                        </div>
+
+                        @{
+                            double billedPercent = Model.TotalDeliveredRevenue > 0 ? (double)(Model.BilledRevenue / Model.TotalDeliveredRevenue) * 100 : 0;
+                            double unbilledPercent = Model.TotalDeliveredRevenue > 0 ? 100 - billedPercent : 0;
+                        }
+                        <div class="progress progress-xl">
+                            <div class="progress-bar bg-success" style="width: @billedPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%">ĐÃ XUẤT HĐ: @billedPercent.ToString("0")%</div>
+                            @if(unbilledPercent > 0) {
+                                <div class="progress-bar bg-warning text-dark progress-bar-striped progress-bar-animated" style="width: @unbilledPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%">CHƯA XUẤT HĐ: @unbilledPercent.ToString("0")%</div>
+                            }
+                        </div>
+                        <small class="text-muted fst-italic mt-2 d-block no-print">* Cần giục Kế toán xuất nốt phần màu vàng để đảm bảo tính pháp lý và thu hồi công nợ.</small>
+                    </div>
+                </div>
+
+                <div class="card card-realized">
+                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                        <h5 class="fw-bold text-danger mb-0"><i class="fa-solid fa-boxes-stacked me-2"></i>2. CHI PHÍ VẬT TƯ: TỔNG CHI MUA vs THỰC DÙNG</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4 border-end">
+                                <div class="stat-label">Tổng tiền chi Mua Vật Tư</div>
+                                <div class="stat-value text-danger">@Model.TotalMaterialPurchased.ToString("N0") <small class="text-muted fs-6">đ</small></div>
+                            </div>
+                            <div class="col-md-4 border-end">
+                                <div class="stat-label">Thực dùng để SX (Vào Giá vốn)</div>
+                                <div class="stat-value text-primary">@Model.MaterialConsumed.ToString("N0") <small class="text-muted fs-6">đ</small></div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-label">Tồn kho / Đọng vốn</div>
+                                <div class="stat-value @(Model.MaterialRemaining > 0 ? "text-secondary" : "text-success")">
+                                    @Model.MaterialRemaining.ToString("N0") <small class="text-muted fs-6">đ</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (Model.TotalMaterialPurchased >= Model.MaterialConsumed && Model.TotalMaterialPurchased > 0)
+                        {
+                            double consumedPercent = (double)(Model.MaterialConsumed / Model.TotalMaterialPurchased) * 100;
+                            double remainPercent = 100 - consumedPercent;
+                            <div class="progress progress-xl">
+                                <div class="progress-bar bg-primary" style="width: @consumedPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%">THỰC DÙNG: @consumedPercent.ToString("0")%</div>
+                                @if(remainPercent > 0) {
+                                    <div class="progress-bar bg-secondary" style="width: @remainPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%">ĐỌNG VỐN TỒN KHO: @remainPercent.ToString("0")%</div>
+                                }
+                            </div>
+                        }
+                        else if (Model.MaterialConsumed > Model.TotalMaterialPurchased)
+                        {
+                            <div class="alert alert-success fw-bold mb-0 mt-3 no-print">
+                                <i class="fa-solid fa-arrow-trend-down me-2"></i>Tháng này xuất kho sử dụng nhiều hơn mua mới (Đang tiêu hao Tồn kho cũ). Giải phóng vốn tốt!
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="card card-realized">
+                    <div class="card-header bg-dark text-white pt-3 pb-3">
+                        <h5 class="fw-bold mb-0"><i class="fa-solid fa-money-bill-transfer me-2"></i>3. TỔNG HỢP CHI PHÍ VẬN HÀNH (OPEX)</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light text-muted small text-uppercase">
+                                <tr>
+                                    <th class="ps-4">Nhóm Chi Phí</th>
+                                    <th class="text-end pe-4">Thành Tiền Phân Bổ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach(var group in Model.OpexGroups)
+                                {
+                                    <tr>
+                                        <td class="ps-4 fw-bold text-dark"><i class="fa-solid fa-tag text-secondary me-2 no-print"></i>@group.Key</td>
+                                        <td class="text-end pe-4 fw-bold font-monospace fs-5">@group.Value.ToString("N0") đ</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot class="bg-light">
+                                <tr>
+                                    <td class="ps-4 fw-bold text-uppercase fs-6">Tổng chi phí vận hành (OPEX)</td>
+                                    <td class="text-end pe-4 fw-black text-danger fs-5">@Model.TotalOpex.ToString("N0") đ</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="chart-view" style="display: none;">
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <div class="card card-realized h-100">
+                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 text-center">
+                        <h6 class="fw-bold text-primary mb-0">DOANH THU & HÓA ĐƠN</h6>
+                    </div>
+                    <div class="card-body d-flex justify-content-center align-items-center" style="position: relative; height: 350px;">
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6 mb-4">
+                <div class="card card-realized h-100">
+                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 text-center">
+                        <h6 class="fw-bold text-danger mb-0">CHI PHÍ VẬT TƯ (MUA vs DÙNG)</h6>
+                    </div>
+                    <div class="card-body d-flex justify-content-center align-items-center" style="position: relative; height: 350px;">
+                        <canvas id="materialChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-12 mb-4">
+                <div class="card card-realized">
+                    <div class="card-header bg-dark text-white pt-3 pb-3 text-center">
+                        <h6 class="fw-bold mb-0">PHÂN BỔ CHI PHÍ VẬN HÀNH (OPEX)</h6>
+                    </div>
+                    <div class="card-body" style="position: relative; height: 400px; width: 100%;">
+                        <canvas id="opexChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+<script>
+    let isChartRendered = false; // Cờ kiểm tra tránh vẽ lại nhiều lần gây lag
+
+    function toggleViewMode() {
+        var isChartMode = document.getElementById("viewModeSwitch").checked;
+        var classicView = document.getElementById("classic-view");
+        var chartView = document.getElementById("chart-view");
+        var label = document.getElementById("viewModeLabel");
+
+        if (isChartMode) {
+            classicView.style.display = "none";
+            chartView.style.display = "block";
+            label.innerHTML = '<i class="fa-solid fa-list me-1"></i> Xem Dạng Bảng';
+            label.classList.replace("text-primary", "text-success");
+            
+            // Chỉ vẽ biểu đồ ở lần bật đầu tiên
+            if (!isChartRendered) {
+                renderCharts();
+                isChartRendered = true;
+            }
+        } else {
+            classicView.style.display = "block";
+            chartView.style.display = "none";
+            label.innerHTML = '<i class="fa-solid fa-chart-column me-1"></i> Biểu Đồ Thông Minh';
+            label.classList.replace("text-success", "text-primary");
+        }
+    }
+
+    function renderCharts() {
+        // Cấu hình định dạng tiền tệ cho Tooltip
+        const currencyFormatter = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
+
+        // 🔥 FIX LỖI: Lấy dữ liệu từ C# và ép kiểu chuẩn JSON để tránh lỗi dấu phẩy thập phân của tiếng Việt
+        var billedRev = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.BilledRevenue));
+        var unbilledRev = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.UnbilledRevenue));
+        
+        var matRemaining = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MaterialRemaining));
+        var matConsumed = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MaterialConsumed));
+
+        // 1. BIỂU ĐỒ DOANH THU (DOUGHNUT)
+        new Chart(document.getElementById('revenueChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Đã Xuất Hóa Đơn', 'Chưa Xuất (Tồn đọng)'],
+                datasets: [{
+                    data: [billedRev, unbilledRev],
+                    backgroundColor: ['#198754', '#ffc107'],
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: { callbacks: { label: function(context) { return context.label + ': ' + currencyFormatter.format(context.raw); } } }
+                }
+            }
+        });
+
+        // 2. BIỂU ĐỒ VẬT TƯ (DOUGHNUT)
+        var matLabels = matRemaining >= 0 ? ['Thực Dùng SX', 'Đọng Kho (Chưa Dùng)'] : ['Thực Dùng', 'Tiêu hao kho cũ'];
+        var matData = matRemaining >= 0 ? [matConsumed, matRemaining] : [matConsumed, Math.abs(matRemaining)];
+        var matColors = matRemaining >= 0 ? ['#0d6efd', '#6c757d'] : ['#0d6efd', '#20c997'];
+
+        new Chart(document.getElementById('materialChart'), {
+            type: 'doughnut',
+            data: {
+                labels: matLabels,
+                datasets: [{
+                    data: matData,
+                    backgroundColor: matColors,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: { callbacks: { label: function(context) { return context.label + ': ' + currencyFormatter.format(context.raw); } } }
+                }
+            }
+        });
+
+        // 3. BIỂU ĐỒ OPEX (BAR CHART)
+        var opexLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OpexGroups.Keys));
+        var opexData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OpexGroups.Values));
+
+        new Chart(document.getElementById('opexChart'), {
+            type: 'bar',
+            data: {
+                labels: opexLabels,
+                datasets: [{
+                    label: 'Thành tiền phân bổ (VNĐ)',
+                    data: opexData,
+                    backgroundColor: '#dc3545',
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: function(context) { return currencyFormatter.format(context.raw); } } }
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { callback: function(value) { return value.toLocaleString('vi-VN'); } } }
+                }
+            }
+        });
+    }
+</script>

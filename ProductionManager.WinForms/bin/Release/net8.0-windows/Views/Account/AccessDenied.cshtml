@@ -1,0 +1,39 @@
+﻿@{
+    ViewData["Title"] = "Không đủ quyền truy cập";
+}
+
+<div class="container py-5 text-center">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-danger">
+                <div class="card-body p-5">
+
+                    <div class="mb-4 text-danger">
+                        <i class="fa-solid fa-ban" style="font-size: 5rem;"></i>
+                    </div>
+
+                    <h2 class="fw-bold text-danger">Truy cập bị từ chối!</h2>
+
+                    <p class="lead mt-3 text-muted">
+                        Xin lỗi, bạn <strong>không có quyền</strong> truy cập vào trang này.
+                        <br />
+                        Vui lòng liên hệ Admin nếu bạn cho rằng đây là sự nhầm lẫn.
+                    </p>
+
+                    <hr />
+
+                    <div class="d-flex justify-content-center gap-3 mt-4">
+                        <a asp-controller="Home" asp-action="Index" class="btn btn-secondary">
+                            <i class="fa-solid fa-house"></i> Về Trang chủ
+                        </a>
+
+                        <a asp-controller="Account" asp-action="Login" class="btn btn-primary">
+                            <i class="fa-solid fa-right-from-bracket"></i> Đăng nhập tài khoản khác
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

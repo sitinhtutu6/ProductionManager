@@ -1,0 +1,41 @@
+﻿@model IEnumerable<ProductionManager.Data.OrderHistory>
+
+<style>
+    /* Kế thừa UI chuẩn cho bảng Popup */
+    .table-history { margin-bottom: 0; width: 100%; border-collapse: separate; border-spacing: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .table-history th, .table-history td { border-right: 1px solid #e0e6ed; border-bottom: 1px solid #e0e6ed; padding: 12px 16px; vertical-align: middle; }
+    .table-history th:last-child, .table-history td:last-child { border-right: none; }
+    .table-history thead th { position: sticky; top: 0; z-index: 10; background-color: #f8fafc; color: #475569; font-weight: 700; font-size: 13px; text-transform: uppercase; border-bottom: 2px solid #94a3b8; white-space: nowrap; }
+    .table-history tbody tr:hover { background-color: #f1f5f9; transition: background-color 0.15s; }
+    .text-truncate-custom { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
+</style>
+<table class="table table-history align-middle">
+        <thead>
+            <tr>
+                <th style="width: 130px;" class="text-center">Thời gian</th>
+                <th style="width: 150px;">Hành động</th>
+                <th>Trước khi sửa</th>
+                <th>Sau khi sửa</th>
+                <th style="width: 120px;" class="text-center">Người sửa</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                 <tr><td colspan="5" class="text-center py-4 text-muted">Chưa có lịch sử thay đổi nào.</td></tr>
+            }
+            else
+            {
+                foreach (var log in Model)
+                {
+                    <tr>
+                        <td class="text-center text-muted" style="font-size: 13px;">@log.ChangedAt.ToString("dd/MM HH:mm")</td>
+                        <td class="fw-bold text-dark" style="font-size: 13px;">@log.Action</td>
+                        <td><span class="text-danger text-truncate-custom" style="font-size: 13px;" title="@log.OldValue">@(string.IsNullOrEmpty(log.OldValue) ? "-" : log.OldValue)</span></td>
+                        <td><span class="text-success text-truncate-custom" style="font-size: 13px;" title="@log.NewValue">@(string.IsNullOrEmpty(log.NewValue) ? "-" : log.NewValue)</span></td>
+                        <td class="text-center fw-bold text-primary" style="font-size: 13px;">@log.ChangedBy</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>

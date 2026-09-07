@@ -1,0 +1,228 @@
+﻿@using ProductionManager.Data
+@model List<ProductionApp.Web.Controllers.SupplierDebtVM>
+@{
+    ViewData["Title"] = "Quản lý Công Nợ";
+    decimal totalDebt = ViewBag.TotalDebt ?? 0; // Tổng nợ còn lại
+    decimal totalPaid = ViewBag.TotalPaid ?? 0; // Tổng đã trả
+    decimal totalAll = ViewBag.TotalAll ?? 0;   // Tổng mua vào
+
+    // Tính % tổng thể
+    double percentPaid = totalAll > 0 ? (double)(totalPaid / totalAll) * 100 : 0;
+}
+
+<div class="container-fluid p-4">
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 bg-white border-start border-4 border-danger">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-uppercase fw-bold text-danger small mb-1">TỔNG NỢ PHẢI TRẢ</div>
+                            <div class="fs-3 fw-bold text-dark">@totalDebt.ToString("N0") <span class="fs-6 text-muted">VNĐ</span></div>
+                        </div>
+                        <div class="bg-danger bg-opacity-10 p-3 rounded-circle text-danger">
+                            <i class="fa-solid fa-sack-dollar fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 bg-white border-start border-4 border-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-uppercase fw-bold text-success small mb-1">ĐÃ THANH TOÁN</div>
+                            <div class="fs-3 fw-bold text-dark">@totalPaid.ToString("N0") <span class="fs-6 text-muted">VNĐ</span></div>
+                        </div>
+                        <div class="bg-success bg-opacity-10 p-3 rounded-circle text-success">
+                            <i class="fa-solid fa-check-double fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 bg-white">
+                <div class="card-body">
+                    <div class="text-uppercase fw-bold text-primary small mb-2">TIẾN ĐỘ HOÀN THÀNH CÔNG NỢ</div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="fw-bold text-dark">@Math.Round(percentPaid, 1)%</span>
+                        <span class="text-muted small">Mục tiêu: 100%</span>
+                    </div>
+                    <div class="progress" style="height: 15px;">
+                        <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" role="progressbar" style="width: @percentPaid%"></div>
+                    </div>
+                    <div class="mt-2 small text-muted fst-italic">
+                        * Tỉ lệ dựa trên tổng giá trị nhập hàng lũy kế.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body py-3">
+            <div class="row align-items-center g-2">
+                <div class="col-md-4 d-flex align-items-center gap-2">
+                    <a asp-controller="CashBook" asp-action="Index" class="btn btn-light border fw-bold text-secondary shadow-sm" title="Quay lại Sổ Quỹ">
+                        <i class="fa-solid fa-arrow-left me-1"></i> Sổ Quỹ
+                    </a>
+                    <div class="vr h-100"></div>
+                    <h5 class="mb-0 fw-bold text-secondary"><i class="fa-solid fa-list-check me-2"></i>CHI TIẾT CÔNG NỢ</h5>
+                </div>
+                <div class="col-md-8">
+                    <form method="get" class="d-flex justify-content-end gap-2">
+                        <select name="status" class="form-select form-select-sm w-auto fw-bold text-dark" onchange="this.form.submit()">
+                            <option value="">-- Tất cả trạng thái --</option>
+                            <option value="Debt" selected="@(ViewBag.Status == "Debt")">🔴 Đang nợ</option>
+                            <option value="Paid" selected="@(ViewBag.Status == "Paid")">🟢 Đã trả hết</option>
+                        </select>
+                        <div class="input-group input-group-sm w-auto">
+                            <span class="input-group-text bg-white"><i class="fa-solid fa-search"></i></span>
+                            <input type="text" name="keyword" class="form-control" placeholder="Tìm NCC, Mã phiếu..." value="@ViewBag.Keyword" />
+                        </div>
+                        <button class="btn btn-primary btn-sm fw-bold">Lọc</button>
+
+                        <div class="vr mx-2"></div>
+
+                        <a asp-action="ExportExcel" class="btn btn-success btn-sm fw-bold shadow-sm">
+                            <i class="fa-solid fa-file-excel me-1"></i> Xuất Excel
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="accordion" id="debtAccordion">
+        @if (Model.Any())
+        {
+            @foreach (var supplier in Model)
+            {
+                var cleanId = "sup-" + Math.Abs(supplier.SupplierName.GetHashCode());
+                double supPercent = supplier.TotalPurchase > 0 ? (double)((supplier.TotalPurchase - supplier.TotalDebt) / supplier.TotalPurchase) * 100 : 0;
+                bool isFullyPaid = supplier.TotalDebt <= 0;
+
+                <div class="accordion-item border-0 shadow-sm mb-3 overflow-hidden">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed py-3 @(isFullyPaid ? "bg-light opacity-75" : "bg-white")" type="button" data-bs-toggle="collapse" data-bs-target="#@cleanId">
+                            <div class="row w-100 align-items-center">
+                                <div class="col-md-4">
+                                    <div class="fw-bold text-dark fs-5">
+                                        <i class="fa-solid fa-truck-field me-2 @(isFullyPaid ? "text-success" : "text-danger")"></i>
+                                        @supplier.SupplierName
+                                    </div>
+                                    <small class="text-muted">
+                                        <i class="fa-solid fa-file-invoice me-1"></i> @supplier.ImportCount phiếu nhập
+                                    </small>
+                                </div>
+
+                                <div class="col-md-4 d-none d-md-block px-4">
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span class="text-muted">Đã trả: @((supplier.TotalPurchase - supplier.TotalDebt).ToString("N0"))</span>
+                                        <span class="fw-bold @(isFullyPaid ? "text-success" : "text-warning")">@Math.Round(supPercent)%</span>
+                                    </div>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar @(isFullyPaid ? "bg-success" : "bg-warning")" role="progressbar" style="width: @supPercent%"></div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3 text-end pe-4">
+                                    @if (isFullyPaid)
+                                    {
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 rounded-pill">
+                                            <i class="fa-solid fa-check me-1"></i> KHÔNG CÒN NỢ
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <div class="fs-4 fw-bold text-danger">@supplier.TotalDebt.ToString("N0")</div>
+                                        <small class="text-danger fw-bold opacity-75">PHẢI TRẢ</small>
+                                    }
+                                </div>
+                            </div>
+                        </button>
+                    </h2>
+
+                    <div id="@cleanId" class="accordion-collapse collapse" data-bs-parent="#debtAccordion">
+                        <div class="accordion-body bg-light p-3">
+                            <div class="table-responsive bg-white rounded border">
+                                <table class="table table-hover mb-0 align-middle">
+                                    <thead class="bg-light text-muted small text-uppercase">
+                                        <tr>
+                                            <th class="ps-3">Ngày nhập</th>
+                                            <th>Mã phiếu</th>
+                                            <th class="text-end">Tổng tiền</th>
+                                            <th class="text-end">Đã trả</th>
+                                            <th class="text-end">Còn nợ</th>
+                                            <th class="text-center">Trạng thái</th>
+                                            <th class="text-center">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in supplier.Imports)
+                                        {
+                                            bool done = item.PaymentStatus == ImportPaymentStatus.Paid;
+                                            <tr>
+                                                <td class="ps-3 text-muted">@item.ImportDate.ToString("dd/MM/yy")</td>
+                                                <td class="fw-bold text-primary">@item.ImportCode</td>
+                                                <td class="text-end fw-bold">@item.TotalAmount.ToString("N0")</td>
+                                                <td class="text-end text-success">@item.PaidAmount.ToString("N0")</td>
+                                                <td class="text-end text-danger fw-bold">
+                                                    @if (item.RemainingAmount > 0)
+                                                    {
+                                                        @item.RemainingAmount.ToString("N0")
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>-</span>
+                                                    }
+                                                </td>
+                                                <td class="text-center">
+                                                    @if (done)
+                                                    {
+                                                        <span class="badge bg-success">Hoàn tất</span>
+                                                    }
+                                                    else if (item.PaidAmount > 0)
+                                                    {
+                                                        <span class="badge bg-warning text-dark">Trả 1 phần</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-danger">Chưa trả</span>
+                                                    }
+                                                </td>
+                                                <td class="text-center py-2">
+                                                    @if (!done)
+                                                    {
+                                                        <a href="/CashBook/Create?type=Payment&importId=@item.Id"
+                                                           class="btn btn-outline-danger btn-sm fw-bold px-3 shadow-sm">
+                                                            <i class="fa-solid fa-money-bill-wave me-1"></i> Trả tiền
+                                                        </a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-success"><i class="fa-solid fa-check-circle"></i></span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <img src="https://cdn-icons-png.flaticon.com/512/7486/7486744.png" alt="Empty" style="width: 100px; opacity: 0.5;" />
+                <h5 class="text-muted mt-3">Không tìm thấy dữ liệu công nợ nào.</h5>
+            </div>
+        }
+    </div>
+</div>

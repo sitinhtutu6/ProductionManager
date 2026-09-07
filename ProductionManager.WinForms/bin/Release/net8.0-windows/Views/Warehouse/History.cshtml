@@ -1,0 +1,253 @@
+﻿@using ProductionManager.Data
+@model IEnumerable<ProductionManager.Data.StockTransaction>
+@{
+    ViewData["Title"] = "Lịch sử Giao dịch";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Kho Vật Tư", Url.Action("Index", "Warehouse")), 
+        ("Lịch Sử", "") 
+    };
+    
+    // Format giá trị chuẩn ISO cho input (để JS đọc được)
+    var fromDateVal = ViewBag.FromDate != null ? ((DateTime)ViewBag.FromDate).ToString("yyyy-MM-dd") : "";
+    var toDateVal = ViewBag.ToDate != null ? ((DateTime)ViewBag.ToDate).ToString("yyyy-MM-dd") : "";
+
+    // Lấy trạng thái bộ lọc từ URL một cách an toàn
+    string currentType = Context.Request.Query["type"];
+    string currentReason = Context.Request.Query["reason"];
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<style>
+    /* CSS cho tính năng Sắp xếp cột */
+    .sortable-col { cursor: pointer; user-select: none; transition: background 0.2s; }
+    .sortable-col:hover { background-color: #e2e8f0 !important; color: #0d6efd !important; }
+    .sort-icon { font-size: 0.8rem; opacity: 0.5; margin-left: 5px; }
+    .sort-icon.active { opacity: 1; color: #0d6efd; }
+</style>
+
+<div class="container-fluid p-4">
+    <div class="card shadow-lg border-0 rounded-3">
+        <div class="card-header bg-white py-3 border-bottom">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <h5 class="mb-0 fw-bold text-primary"><i class="fa-solid fa-clock-rotate-left me-2"></i>NHẬT KÝ KHO</h5>
+                </div>
+                <div class="col-md-9 text-end">
+                    <form id="filterForm" asp-action="History" method="get" class="d-flex justify-content-end gap-2 align-items-center flex-wrap">
+                        
+                        <input type="hidden" name="sortOrder" id="sortOrder" value="@ViewBag.CurrentSort" />
+
+                        <select name="type" id="ddlType" class="form-select form-select-sm fw-bold text-dark" style="width: 140px;" onchange="toggleReasonFilter()">
+                            <option value="">-- Tất cả GD --</option>
+                            <option value="Import" selected="@(currentType == "Import")">📥 Nhập kho</option>
+                            <option value="Export" selected="@(currentType == "Export")">📤 Xuất kho</option>
+                            <option value="Opening" selected="@(currentType == "Opening")">📦 Tồn đầu</option>
+                            <option value="Adjustment" selected="@(currentType == "Adjustment")">⚖️ Kiểm kê</option>
+                        </select>
+
+                        <div id="boxReasonFilter" style="@(currentType == "Export" ? "display:block;" : "display:none;")">
+                            <select name="reason" class="form-select form-select-sm fw-bold border-danger" style="width: 170px;">
+                                <option value="">-- Tất cả lý do --</option>
+                                <option value="1" selected="@(currentReason == "1")">Sản xuất / Bán (Giá vốn)</option>
+                                <option value="2" selected="@(currentReason == "2")">Trả Nhà cung cấp</option>
+                                <option value="3" selected="@(currentReason == "3")">Hao hụt / Hư hỏng</option>
+                            </select>
+                        </div>
+
+                        <input type="text" name="docCode" class="form-control form-control-sm" style="width: 130px;" placeholder="Mã phiếu..." value="@ViewBag.DocCode">
+                        
+                        <div class="input-group input-group-sm" style="width: 250px;">
+                            <input type="text" name="fromDate" class="form-control datepicker text-center" value="@fromDateVal" placeholder="Từ ngày">
+                            <span class="input-group-text bg-white border-start-0 border-end-0"><i class="fa-solid fa-arrow-right"></i></span>
+                            <input type="text" name="toDate" class="form-control datepicker text-center" value="@toDateVal" placeholder="Đến ngày">
+                        </div>
+
+                        <button type="submit" class="btn btn-sm btn-primary fw-bold px-3">Lọc</button>
+                        <button type="submit" asp-action="ExportHistory" class="btn btn-sm btn-success fw-bold px-3"><i class="fa-solid fa-file-excel"></i></button>
+                        <a asp-action="Index" class="btn btn-outline-dark btn-sm fw-bold">Quay lại</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle table-hover">
+                    <thead class="bg-light text-secondary text-uppercase small fw-bold">
+                        <tr>
+                            <th class="ps-4 sortable-col" onclick="setSort('@ViewBag.DateSortParm')" title="Sắp xếp theo thời gian">
+                                Thời gian / Mã
+                                @if(string.IsNullOrEmpty(ViewBag.CurrentSort)) { <i class="fa-solid fa-arrow-down-long sort-icon active"></i> }
+                                else if(ViewBag.CurrentSort == "date_asc") { <i class="fa-solid fa-arrow-up-long sort-icon active"></i> }
+                                else { <i class="fa-solid fa-sort sort-icon"></i> }
+                            </th>
+                            
+                            <th class="sortable-col" onclick="setSort('@ViewBag.TypeSortParm')" title="Sắp xếp theo Loại">
+                                Phân loại
+                                @if(ViewBag.CurrentSort == "type_desc") { <i class="fa-solid fa-arrow-down-a-z sort-icon active"></i> }
+                                else if(ViewBag.CurrentSort == "type_asc") { <i class="fa-solid fa-arrow-up-a-z sort-icon active"></i> }
+                                else { <i class="fa-solid fa-sort sort-icon"></i> }
+                            </th>
+
+                            <th>Nội dung / Đối tác</th>
+                            
+                            <th class="sortable-col" onclick="setSort('@ViewBag.ItemSortParm')" title="Sắp xếp theo Tên vật tư">
+                                Vật tư
+                                @if(ViewBag.CurrentSort == "item_desc") { <i class="fa-solid fa-arrow-down-a-z sort-icon active"></i> }
+                                else if(ViewBag.CurrentSort == "item_asc") { <i class="fa-solid fa-arrow-up-a-z sort-icon active"></i> }
+                                else { <i class="fa-solid fa-sort sort-icon"></i> }
+                            </th>
+                            
+                            <th class="text-end sortable-col" onclick="setSort('@ViewBag.QtySortParm')" title="Sắp xếp theo Số lượng">
+                                Số lượng
+                                @if(ViewBag.CurrentSort == "qty_desc") { <i class="fa-solid fa-arrow-down-9-1 sort-icon active"></i> }
+                                else if(ViewBag.CurrentSort == "qty_asc") { <i class="fa-solid fa-arrow-up-1-9 sort-icon active"></i> }
+                                else { <i class="fa-solid fa-sort sort-icon"></i> }
+                            </th>
+                            
+                            <th class="text-end sortable-col" onclick="setSort('@ViewBag.StockSortParm')" title="Sắp xếp theo Tồn kho">
+                                Tồn sau
+                                @if(ViewBag.CurrentSort == "stock_desc") { <i class="fa-solid fa-arrow-down-9-1 sort-icon active"></i> }
+                                else if(ViewBag.CurrentSort == "stock_asc") { <i class="fa-solid fa-arrow-up-1-9 sort-icon active"></i> }
+                                else { <i class="fa-solid fa-sort sort-icon"></i> }
+                            </th>
+                            
+                            <th>Người thực hiện</th>
+                            <th class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var item in Model)
+                            {
+                                <tr class="border-bottom">
+                                    <td class="ps-4">
+                                        <div class="fw-bold">@item.TransactionDate.ToString("dd/MM/yyyy HH:mm")</div>
+                                        <span class="badge bg-light text-muted border mt-1">@item.DocumentCode</span>
+                                    </td>
+                                    <td>
+                                        @if(item.Type == "Import") 
+                                        { 
+                                            <span class="badge bg-success bg-opacity-10 text-success fw-bold">NHẬP KHO</span> 
+                                        }
+                                        else if(item.Type == "Export") 
+                                        { 
+                                            <span class="badge bg-danger bg-opacity-10 text-danger fw-bold d-block mb-1" style="width: fit-content;">XUẤT KHO</span>
+                                            @if (item.Reason != null)
+                                            {
+                                                if (item.Reason == ExportReason.ProductionOrSale) 
+                                                { 
+                                                    <span class="badge bg-primary" style="font-size: 0.7rem;">Sản xuất / Bán</span> 
+                                                }
+                                                else if (item.Reason == ExportReason.ReturnToSupplier) 
+                                                { 
+                                                    <span class="badge bg-secondary" style="font-size: 0.7rem;">Trả NCC</span> 
+                                                }
+                                                else if (item.Reason == ExportReason.DamageOrLoss) 
+                                                { 
+                                                    <span class="badge bg-dark text-white" style="font-size: 0.7rem;">Hủy / Hao hụt</span> 
+                                                }
+                                            }
+                                        }
+                                        else if(item.Type == "Opening") 
+                                        { 
+                                            <span class="badge bg-info bg-opacity-10 text-info fw-bold">TỒN ĐẦU</span> 
+                                        }
+                                        else 
+                                        { 
+                                            <span class="badge bg-secondary text-white fw-bold">KIỂM KÊ</span> 
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="small fw-bold">@item.Receiver</div>
+                                        <div class="small text-muted text-truncate" style="max-width: 200px;">@item.Note</div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold text-primary">@item.WarehouseItem?.Name</div>
+                                        <code class="small">@item.WarehouseItem?.Code</code>
+                                    </td>
+                                    <td class="text-end fw-bold @(item.Type == "Export" ? "text-danger" : "text-success")">
+                                        @(item.Type == "Export" ? "-" : "+")@item.Quantity.ToString("N2")
+                                    </td>
+                                    <td class="text-end fw-bold text-dark">@item.CurrentStock.ToString("N2")</td>
+                                    <td><small class="text-muted">@item.Staff</small></td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/Warehouse/EditTransaction?code=@item.DocumentCode" class="btn btn-outline-warning"><i class="fa-solid fa-pen"></i></a>
+                                            <button class="btn btn-outline-danger" onclick="deleteTicket('@item.DocumentCode')"><i class="fa-solid fa-trash"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted fst-italic">
+                                    <i class="fa-solid fa-magnifying-glass mb-2 fa-2x opacity-50"></i><br />
+                                    Không tìm thấy dữ liệu luân chuyển kho.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    // Xử lý Sort Cột
+    function setSort(sortValue) {
+        document.getElementById('sortOrder').value = sortValue;
+        document.getElementById('filterForm').submit();
+    }
+
+    // Xử lý ẩn/hiện bộ lọc Lý do khi chọn Loại chứng từ
+    function toggleReasonFilter() {
+        var type = document.getElementById("ddlType").value;
+        var reasonBox = document.getElementById("boxReasonFilter");
+        if (type === "Export") {
+            reasonBox.style.display = "block";
+        } else {
+            reasonBox.style.display = "none";
+            reasonBox.querySelector("select").value = ""; 
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        flatpickr(".datepicker", { 
+            dateFormat: "Y-m-d", 
+            altInput: true,      
+            altFormat: "d/m/Y",  
+            locale: "vn",
+            allowInput: true 
+        });
+    });
+
+    function deleteTicket(code) {
+        Swal.fire({
+            title: 'Xóa phiếu ' + code + '?',
+            text: "Dữ liệu tồn kho sẽ được hoàn tác!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Xóa ngay',
+            cancelButtonText: 'Hủy'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                let formData = new FormData(); formData.append('code', code);
+                fetch('/Warehouse/DeleteTransaction', { method: 'POST', body: formData })
+                .then(res => res.json()).then(res => {
+                    if (res.success) Swal.fire("Xong!", res.message, "success").then(() => location.reload());
+                    else Swal.fire("Lỗi", res.message, "error");
+                });
+            }
+        });
+    }
+</script>

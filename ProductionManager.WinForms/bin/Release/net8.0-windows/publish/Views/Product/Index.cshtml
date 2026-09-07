@@ -1,0 +1,584 @@
+﻿@model IEnumerable<ProductionManager.Data.Product>
+@using Microsoft.AspNetCore.Authorization
+@using ProductionManager.Data
+@using ProductionApp.Web.Constants
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Quản lý Sản xuất & Định mức";
+
+    // Kiểm tra quyền hạn
+    bool canView = User.IsInRole("Admin") ||
+                     User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.View);
+    bool canCreate = User.IsInRole("Admin") ||
+                     User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Create);
+    bool canEdit = User.IsInRole("Admin") ||
+                   User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Edit);
+    bool canDelete = User.IsInRole("Admin") ||
+                     User.HasClaim(c => c.Type == AppPermissions.ClaimType && c.Value == AppPermissions.Orders.Delete);
+}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<style>
+    /* Header Gradient */
+    .product-header {
+        background: linear-gradient(to right, rgba(13, 110, 253, 0.9), rgba(13, 110, 253, 0.7)), url('https://images.unsplash.com/photo-1530124566582-a618bc2615dc?q=80&w=2070&auto=format&fit=crop');
+        background-size: cover;
+        background-position: center;
+        color: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .card-custom { border: none; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); overflow: hidden; }
+    
+    /* Nút mở rộng */
+    .btn-expand { transition: transform 0.3s ease; }
+    .btn-expand.collapsed { transform: rotate(0deg); }
+    .btn-expand:not(.collapsed) { transform: rotate(180deg); background-color: #0d6efd; color: white; border-color: #0d6efd; }
+    
+    /* Tabs */
+    .nav-tabs .nav-link { border: none; color: #6c757d; font-weight: 600; padding: 10px 20px; border-radius: 8px 8px 0 0; }
+    .nav-tabs .nav-link.active { color: #0d6efd; background-color: #f8f9fa; border-bottom: 3px solid #0d6efd; }
+    .table-hover tbody tr:hover { background-color: rgba(13, 110, 253, 0.05); }
+    
+    /* Ảnh Thumbnail */
+    .product-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; cursor: pointer; transition: transform 0.2s; }
+    .product-thumb:hover { transform: scale(1.5); z-index: 10; box-shadow: 0 0 10px rgba(0,0,0,0.2); }
+</style>
+<div class="container-fluid p-4">
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fa-solid fa-check-circle me-2"></i> <strong>Thành công!</strong> @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i> <strong>Lỗi!</strong> @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    <div class="product-header d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="fa-solid fa-cubes-stacked"></i> Danh mục Sản phẩm</h2>
+            <p class="mb-0 opacity-75">Quản lý định mức, vật tư và liên kết tồn kho</p>
+        </div>
+        <div>
+            @if (canCreate)
+            {
+                <a asp-action="Create" class="btn btn-light fw-bold text-primary shadow-sm px-4 py-2">
+                    <i class="fa-solid fa-plus"></i> Tạo Sản Phẩm
+                </a>
+            }
+            <a asp-controller="Warehouse" asp-action="Index" class="btn btn-warning fw-bold text-dark shadow-sm px-4 py-2 ms-2">
+                <i class="fa-solid fa-warehouse"></i> Kho Vật Tư
+            </a>
+            <a asp-controller="ProductQuotation" asp-action="Index" class="btn btn-warning fw-bold shadow-sm">
+                <i class="fa-solid fa-file-invoice-dollar me-1"></i> File Báo Giá
+            </a>
+        </div>
+    </div>
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-3">
+            <form method="get" asp-action="Index" class="row g-2 align-items-center">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                        <input type="text" name="searchString" class="form-control border-start-0" 
+                               placeholder="Nhập tên, mã sản phẩm hoặc quét mã..." value="@ViewData["CurrentSearch"]">
+                        
+                        <button type="button" class="btn btn-dark" onclick="startScanner()" title="Mở Camera quét mã">
+                            <i class="fa-solid fa-qrcode me-1"></i> Quét
+                        </button>
+                        
+                        <button type="submit" class="btn btn-primary fw-bold">Tìm kiếm</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="card card-custom">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="bg-light text-muted small text-uppercase">
+                    <tr>
+                        <th width="50" class="text-center">#</th>
+                        <th width="80" class="text-center">Ảnh</th>
+                        <th>Mã SP</th>
+                        <th>Tên Sản Phẩm</th>
+                        <th>Quy cách (mm)</th>
+                        <th>Tồn Kho</th>
+                        <th class="text-end">Giá bán</th>
+                        <th class="text-center" width="220">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr><td colspan="8" class="text-center py-5 text-muted fst-italic">Chưa có dữ liệu sản phẩm.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            bool hasData = (item.ProductDetails?.Any() == true || item.Materials?.Any() == true);
+
+                            <tr class="@(hasData ? "" : "bg-light bg-opacity-50")">
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-primary rounded-circle btn-expand collapsed" type="button"
+                                            data-bs-toggle="collapse" data-bs-target="#expand_@item.Id">
+                                        <i class="fa-solid fa-chevron-down"></i>
+                                    </button>
+                                </td>
+                                
+                                <td class="text-center">
+                                    @if (!string.IsNullOrEmpty(item.ImagePath))
+                                    {
+                                        <img src="~/product-images/@item.ImagePath" class="product-thumb border shadow-sm" 
+                                             onclick="showImagePreview('/product-images/@item.ImagePath')" title="Xem ảnh lớn" />
+                                    }
+                                    else
+                                    {
+                                        <div class="product-thumb bg-light d-flex align-items-center justify-content-center text-muted border">
+                                            <i class="fa-solid fa-image"></i>
+                                        </div>
+                                    }
+                                </td>
+
+                                <td class="fw-bold text-primary">@item.ProductCode</td>
+                                <td class="fw-bold">@item.ProductName</td>
+                                <td class="text-muted small">@item.Length x @item.Width x @item.Thick</td>
+                                
+                                <td>
+                                    @if (item.WarehouseItem != null)
+                                    {
+                                        var stock = item.WarehouseItem.StockQuantity;
+                                        var badgeClass = stock > 0 ? "bg-success" : "bg-secondary";
+                                        <span class="badge @badgeClass">
+                                            <i class="fa-solid fa-box me-1"></i> @stock @item.Unit
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-muted border border-secondary" title="Chưa liên kết kho">
+                                            <i class="fa-solid fa-link-slash"></i> N/A
+                                        </span>
+                                    }
+                                </td>
+
+                                <td class="text-end text-success fw-bold">@item.DefaultPrice.ToString("N0")</td>
+
+                                <td class="text-center">
+                                    <div class="btn-group shadow-sm" role="group">
+                                        <button type="button" class="btn btn-sm btn-light border text-dark fw-bold" 
+                                                title="In Tem Mã Vạch"
+                                                onclick="printLabel('@item.ProductCode', '@item.ProductName', '@item.DefaultPrice.ToString("N0")')">
+                                            <i class="fa-solid fa-print"></i>
+                                        </button>
+
+                                        @if (canView)
+                                        {
+                                            <a asp-action="Profile" asp-route-id="@item.Id"
+                                               class="btn btn-sm btn-light border text-info fw-bold" title="Hồ sơ & Bản vẽ SP">
+                                                <i class="fa-solid fa-folder-open"></i>
+                                            </a>
+                                        }                                
+
+                                        @if (canCreate)
+                                        {
+                                            <a asp-action="AddMaterial" asp-route-productId="@item.Id"
+                                               class="btn btn-sm btn-light border text-dark fw-bold" title="Định mức Vật tư">
+                                                <i class="fa-solid fa-screwdriver-wrench text-warning"></i>
+                                            </a>
+                                        }
+
+                                        @if (canCreate)
+                                        {
+                                            <a asp-action="ExportBomExcel" asp-route-id="@item.Id"
+                                               class="btn btn-sm btn-light border text-success fw-bold" title="Xuất BOM Excel">
+                                                <i class="fa-solid fa-file-excel"></i>
+                                            </a>
+                                        }
+
+                                        @if (canEdit)
+                                        {
+                                            <a asp-action="Edit" asp-route-id="@item.Id"
+                                               class="btn btn-sm btn-light border text-primary" title="Sửa">
+                                                <i class="fa-solid fa-pen"></i>
+                                            </a>
+                                        }
+                                        @if (canDelete)
+                                        {
+                                            <a asp-action="Delete" asp-route-id="@item.Id"
+                                               class="btn btn-sm btn-light border text-danger"
+                                               onclick="return confirm('Xóa sản phẩm này sẽ mất hết vật tư và chi tiết con. Tiếp tục?')" title="Xóa">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </a>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <tr class="collapse bg-white" id="expand_@item.Id">
+                                <td colspan="8" class="p-0 border-bottom border-3 border-primary">
+                                    <div class="p-4 bg-light">
+
+                                        <ul class="nav nav-tabs border-bottom-0 mb-3" id="myTab_@item.Id" role="tablist">
+                                            <li class="nav-item">
+                                                <button class="nav-link active" id="variant-tab-@item.Id" data-bs-toggle="tab"
+                                                        data-bs-target="#variant-content-@item.Id" type="button" role="tab">
+                                                    <i class="fa-solid fa-list-check me-2"></i> Chi tiết Gỗ / Bán thành phẩm (@(item.ProductDetails?.Count ?? 0))
+                                                </button>
+                                            </li>
+                                            <li class="nav-item">
+                                                <button class="nav-link" id="material-tab-@item.Id" data-bs-toggle="tab"
+                                                        data-bs-target="#material-content-@item.Id" type="button" role="tab">
+                                                    <i class="fa-solid fa-layer-group me-2"></i> Định mức Vật tư (@(item.Materials?.Count ?? 0))
+                                                </button>
+                                            </li>
+                                        </ul>
+
+                                        <div class="tab-content bg-white p-3 rounded shadow-sm border">
+
+                                            <div class="tab-pane fade show active" id="variant-content-@item.Id" role="tabpanel">
+                                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                                    <h6 class="text-primary fw-bold mb-0">Bảng kê chi tiết (Bán thành phẩm)</h6>
+                                                    @if (canEdit)
+                                                    {
+                                                        <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-primary">
+                                                            <i class="fa-solid fa-pen-to-square"></i> Quản lý Chi tiết
+                                                        </a>
+                                                    }
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-lg-8">
+                                                        <table class="table table-sm table-bordered mb-0 align-middle">
+                                                            <thead class="table-light small text-muted text-center">
+                                                                <tr>
+                                                                    <th>Mã CT</th>
+                                                                    <th>Tên Chi tiết</th>
+                                                                    <th>Quy cách (mm)</th>
+                                                                    <th>SL</th>
+                                                                    <th>Số khối (m3)</th>
+                                                                    <th>Vật liệu</th>
+                                                                    <th>Ghi Chú</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @if (item.ProductDetails != null && item.ProductDetails.Any())
+                                                                {
+                                                                    foreach (var v in item.ProductDetails)
+                                                                    {
+                                                                        double vol = (v.Length * v.Width * v.Thick * v.Quantity) / 1000000000.0;
+                                                                        <tr>
+                                                                            <td class="text-center text-muted small">@v.DetailCode</td>
+                                                                            <td>@v.VariantName</td>
+                                                                            <td class="text-center small">@v.Length x @v.Width x @v.Thick</td>
+                                                                            <td class="text-center fw-bold">@v.Quantity</td>
+                                                                            <td class="text-center small">@vol.ToString("0.0000")</td>
+                                                                            <td class="small">@v.MaterialType</td>
+                                                                            <td class="text-end text-primary small">@v.Note</td>
+                                                                        </tr>
+                                                                    }
+                                                                    <tr class="table-info fw-bold small">
+                                                                        <td colspan="3" class="text-end">TỔNG CỘNG:</td>
+                                                                        <td class="text-center text-danger">@item.ProductDetails.Sum(x => x.Quantity)</td>
+                                                                        <td class="text-center text-danger">
+                                                                            @item.ProductDetails.Sum(x => (x.Length * x.Width * x.Thick * x.Quantity) / 1000000000.0).ToString("0.0000")
+                                                                        </td>
+                                                                        <td colspan="2"></td>
+                                                                    </tr>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <tr><td colspan="7" class="text-center text-muted small py-3">Chưa có chi tiết nào.</td></tr>
+                                                                }
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    <div class="col-lg-4">
+                                                        <div class="card bg-light border-0 h-100">
+                                                            <div class="card-header bg-secondary text-white small fw-bold">
+                                                                <i class="fa-solid fa-calculator"></i> TỔNG HỢP VẬT TƯ GỖ
+                                                            </div>
+                                                            <div class="card-body p-0">
+                                                                <table class="table table-sm mb-0">
+                                                                    <thead class="small text-muted bg-light">
+                                                                        <tr>
+                                                                            <th class="ps-3">Loại Gỗ</th>
+                                                                            <th class="text-center">Độ dày</th>
+                                                                            <th class="text-end pe-3">Tổng (m³)</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @if (item.ProductDetails != null && item.ProductDetails.Any())
+                                                                        {
+                                                                            var woodGroups = item.ProductDetails
+                                                                                .Where(x => !string.IsNullOrEmpty(x.MaterialType))
+                                                                                .GroupBy(x => x.MaterialType.Trim())
+                                                                                .Select(g => new
+                                                                                {
+                                                                                    Name = g.Key,
+                                                                                    TotalVol = g.Sum(x => (x.Length * x.Width * x.Thick * x.Quantity) / 1000000000.0),
+                                                                                    Details = g.GroupBy(x => x.Thick)
+                                                                                        .Select(sg => new { Thick = sg.Key, Vol = sg.Sum(v => (v.Length * v.Width * v.Thick * v.Quantity) / 1000000000.0) })
+                                                                                        .OrderBy(x => x.Thick)
+                                                                                });
+
+                                                                            foreach (var wood in woodGroups)
+                                                                            {
+                                                                                <tr class="table-active">
+                                                                                    <td class="fw-bold text-dark ps-2" colspan="2">@wood.Name</td>
+                                                                                    <td class="text-end fw-bold text-dark pe-2">@wood.TotalVol.ToString("0.0000")</td>
+                                                                                </tr>
+                                                                                foreach (var d in wood.Details)
+                                                                                {
+                                                                                    <tr>
+                                                                                        <td></td>
+                                                                                        <td class="text-center small text-muted">@d.Thick mm</td>
+                                                                                        <td class="text-end small text-secondary pe-3">@d.Vol.ToString("0.0000")</td>
+                                                                                    </tr>
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            <tr><td colspan="3" class="text-center small text-muted p-2">Trống</td></tr>
+                                                                        }
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="tab-pane fade" id="material-content-@item.Id" role="tabpanel">
+                                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                                    <h6 class="text-warning text-dark fw-bold mb-0">Định mức vật tư đi kèm (BOM)</h6>
+                                                    @if (canCreate)
+                                                    {
+                                                        <a asp-action="AddMaterial" asp-route-productId="@item.Id" class="btn btn-sm btn-warning fw-bold text-dark shadow-sm">
+                                                            <i class="fa-solid fa-plus"></i> Thêm Vật tư
+                                                        </a>
+                                                    }
+                                                </div>
+
+                                                <table class="table table-sm table-bordered align-middle mb-0 border-warning">
+                                                    <thead class="bg-warning bg-opacity-10 small text-dark">
+                                                        <tr>
+                                                            <th>Mã VT</th>
+                                                            <th>Tên Vật tư</th>
+                                                            <th class="text-center">ĐVT</th>
+                                                            <th class="text-center">Định mức</th>
+                                                            <th class="text-end">Giá vốn</th>
+                                                            <th class="text-center">Thao tác</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @if (item.Materials != null && item.Materials.Any())
+                                                        {
+                                                            foreach (var m in item.Materials)
+                                                            {
+                                                                string mName = m.WarehouseItem?.Name ?? m.MaterialName;
+                                                                string mCode = m.WarehouseItem?.Code ?? m.MaterialCode;
+                                                                string mUnit = m.WarehouseItem?.Unit ?? m.Unit;
+
+                                                                <tr>
+                                                                    <td class="small text-muted">@mCode</td>
+                                                                    <td class="fw-bold">@mName</td>
+                                                                    <td class="text-center">@mUnit</td>
+                                                                    <td class="text-center fw-bold text-primary fs-6">@m.Quantity</td>
+                                                                    <td class="text-end text-muted">@m.CostPrice.ToString("N0")</td>
+                                                                    <td class="text-center">
+                                                                        @if (canEdit)
+                                                                        {
+                                                                            <a asp-action="EditMaterial" asp-route-id="@m.Id" class="text-primary me-2" title="Sửa"><i class="fa-solid fa-pen"></i></a>
+                                                                        }
+                                                                        @if (canDelete)
+                                                                        {
+                                                                            <a asp-action="DeleteMaterial" asp-route-id="@m.Id" class="text-danger"
+                                                                               onclick="return confirm('Xóa định mức này?')" title="Xóa"><i class="fa-solid fa-trash"></i></a>
+                                                                        }
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            <tr><td colspan="6" class="text-center text-muted small py-3">Chưa có vật tư nào được gán.</td></tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="imgPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0 shadow-none">
+            <div class="modal-body text-center p-0 position-relative">
+                <button type="button" class="btn btn-light position-absolute top-0 end-0 m-3 rounded-circle shadow" data-bs-dismiss="modal"><i class="fa-solid fa-xmark"></i></button>
+                <img id="previewImg" src="" class="img-fluid rounded shadow-lg" style="max-height: 85vh;">
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="scannerModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fa-solid fa-camera me-2"></i>Quét Mã (Barcode/QR)</h5>
+                <button type="button" class="btn-close btn-close-white" onclick="stopScanner()" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="reader" style="width: 100%;"></div>
+            </div>
+            <div class="modal-footer justify-content-center bg-light">
+                <small class="text-muted">Đưa mã vào khung hình để tự động nhận diện</small>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="printLabelModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-tag me-2"></i>In Tem Nhãn</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center" id="labelContent">
+                <div class="border border-2 border-dark p-3 d-inline-block rounded" style="width: 320px; background: white;">
+                    <h5 class="fw-bold mb-1 text-uppercase" id="lblProductName">TÊN SẢN PHẨM</h5>
+                    <div class="text-muted small mb-2" id="lblPrice">0 đ</div>
+                    
+                    <svg id="barcodeDisplay" style="width: 100%;"></svg>
+                    
+                    <div id="qrcodeDisplay" class="d-flex justify-content-center mt-2"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary fw-bold" onclick="printDiv('labelContent')">
+                    <i class="fa-solid fa-print me-2"></i>IN NGAY
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    // --- 1. Xử lý ảnh ---
+    function showImagePreview(src) {
+        document.getElementById('previewImg').src = src;
+        new bootstrap.Modal(document.getElementById('imgPreviewModal')).show();
+    }
+
+    // --- 2. Xử lý In Tem ---
+    function printLabel(code, name, price) {
+        document.getElementById('lblProductName').innerText = name;
+        document.getElementById('lblPrice').innerText = price + ' VND';
+
+        // Tạo Barcode
+        JsBarcode("#barcodeDisplay", code, {
+            format: "CODE128",
+            lineColor: "#000",
+            width: 2,
+            height: 60,
+            displayValue: true,
+            fontSize: 14
+        });
+
+        // Tạo QRCode (Optional)
+        document.getElementById("qrcodeDisplay").innerHTML = "";
+        new QRCode(document.getElementById("qrcodeDisplay"), {
+            text: code,
+            width: 80,
+            height: 80
+        });
+
+        new bootstrap.Modal(document.getElementById('printLabelModal')).show();
+    }
+
+    function printDiv(divId) {
+        var content = document.getElementById(divId).innerHTML;
+        var myWindow = window.open('', '', 'width=600,height=600');
+        myWindow.document.write('<html><head><title>Print Label</title>');
+        myWindow.document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">');
+        myWindow.document.write('</head><body class="text-center pt-5">');
+        myWindow.document.write(content);
+        myWindow.document.write('</body></html>');
+        myWindow.document.close();
+        myWindow.focus();
+        setTimeout(function(){ myWindow.print(); myWindow.close(); }, 500);
+    }
+
+    // --- 3. Xử lý Scanner ---
+    let html5QrcodeScanner;
+
+    function startScanner() {
+        const modal = new bootstrap.Modal(document.getElementById('scannerModal'));
+        modal.show();
+
+        html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", 
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            /* verbose= */ false
+        );
+        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    }
+
+    function onScanSuccess(decodedText, decodedResult) {
+        stopScanner();
+        // Đóng modal thủ công
+        const modalEl = document.getElementById('scannerModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+
+        // Âm thanh
+        let audio = new Audio('https://media.geeksforgeeks.org/wp-content/uploads/20190531135120/beep.mp3');
+        audio.play();
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Đã quét mã!',
+            text: decodedText,
+            timer: 800,
+            showConfirmButton: false
+        }).then(() => {
+            // Điền vào ô tìm kiếm và submit
+            let searchInput = document.querySelector('input[name="searchString"]');
+            if(searchInput) {
+                searchInput.value = decodedText;
+                searchInput.form.submit();
+            }
+        });
+    }
+
+    function onScanFailure(error) {
+        // console.warn(`Code scan error = ${error}`);
+    }
+
+    function stopScanner() {
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.clear().catch(error => {
+                console.error("Failed to clear html5QrcodeScanner. ", error);
+            });
+        }
+    }
+</script>

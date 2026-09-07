@@ -1,0 +1,575 @@
+﻿@{
+    ViewData["Title"] = "Báo cáo Kinh doanh & Sản xuất";
+    var rcv = ViewBag.KpiReceived;
+    var dlv = ViewBag.KpiDelivered;
+    var inv = ViewBag.KpiInvoice;
+    decimal cash = ViewBag.KpiCash;
+
+    var listRcv = ViewBag.ListReceived as List<ProductionManager.Data.Order>;
+    var listDlv = ViewBag.ListDelivered as List<ProductionManager.Data.Order>;
+    var listInv = ViewBag.ListInvoices as List<ProductionManager.Data.Invoice>;
+    var listCash = ViewBag.ListCash as List<ProductionManager.Data.CashEntry>;
+}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<style>
+    body {
+        background-color: #f8fafc;
+        font-family: 'Inter', sans-serif;
+        color: #1e293b;
+    }
+
+    .report-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 20px -2px rgba(0,0,0,0.03);
+        overflow: hidden;
+        transition: transform 0.3s;
+    }
+
+        .report-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08);
+        }
+
+    .kpi-title {
+        font-size: 0.85rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748b;
+    }
+
+    .kpi-total {
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: -1px;
+        margin: 10px 0;
+    }
+
+    .kpi-detail {
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        border-bottom: 1px dashed #e2e8f0;
+    }
+
+        .kpi-detail:last-child {
+            border-bottom: none;
+        }
+
+    .filter-box {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+        margin-bottom: 25px;
+        border: 1px solid #e2e8f0;
+        border-left: 5px solid #0ea5e9;
+    }
+
+    .chart-wrapper {
+        position: relative;
+        height: 350px;
+        width: 100%;
+        padding: 15px;
+    }
+
+    .border-card-1 {
+        border-bottom: 4px solid #3b82f6;
+    }
+
+    .text-card-1 {
+        color: #3b82f6;
+    }
+
+    .border-card-2 {
+        border-bottom: 4px solid #10b981;
+    }
+
+    .text-card-2 {
+        color: #10b981;
+    }
+
+    .border-card-3 {
+        border-bottom: 4px solid #8b5cf6;
+    }
+
+    .text-card-3 {
+        color: #8b5cf6;
+    }
+
+    .border-card-4 {
+        border-bottom: 4px solid #f59e0b;
+    }
+
+    .text-card-4 {
+        color: #f59e0b;
+    }
+
+    /* Custom Tabs */
+    .nav-tabs-custom {
+        border-bottom: 2px solid #e2e8f0;
+        margin-bottom: 20px;
+    }
+
+        .nav-tabs-custom .nav-link {
+            border: none;
+            font-weight: 700;
+            color: #64748b;
+            padding: 12px 24px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            border-bottom: 3px solid transparent;
+            background: transparent;
+        }
+
+            .nav-tabs-custom .nav-link.active {
+                color: #0ea5e9;
+                border-bottom: 3px solid #0ea5e9;
+                background: #f0f9ff;
+                border-radius: 8px 8px 0 0;
+            }
+
+    .table-modern {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .table-modern th {
+            background: #f8fafc;
+            padding: 12px 16px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #475569;
+            border-bottom: 2px solid #e2e8f0;
+            font-weight: 800;
+        }
+
+        .table-modern td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+
+    /* CSS KHI IN BÁO CÁO (PDF) */
+    @@media print {
+        body {
+            background: #fff !important;
+        }
+
+        .filter-box, .nav-tabs-custom, .btn, footer, .sidebar {
+            display: none !important;
+        }
+
+        .report-card {
+            border: 1px solid #ccc;
+            box-shadow: none !important;
+            margin-bottom: 20px;
+            break-inside: avoid;
+        }
+
+        .table-modern {
+            border: 1px solid #000;
+        }
+
+            .table-modern th, .table-modern td {
+                border: 1px solid #000;
+                padding: 8px;
+                font-size: 11px;
+            }
+
+        .tab-content > .tab-pane {
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            page-break-before: always;
+        }
+
+        h4.print-title {
+            display: block !important;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+    }
+
+    h4.print-title {
+        display: none;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+        <div>
+            <h3 class="fw-800 text-dark mb-1"><i class="fa-solid fa-chart-pie text-primary me-2"></i>BÁO CÁO KINH DOANH & SẢN XUẤT</h3>
+            <div class="text-muted fw-600 small">Số liệu cập nhật theo thời gian thực (Real-time).</div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="@Url.Action("ExportExcel", new { fromDate = ViewBag.FromDate, toDate = ViewBag.ToDate })" class="btn btn-success fw-bold shadow-sm rounded-pill px-4"><i class="fa-solid fa-file-excel me-2"></i> Xuất Excel</a>
+            <button onclick="window.print()" class="btn btn-dark fw-bold shadow-sm rounded-pill px-4"><i class="fa-solid fa-file-pdf me-2"></i> In PDF (A4)</button>
+        </div>
+    </div>
+
+    <!-- BỘ LỌC THỜI GIAN THÔNG MINH -->
+    <div class="filter-box">
+        <form id="reportForm" method="get" class="row g-3 align-items-center">
+            <div class="col-md-5">
+                <div class="d-flex gap-2">
+                    <select id="quickYear" class="form-select fw-bold text-primary bg-light border-0 shadow-sm" onchange="applyQuickFilter()">
+                        <option value="">-- Năm --</option>
+                        <option value="@DateTime.Now.Year">@DateTime.Now.Year</option>
+                        <option value="@(DateTime.Now.Year - 1)">@(DateTime.Now.Year - 1)</option>
+                    </select>
+                    <select id="quickQuarter" class="form-select fw-bold text-primary bg-light border-0 shadow-sm" onchange="applyQuickFilter()">
+                        <option value="">-- Quý --</option>
+                        <option value="1">Quý 1</option>
+                        <option value="2">Quý 2</option>
+                        <option value="3">Quý 3</option>
+                        <option value="4">Quý 4</option>
+                    </select>
+                    <select id="quickMonth" class="form-select fw-bold text-primary bg-light border-0 shadow-sm" onchange="applyQuickFilter()">
+                        <option value="">-- Tháng --</option>
+                        @for (int i = 1; i <= 12; i++)
+                        {
+                            <option value="@i">Tháng @i</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="col-md-5">
+                <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                    <span class="input-group-text bg-light border-0"><i class="fa-regular fa-calendar text-muted"></i></span>
+                    <input type="text" id="fromDate" name="fromDate" class="form-control border-0 fw-bold text-center datepicker" value="@ViewBag.FromDate" placeholder="Từ ngày">
+                    <span class="input-group-text bg-light border-0"><i class="fa-solid fa-arrow-right text-muted"></i></span>
+                    <input type="text" id="toDate" name="toDate" class="form-control border-0 fw-bold text-center datepicker" value="@ViewBag.ToDate" placeholder="Đến ngày">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary fw-bold px-4 rounded-3 shadow-sm w-100"><i class="fa-solid fa-magnifying-glass me-1"></i> LỌC</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 4 THẺ CHỈ SỐ KPI -->
+    <div class="row g-4 mb-4">
+        <!-- 1. ĐƠN NHẬN -->
+        <div class="col-xl-3 col-md-6">
+            <div class="report-card border-card-1 p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="kpi-title">ĐƠN HÀNG ĐÃ NHẬN</div>
+                    <div class="bg-primary bg-opacity-10 p-2 rounded-circle text-primary"><i class="fa-solid fa-file-signature fa-lg"></i></div>
+                </div>
+                <div class="kpi-total text-card-1">@rcv.Total.ToString("N0") <span class="fs-6 fw-bold text-muted">₫</span></div>
+                <div class="mt-3">
+                    <div class="kpi-detail"><span class="text-muted">Tiền Hàng:</span> <span class="text-dark">@rcv.Sub.ToString("N0") ₫</span></div>
+                    <div class="kpi-detail"><span class="text-muted">Thuế VAT:</span> <span class="text-danger">@rcv.Vat.ToString("N0") ₫</span></div>
+                </div>
+                <div class="small text-muted mt-3 fst-italic d-print-none"><i class="fa-solid fa-circle-info me-1"></i>Đã duyệt & Đang SX (@listRcv.Count đơn)</div>
+            </div>
+        </div>
+
+        <!-- 2. ĐƠN ĐÃ GIAO -->
+        <div class="col-xl-3 col-md-6">
+            <div class="report-card border-card-2 p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="kpi-title">ĐƠN HÀNG ĐÃ GIAO</div>
+                    <div class="bg-success bg-opacity-10 p-2 rounded-circle text-success"><i class="fa-solid fa-truck-fast fa-lg"></i></div>
+                </div>
+                <div class="kpi-total text-card-2">@dlv.Total.ToString("N0") <span class="fs-6 fw-bold text-muted">₫</span></div>
+                <div class="mt-3">
+                    <div class="kpi-detail"><span class="text-muted">Tiền Hàng:</span> <span class="text-dark">@dlv.Sub.ToString("N0") ₫</span></div>
+                    <div class="kpi-detail"><span class="text-muted">Thuế VAT:</span> <span class="text-danger">@dlv.Vat.ToString("N0") ₫</span></div>
+                </div>
+                <div class="small text-muted mt-3 fst-italic d-print-none"><i class="fa-solid fa-circle-info me-1"></i>Đang giao & Hoàn thành (@listDlv.Count đơn)</div>
+            </div>
+        </div>
+
+        <!-- 3. HÓA ĐƠN ĐÃ XUẤT -->
+        <div class="col-xl-3 col-md-6">
+            <div class="report-card border-card-3 p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="kpi-title">HÓA ĐƠN ĐÃ XUẤT</div>
+                    <div class="bg-purple bg-opacity-10 p-2 rounded-circle" style="color: #8b5cf6;"><i class="fa-solid fa-file-invoice-dollar fa-lg"></i></div>
+                </div>
+                <div class="kpi-total text-card-3">@inv.Total.ToString("N0") <span class="fs-6 fw-bold text-muted">₫</span></div>
+                <div class="mt-3">
+                    <div class="kpi-detail"><span class="text-muted">Tiền Hàng (Tạm tính):</span> <span class="text-dark">@inv.Sub.ToString("N0") ₫</span></div>
+                    <div class="kpi-detail"><span class="text-muted">Tiền thuế:</span> <span class="text-danger">@inv.Vat.ToString("N0") ₫</span></div>
+                </div>
+                <div class="small text-muted mt-3 fst-italic d-print-none"><i class="fa-solid fa-circle-info me-1"></i>Tổng giá trị xuất VAT (@listInv.Count đợt)</div>
+            </div>
+        </div>
+
+        <!-- 4. THỰC THU -->
+        <div class="col-xl-3 col-md-6">
+            <div class="report-card border-card-4 p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="kpi-title">DÒNG TIỀN THỰC THU</div>
+                    <div class="bg-warning bg-opacity-10 p-2 rounded-circle text-warning"><i class="fa-solid fa-sack-dollar fa-lg"></i></div>
+                </div>
+                <div class="kpi-total text-card-4">@cash.ToString("N0") <span class="fs-6 fw-bold text-muted">₫</span></div>
+
+                <div class="alert alert-warning bg-opacity-10 border-warning border-opacity-25 mt-3 px-3 py-2 small fw-bold text-dark d-print-none">
+                    <i class="fa-solid fa-arrow-trend-up text-success me-1"></i> Dòng tiền Khách hàng đã thanh toán (@listCash.Count phiếu).
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KHỐI BIỂU ĐỒ -->
+    <div class="row g-4 mb-4 d-print-none">
+        <div class="col-lg-8">
+            <div class="report-card p-4">
+                <h6 class="fw-bold text-dark mb-4 text-uppercase"><i class="fa-solid fa-chart-column text-primary me-2"></i>Biểu đồ Giá trị Kinh doanh</h6>
+                <div class="chart-wrapper"><canvas id="monthlyChart"></canvas></div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="report-card p-4 h-100">
+                <h6 class="fw-bold text-dark mb-4 text-uppercase"><i class="fa-solid fa-chart-pie text-warning me-2"></i>Tỷ trọng Trạng thái Đơn</h6>
+                <div class="chart-wrapper d-flex align-items-center justify-content-center"><canvas id="statusChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KHỐI BẢNG DANH SÁCH CHI TIẾT (TABS) -->
+    <div class="report-card p-4 bg-white">
+        <ul class="nav nav-tabs nav-tabs-custom d-print-none" role="tablist">
+            <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabRcv"><i class="fa-solid fa-file-signature me-2"></i>Đơn Đã Nhận</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabDlv"><i class="fa-solid fa-truck-fast me-2"></i>Đơn Đã Giao</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabInv"><i class="fa-solid fa-file-invoice-dollar me-2"></i>Hóa Đơn Đã Xuất</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCash"><i class="fa-solid fa-sack-dollar me-2"></i>Dòng Tiền Thu</button></li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- TAB 1: ĐƠN NHẬN -->
+            <div class="tab-pane fade show active" id="tabRcv">
+                <h4 class="print-title">I. DANH SÁCH ĐƠN HÀNG ĐÃ NHẬN (ĐANG SẢN XUẤT)</h4>
+                <div class="table-responsive">
+                    <table class="table-modern">
+                        <thead><tr><th>STT</th><th>Mã Đơn</th><th>Khách Hàng</th><th class="text-center">Ngày Nhận</th><th class="text-end">Tiền Hàng</th><th class="text-end">Thuế VAT</th><th class="text-end">Tổng Cộng</th></tr></thead>
+                        <tbody>
+                            @if (!listRcv.Any())
+                            {
+                                <tr><td colspan="7" class="text-center py-4 text-muted fst-italic">Không có dữ liệu</td></tr>
+                            }
+                            @for (int i = 0; i < listRcv.Count; i++)
+                            {
+                                var o = listRcv[i];
+                                // Đoạn code backend đã gom cục tính toán, ta tính nhanh lại cho UI hiển thị
+                                decimal sub = 0; decimal vat = 0;
+                                if (o.OrderDetails != null)
+                                {
+                                    foreach (var d in o.OrderDetails.Where(x => !x.IsComponent))
+                                    {
+                                        decimal s = d.Quantity * d.UnitPrice; sub += s; vat += s * (decimal)(d.VatPercent / 100.0);
+                                    }
+                                }
+                                <tr>
+                                    <td class="text-center text-muted fw-bold">@(i + 1)</td>
+                                    <td class="fw-bold font-monospace text-primary">@o.OrderCode</td>
+                                    <td class="fw-bold text-dark">@o.Customer?.CompanyName</td>
+                                    <td class="text-center">@o.OrderDate.ToString("dd/MM/yyyy")</td>
+                                    <td class="text-end text-muted">@sub.ToString("N0")</td>
+                                    <td class="text-end text-danger">@vat.ToString("N0")</td>
+                                    <td class="text-end fw-bold text-success">@((sub + vat).ToString("N0"))</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 2: ĐƠN ĐÃ GIAO -->
+            <div class="tab-pane fade" id="tabDlv">
+                <h4 class="print-title">II. DANH SÁCH ĐƠN HÀNG ĐÃ GIAO / HOÀN THÀNH</h4>
+                <div class="table-responsive">
+                    <table class="table-modern">
+                        <thead><tr><th>STT</th><th>Mã Đơn</th><th>Khách Hàng</th><th class="text-center">Hạn Giao</th><th class="text-end">Tiền Hàng</th><th class="text-end">Thuế VAT</th><th class="text-end">Tổng Cộng</th></tr></thead>
+                        <tbody>
+                            @if (!listDlv.Any())
+                            {
+                                <tr><td colspan="7" class="text-center py-4 text-muted fst-italic">Không có dữ liệu</td></tr>
+                            }
+                            @for (int i = 0; i < listDlv.Count; i++)
+                            {
+                                var o = listDlv[i];
+                                decimal sub = 0; decimal vat = 0;
+                                if (o.OrderDetails != null)
+                                {
+                                    foreach (var d in o.OrderDetails.Where(x => !x.IsComponent))
+                                    {
+                                        decimal s = d.Quantity * d.UnitPrice; sub += s; vat += s * (decimal)(d.VatPercent / 100.0);
+                                    }
+                                }
+                                <tr>
+                                    <td class="text-center text-muted fw-bold">@(i + 1)</td>
+                                    <td class="fw-bold font-monospace text-primary">@o.OrderCode</td>
+                                    <td class="fw-bold text-dark">@o.Customer?.CompanyName</td>
+                                    <td class="text-center text-danger fw-bold">@(o.DeliveryDeadline?.ToString("dd/MM/yyyy") ?? "-")</td>
+                                    <td class="text-end text-muted">@sub.ToString("N0")</td>
+                                    <td class="text-end text-danger">@vat.ToString("N0")</td>
+                                    <td class="text-end fw-bold text-success">@((sub + vat).ToString("N0"))</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 3: HÓA ĐƠN -->
+            <div class="tab-pane fade" id="tabInv">
+                <h4 class="print-title">III. DANH SÁCH HÓA ĐƠN VAT ĐÃ XUẤT</h4>
+                <div class="table-responsive">
+                    <table class="table-modern">
+                        <thead><tr><th>STT</th><th>Số Hóa Đơn</th><th class="text-center">Ngày Xuất</th><th>Đơn hàng chiếu (PO)</th><th class="text-end">Tổng Tiền Xuất (Gồm VAT)</th></tr></thead>
+                        <tbody>
+                            @if (!listInv.Any())
+                            {
+                                <tr><td colspan="5" class="text-center py-4 text-muted fst-italic">Không có dữ liệu</td></tr>
+                            }
+                            @for (int i = 0; i < listInv.Count; i++)
+                            {
+                                var o = listInv[i];
+                                string refOrders = string.Join(", ", o.InvoiceDetails?.Select(d => d.Order?.OrderCode) ?? new List<string>());
+                                <tr>
+                                    <td class="text-center text-muted fw-bold">@(i + 1)</td>
+                                    <td class="fw-bold font-monospace text-primary">@o.InvoiceNumber</td>
+                                    <td class="text-center">@o.InvoiceDate.ToString("dd/MM/yyyy")</td>
+                                    <td class="fw-bold text-muted font-monospace">@refOrders</td>
+                                    <td class="text-end fw-bold text-success">@o.TotalAmount.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 4: THỰC THU -->
+            <div class="tab-pane fade" id="tabCash">
+                <h4 class="print-title">IV. DÒNG TIỀN THỰC THU (SỔ QUỸ)</h4>
+                <div class="table-responsive">
+                    <table class="table-modern">
+                        <thead><tr><th>STT</th><th>Số Phiếu Thu</th><th class="text-center">Ngày Thu</th><th>Người Nộp / Khách Hàng</th><th>Tham Chiếu</th><th class="text-end">Số Tiền Khách Trả</th></tr></thead>
+                        <tbody>
+                            @if (!listCash.Any())
+                            {
+                                <tr><td colspan="6" class="text-center py-4 text-muted fst-italic">Không có dữ liệu</td></tr>
+                            }
+                            @for (int i = 0; i < listCash.Count; i++)
+                            {
+                                var o = listCash[i];
+                                <tr>
+                                    <td class="text-center text-muted fw-bold">@(i + 1)</td>
+                                    <td class="fw-bold font-monospace text-warning">@o.VoucherCode</td>
+                                    <td class="text-center">@o.TransactionDate.ToString("dd/MM/yyyy")</td>
+                                    <td class="fw-bold text-dark">@o.TargetName</td>
+                                    <td class="fw-bold text-muted font-monospace">@(o.Order?.OrderCode ?? o.PaperVoucherNumber)</td>
+                                    <td class="text-end fw-bold text-success fs-6">@o.Amount.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        // LOGIC BỘ LỌC CHỌN NHANH (NĂM, QUÝ, THÁNG)
+        let fpFrom, fpTo;
+
+        document.addEventListener("DOMContentLoaded", function () {
+        fpFrom = flatpickr("#fromDate", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn" });
+        fpTo = flatpickr("#toDate", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn" });
+
+        const monthlyDataRaw = @Html.Raw(ViewBag.ChartMonthly ?? "[]");
+        const statusDataRaw = @Html.Raw(ViewBag.ChartStatus ?? "[]");
+
+        // 1. BIỂU ĐỒ CỘT
+        const ctxBar = document.getElementById('monthlyChart').getContext('2d');
+        const labels = monthlyDataRaw.map(x => x.Month);
+        const dataReceived = monthlyDataRaw.map(x => x.Received);
+        const dataDelivered = monthlyDataRaw.map(x => x.Delivered);
+        const dataInvoiced = monthlyDataRaw.map(x => x.Invoiced);
+
+        new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+        labels: labels,
+        datasets: [
+        { label: 'Đơn Đã Nhận', data: dataReceived, backgroundColor: '#3b82f6', borderRadius: 4 },
+        { label: 'Đơn Đã Giao', data: dataDelivered, backgroundColor: '#10b981', borderRadius: 4 },
+        { label: 'Đã xuất Hóa đơn', data: dataInvoiced, backgroundColor: '#8b5cf6', borderRadius: 4 }
+        ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, font: { family: 'Inter', weight: 'bold' } } } }, scales: { y: { beginAtZero: true, grid: { borderDash: [5, 5] } }, x: { grid: { display: false } } } }
+        });
+
+        // 2. BIỂU ĐỒ TRÒN
+        const ctxPie = document.getElementById('statusChart').getContext('2d');
+        const statusLabels = statusDataRaw.map(x => x.Status);
+        const statusCounts = statusDataRaw.map(x => x.Count);
+        const bgColors = ['#f59e0b', '#3b82f6', '#10b981', '#64748b', '#8b5cf6', '#ef4444', '#0ea5e9'];
+
+        new Chart(ctxPie, {
+        type: 'doughnut',
+        data: { labels: statusLabels, datasets: [{ data: statusCounts, backgroundColor: bgColors, borderWidth: 2, borderColor: '#fff' }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, font: { family: 'Inter', weight: '600', size: 11 } } } } }
+        });
+        });
+
+        // HÀM TÍNH TOÁN NGÀY TỰ ĐỘNG CHO BỘ LỌC
+        function applyQuickFilter() {
+        let yearStr = document.getElementById('quickYear').value;
+        let quarterStr = document.getElementById('quickQuarter').value;
+        let monthStr = document.getElementById('quickMonth').value;
+
+        let year = yearStr ? parseInt(yearStr) : new Date().getFullYear();
+        let startDate, endDate;
+
+        if (monthStr) {
+        // Ưu tiên chọn Tháng trước
+        let month = parseInt(monthStr);
+        startDate = new Date(year, month - 1, 1);
+        endDate = new Date(year, month, 0); // Lấy ngày cuối cùng của tháng
+        // Reset Quý để UI đỡ rối
+        document.getElementById('quickQuarter').value = "";
+        }
+        else if (quarterStr) {
+        // Nếu chọn Quý
+        let quarter = parseInt(quarterStr);
+        let startMonth = (quarter - 1) * 3;
+        startDate = new Date(year, startMonth, 1);
+        endDate = new Date(year, startMonth + 3, 0);
+        }
+        else {
+        // Chỉ chọn Năm
+        startDate = new Date(year, 0, 1);
+        endDate = new Date(year, 11, 31);
+        }
+
+        // Parse Date object -> YYYY-MM-DD
+        let startStr = startDate.getFullYear() + "-" + String(startDate.getMonth() + 1).padStart(2, '0') + "-" + String(startDate.getDate()).padStart(2, '0');
+        let endStr = endDate.getFullYear() + "-" + String(endDate.getMonth() + 1).padStart(2, '0') + "-" + String(endDate.getDate()).padStart(2, '0');
+
+        // Set vào Flatpickr (Giao diện UI) và Hidden Input để submit
+        fpFrom.setDate(startStr);
+        fpTo.setDate(endStr);
+        }
+    </script>
+}

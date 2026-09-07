@@ -1,0 +1,537 @@
+﻿@model IEnumerable<ProductionManager.Data.Invoice>
+@{
+    ViewData["Title"] = "Tra cứu & Theo dõi Hóa đơn";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)> {
+        ("Kinh doanh & Bán hàng", Url.Action("Index", "Order")), ("Sổ Hóa Đơn Đỏ", "")
+    };
+    var customerList = ViewBag.CustomerList as IEnumerable<SelectListItem>;
+
+    // 1. TÍNH TOÁN THỐNG KÊ (KPI)
+    decimal totalFilteredAmount = Model?.Sum(i => i.TotalAmount) ?? 0;
+    int totalFilteredCount = Model?.Count() ?? 0;
+
+    // 2. CHUẨN BỊ DỮ LIỆU CHO BIỂU ĐỒ (Group theo ngày)
+    // ĐÃ FIX LỖI: Dùng Cast<object>() để ép kiểu đồng nhất trước khi dùng fallback
+    var chartData = Model != null && Model.Any()
+        ? Model.GroupBy(i => i.InvoiceDate.Date)
+               .Select(g => new { Date = g.Key.ToString("dd/MM/yyyy"), Total = g.Sum(x => x.TotalAmount) })
+               .OrderBy(x => x.Date)
+               .Cast<object>()
+               .ToList()
+        : new List<object>();
+
+    string chartJson = System.Text.Json.JsonSerializer.Serialize(chartData);
+}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<style>
+    :root {
+        --primary: #0ea5e9;
+        --border: #e2e8f0;
+        --bg-body: #f8fafc;
+        --text-main: #1e293b;
+    }
+
+    body {
+        background-color: var(--bg-body);
+        font-family: 'Inter', sans-serif;
+        color: var(--text-main);
+    }
+
+    .erp-card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+        overflow: hidden;
+    }
+
+    /* BẢNG LƯỚI */
+    .table-erp thead th {
+        background: #f8fafc;
+        color: #475569;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        font-weight: 800;
+        padding: 14px 16px;
+        border-bottom: 2px solid #cbd5e1;
+        white-space: nowrap;
+    }
+
+    .table-erp tbody td {
+        padding: 14px 16px;
+        vertical-align: middle;
+        font-size: 0.875rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .main-row {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+        .main-row:hover {
+            background-color: #f1f5f9;
+        }
+
+    .detail-row td {
+        background-color: #f8fafc;
+        padding: 20px 24px !important;
+        border-bottom: 2px solid #cbd5e1 !important;
+    }
+
+    .chevron-icon {
+        transition: transform 0.3s ease;
+        color: #94a3b8;
+    }
+
+    .row-expanded .chevron-icon {
+        transform: rotate(90deg);
+        color: var(--primary);
+    }
+
+    /* KPI CARDS */
+    .kpi-box {
+        padding: 20px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        border: 1px solid var(--border);
+        background: #fff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .kpi-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    /* BỘ LỌC */
+    .filter-input {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--primary);
+    }
+
+        .filter-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px #e0f2fe;
+        }
+
+    /* CSS CHO BẢN IN PDF */
+    @@media print {
+        body {
+            background-color: #fff !important;
+        }
+
+        .d-print-none {
+            display: none !important;
+        }
+
+        .erp-card {
+            border: none !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .table-erp th, .table-erp td {
+            border: 1px solid #000 !important;
+            padding: 8px !important;
+            font-size: 11px !important;
+        }
+
+        .detail-row {
+            display: table-row !important;
+        }
+        /* Tự động in luôn chi tiết */
+        .chart-container {
+            page-break-inside: avoid;
+        }
+    }
+</style>
+
+<div class="container-fluid py-4" style="max-width: 1500px;">
+
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+        <div>
+            <h3 class="fw-800 text-dark mb-1"><i class="fa-solid fa-file-invoice-dollar text-primary me-2"></i>SỔ HÓA ĐƠN ĐẦU RA</h3>
+            <p class="text-muted fw-600 small mb-0">Tra cứu, thống kê và kết xuất báo cáo hóa đơn VAT.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-dark fw-bold shadow-sm rounded-pill px-4"><i class="fa-solid fa-print me-2"></i> In PDF</button>
+            <a href="/Invoice/ExportExcel" class="btn btn-success fw-bold shadow-sm rounded-pill px-4"><i class="fa-solid fa-file-excel me-2"></i> Xuất Excel</a>
+            <a href="/Order/BatchInvoice" class="btn btn-info fw-bold shadow-sm rounded-pill px-4 text-white"><i class="fa-solid fa-plus me-2"></i> Lập Hóa Đơn Lô</a>
+        </div>
+    </div>
+
+    <!-- THỐNG KÊ KPI -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="kpi-box">
+                <div class="kpi-icon bg-primary bg-opacity-10 text-primary"><i class="fa-solid fa-file-lines"></i></div>
+                <div>
+                    <div class="text-muted small fw-800 text-uppercase">TỔNG SỐ HÓA ĐƠN</div>
+                    <div class="fs-4 fw-800 text-dark">@totalFilteredCount.ToString("N0") <span class="fs-6 text-muted fw-600">tờ</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="kpi-box" style="border-left: 4px solid #10b981;">
+                <div class="kpi-icon bg-success bg-opacity-10 text-success"><i class="fa-solid fa-sack-dollar"></i></div>
+                <div>
+                    <div class="text-muted small fw-800 text-uppercase">TỔNG TIỀN ĐÃ XUẤT HĐ</div>
+                    <div class="fs-4 fw-800 text-success">@totalFilteredAmount.ToString("N0") <span class="fs-6 text-muted fw-600">₫</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="kpi-box">
+                <div class="kpi-icon bg-warning bg-opacity-10 text-warning"><i class="fa-solid fa-scale-balanced"></i></div>
+                <div>
+                    <div class="text-muted small fw-800 text-uppercase">GIÁ TRỊ TRUNG BÌNH / HĐ</div>
+                    <div class="fs-4 fw-800 text-dark">@(totalFilteredCount > 0 ? (totalFilteredAmount / totalFilteredCount).ToString("N0") : "0") <span class="fs-6 text-muted fw-600">₫</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BỘ LỌC THÔNG MINH -->
+    <div class="erp-card p-3 mb-4 d-print-none bg-light">
+        <form id="filterForm" method="get" class="row g-2 align-items-center m-0">
+            @Html.AntiForgeryToken()
+            <div class="col-md-2">
+                <input type="text" name="invoiceNo" class="form-control filter-input bg-white shadow-sm" placeholder="🔍 Mã Đơn / Số HĐ" value="@ViewBag.InvoiceNo" />
+            </div>
+            <div class="col-md-2">
+                <select name="customerId" class="form-select filter-input bg-white shadow-sm text-secondary">
+                    <option value="">-- Tất cả Khách hàng --</option>
+                    @if (customerList != null)
+                    {
+                        foreach (var item in customerList)
+                        {
+                            <option value="@item.Value" selected="@(ViewBag.CustomerId?.ToString() == item.Value ? "selected" : null)">@item.Text</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="text" name="productName" class="form-control filter-input bg-white shadow-sm" placeholder="🔍 Tên Sản phẩm trong HĐ..." value="@ViewBag.ProductName" />
+            </div>
+            <div class="col-md-3">
+                <div class="input-group shadow-sm">
+                    <span class="input-group-text bg-white text-muted border-end-0"><i class="fa-solid fa-calendar"></i></span>
+                    <input type="text" name="fromDate" class="form-control border-start-0 ps-0 datepicker filter-input text-center" placeholder="Từ ngày" value="@(ViewBag.FromDate != null ? ((DateTime)ViewBag.FromDate).ToString("yyyy-MM-dd") : "")" />
+                    <span class="input-group-text bg-light text-muted border-start-0 border-end-0 px-1">-</span>
+                    <input type="text" name="toDate" class="form-control border-start-0 ps-0 datepicker filter-input text-center" placeholder="Đến ngày" value="@(ViewBag.ToDate != null ? ((DateTime)ViewBag.ToDate).ToString("yyyy-MM-dd") : "")" />
+                </div>
+            </div>
+            <div class="col-md-2 d-flex gap-1">
+                <button type="submit" class="btn btn-primary fw-bold w-100 shadow-sm"><i class="fa-solid fa-filter me-1"></i> LỌC</button>
+                <a href="/Invoice/Index" class="btn btn-white border fw-bold px-3 text-danger shadow-sm"><i class="fa-solid fa-xmark"></i></a>
+            </div>
+        </form>
+    </div>
+
+    <div class="erp-card shadow-sm border-0 mb-4">
+        <!-- HEADER SWITCH MODE -->
+        <div class="bg-white p-3 border-bottom d-flex justify-content-between align-items-center d-print-none">
+            <h6 class="fw-800 text-dark m-0"><i class="fa-solid fa-database text-primary me-2"></i>DỮ LIỆU HÓA ĐƠN</h6>
+            <div class="btn-group shadow-sm rounded-pill p-1 bg-light border">
+                <button type="button" id="btnGrid" class="btn btn-sm px-4 rounded-pill fw-bold btn-dark" onclick="switchView('grid')"><i class="fa-solid fa-table-list me-2"></i>Dạng Lưới</button>
+                <button type="button" id="btnChart" class="btn btn-sm px-4 rounded-pill fw-bold btn-light border-0 text-muted" onclick="switchView('chart')"><i class="fa-solid fa-chart-line me-2"></i>Biểu Đồ</button>
+            </div>
+        </div>
+
+        <!-- VÙNG 1: DẠNG LƯỚI BẢNG -->
+        <div id="gridView" class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-erp">
+                <thead>
+                    <tr>
+                        <th width="40" class="text-center d-print-none"><i class="fa-solid fa-expand"></i></th>
+                        <th width="50" class="text-center">STT</th>
+                        <th>Số Hóa Đơn</th>
+                        <th class="text-center">Ngày Xuất</th>
+                        <th class="text-center">Số Đơn Gom</th>
+                        <th class="text-end">Tổng Tiền Thuế</th>
+                        <th class="text-center d-print-none">File Đính Kèm</th>
+                        <th class="text-end pe-4 d-print-none">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        int stt = 1;
+                        foreach (var inv in Model)
+                        {
+                            <tr class="main-row" onclick="toggleDetail(@inv.Id, this)">
+                                <td class="text-center d-print-none"><i class="fa-solid fa-chevron-right chevron-icon"></i></td>
+                                <td class="text-center fw-bold text-muted">@(stt++)</td>
+                                <td class="fw-800 text-primary font-monospace fs-6">@inv.InvoiceNumber</td>
+                                <td class="text-center fw-bold text-dark">@inv.InvoiceDate.ToString("dd/MM/yyyy")</td>
+                                <td class="text-center"><span class="badge bg-secondary rounded-pill px-3">@(inv.InvoiceDetails?.Count() ?? 0) Đơn Hàng</span></td>
+                                <td class="text-end fw-800 text-success fs-6">@inv.TotalAmount.ToString("N0")</td>
+                                <td class="text-center align-middle d-print-none" onclick="event.stopPropagation()">
+                                    @if (!string.IsNullOrEmpty(inv.InvoiceFile))
+                                    {
+                                        <a href="~/invoices/@inv.InvoiceFile" target="_blank" class="btn btn-sm btn-outline-danger fw-bold py-1 px-3 rounded-pill"><i class="fa-solid fa-file-pdf me-1"></i> File PDF</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small fst-italic"><i class="fa-solid fa-unlink opacity-50 me-1"></i>Trống</span>
+                                    }
+                                </td>
+                                <td class="text-end pe-4 d-print-none" onclick="event.stopPropagation()">
+                                    <div class="btn-group shadow-sm rounded-pill">
+                                        <button onclick="openEditModal(@inv.Id, '@inv.InvoiceNumber', '@inv.InvoiceDate.ToString("yyyy-MM-dd")')" class="btn btn-sm btn-light border text-warning" title="Sửa Hóa Đơn"><i class="fa-solid fa-pen"></i></button>
+                                        <button onclick="deleteInvoice(@inv.Id)" class="btn btn-sm btn-light border text-danger" title="Xóa Hóa Đơn"><i class="fa-solid fa-trash-can"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- LƯỚI CHI TIẾT ĐƠN HÀNG BÊN TRONG -->
+                            <tr id="detail-@inv.Id" class="detail-row" style="display: none;">
+                                <td colspan="8" class="p-0 border-0">
+                                    <div class="p-4 bg-light border-bottom" style="box-shadow: inset 0 4px 6px rgba(0,0,0,0.02);">
+                                        <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+                                            <div class="card-header bg-white border-bottom py-3">
+                                                <h6 class="fw-bold text-dark mb-0"><i class="fa-solid fa-layer-group text-primary me-2"></i>CHI TIẾT ĐƠN HÀNG THUỘC LÔ HÓA ĐƠN: <span class="text-primary font-monospace">@inv.InvoiceNumber</span></h6>
+                                            </div>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover align-middle mb-0">
+                                                    <thead class="bg-light text-muted" style="font-size: 0.8rem;">
+                                                        <tr>
+                                                            <th class="ps-4">Khách Hàng</th>
+                                                            <th>Mã Đơn / PO</th>
+                                                            <th class="text-center">Ngày Đặt</th>
+                                                            <th class="text-end">Giá Trị Tổng Đơn</th>
+                                                            <th class="text-end text-success pe-4">Phân Bổ Cho HĐ Này</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @if (inv.InvoiceDetails != null && inv.InvoiceDetails.Any())
+                                                        {
+                                                            foreach (var d in inv.InvoiceDetails)
+                                                            {
+                                                                <tr class="bg-white">
+                                                                    <td class="fw-bold text-dark ps-4 py-2">@d.Order.Customer?.CompanyName</td>
+                                                                    <td class="text-primary font-monospace fw-bold py-2">@d.Order.OrderCode</td>
+                                                                    <td class="text-center text-muted fw-600 py-2">@d.Order.OrderDate.ToString("dd/MM/yyyy")</td>
+                                                                    <td class="text-end fw-bold text-secondary py-2">@d.Order.TotalAmount.ToString("N0")</td>
+                                                                    <td class="text-end fw-800 text-success pe-4 bg-success bg-opacity-10 py-2">@d.BilledAmount.ToString("N0")</td>
+                                                                </tr>
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            <tr><td colspan="5" class="text-center text-muted fst-italic py-3">Không có đơn hàng tham chiếu.</td></tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr><td colspan="8" class="text-center py-5 text-muted fw-bold"><i class="fa-solid fa-folder-open fa-3x mb-3 opacity-25 d-block"></i>Không tìm thấy dữ liệu hóa đơn nào.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- VÙNG 2: DẠNG BIỂU ĐỒ (CHART VIEW) -->
+        <div id="chartView" class="p-4 bg-white chart-container" style="display: none;">
+            <h5 class="fw-bold text-dark text-center mb-4 text-uppercase"><i class="fa-solid fa-chart-area text-primary me-2"></i>BIỂU ĐỒ XU HƯỚNG XUẤT HÓA ĐƠN</h5>
+            <div style="height: 400px; width: 100%;">
+                <canvas id="invoiceChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL SỬA HÓA ĐƠN -->
+<div class="modal fade" id="editInvoiceModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-light">
+                <h6 class="modal-title fw-bold text-warning"><i class="fa-solid fa-pen-to-square me-2"></i>Sửa Thông Tin Hóa Đơn</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="frmEditInvoice" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="editInvoiceId" name="id" />
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Số hóa đơn (*)</label>
+                        <input type="text" name="invoiceNumber" id="editInvoiceNumber" class="form-control fw-bold border-warning" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Ngày xuất HĐ (*)</label>
+                        <input type="text" name="invoiceDate" id="editInvoiceDate" class="form-control datepicker bg-white" required />
+                    </div>
+                    <div class="mb-4">
+                        <label class="small fw-bold text-muted mb-1">Up đè File mới (Để trống nếu giữ cũ)</label>
+                        <input type="file" name="invoiceFile" class="form-control form-control-sm" accept=".pdf,.xml,.zip" />
+                    </div>
+                    <div class="alert alert-info border-0 p-2 small text-center mb-3">
+                        <i class="fa-solid fa-circle-info"></i> Để sửa tiền, vui lòng xóa và xuất lại HĐ Lô từ Đơn hàng.
+                    </div>
+                    <button type="button" onclick="submitEditInvoice()" class="btn btn-warning text-dark w-100 fw-bold shadow-sm py-2">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> CẬP NHẬT
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+        // Khởi tạo Lịch
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn" });
+
+        // Cấu hình Header Token cho AJAX
+        var token = $('input[name="__RequestVerificationToken"]').val();
+        if (token) { $.ajaxSetup({ headers: { 'RequestVerificationToken': token } }); }
+
+        // Khởi tạo Biểu đồ Chart.js
+        initChart();
+        });
+
+        // 1. LOGIC SWITCH VIEW LƯỚI VÀ BIỂU ĐỒ
+        function switchView(mode) {
+        if (mode === 'grid') {
+        document.getElementById('gridView').style.display = 'block';
+        document.getElementById('chartView').style.display = 'none';
+        document.getElementById('btnGrid').classList.replace('btn-light', 'btn-dark');
+        document.getElementById('btnGrid').classList.replace('text-muted', 'text-white');
+        document.getElementById('btnChart').classList.replace('btn-dark', 'btn-light');
+        document.getElementById('btnChart').classList.add('text-muted');
+        } else {
+        document.getElementById('gridView').style.display = 'none';
+        document.getElementById('chartView').style.display = 'block';
+        document.getElementById('btnChart').classList.replace('btn-light', 'btn-dark');
+        document.getElementById('btnChart').classList.replace('text-muted', 'text-white');
+        document.getElementById('btnGrid').classList.replace('btn-dark', 'btn-light');
+        document.getElementById('btnGrid').classList.add('text-muted');
+        }
+        }
+
+        // 2. LOGIC VẼ BIỂU ĐỒ
+        function initChart() {
+        const rawData = @Html.Raw(chartJson);
+        const labels = rawData.map(x => x.Date);
+        const dataValues = rawData.map(x => x.Total);
+
+        const ctx = document.getElementById('invoiceChart').getContext('2d');
+        new Chart(ctx, {
+        type: 'line',
+        data: {
+        labels: labels,
+        datasets: [{
+        label: 'Tổng tiền xuất HĐ (VNĐ)',
+        data: dataValues,
+        borderColor: '#0ea5e9',
+        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+        borderWidth: 3,
+        pointBackgroundColor: '#fff',
+        pointBorderColor: '#0ea5e9',
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        fill: true,
+        tension: 0.3 // Làm mượt đường cong
+        }]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { font: { family: 'Inter', weight: 'bold' } } } },
+        scales: {
+        y: { beginAtZero: true, grid: { borderDash: [5, 5] }, ticks: { callback: function (value) { return value.toLocaleString('vi-VN'); } } },
+        x: { grid: { display: false } }
+        }
+        }
+        });
+        }
+
+        // 3. LOGIC EXPAND DÒNG
+        function toggleDetail(id, row) {
+        var d = document.getElementById('detail-' + id);
+        if (d.style.display === 'none') {
+        d.style.display = 'table-row';
+        row.classList.add('row-expanded');
+        } else {
+        d.style.display = 'none';
+        row.classList.remove('row-expanded');
+        }
+        }
+
+        // 4. LOGIC SỬA / XÓA
+        let editInvoiceDatePickr = null;
+        function openEditModal(id, num, date) {
+        var modalEl = document.getElementById('editInvoiceModal');
+        document.getElementById('frmEditInvoice').reset();
+        $('#editInvoiceId').val(id);
+        $('#editInvoiceNumber').val(num);
+
+        if (editInvoiceDatePickr) editInvoiceDatePickr.destroy();
+        editInvoiceDatePickr = flatpickr("#editInvoiceDate", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn", defaultDate: date });
+
+        new bootstrap.Modal(modalEl).show();
+        }
+
+        function submitEditInvoice() {
+        var form = document.getElementById('frmEditInvoice');
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+
+        Swal.fire({ title: 'Đang lưu...', didOpen: () => Swal.showLoading() });
+        var formData = new FormData(form);
+
+        fetch('/Invoice/Edit', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(res => {
+        if (res.success) { Swal.fire('Thành công', res.message, 'success').then(() => location.reload()); }
+        else { Swal.fire('Lỗi', res.message, 'error'); }
+        }).catch(err => { Swal.fire('Lỗi', 'Không thể kết nối máy chủ.', 'error'); });
+        }
+
+        function deleteInvoice(id) {
+        Swal.fire({
+        title: 'Chắc chắn xóa Hóa Đơn này?',
+        text: "Toàn bộ đơn hàng được gom trong lô sẽ tự động lùi trạng thái về Chưa xuất hóa đơn!",
+        icon: 'warning',
+        showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6', confirmButtonText: 'Đồng ý, Xóa!'
+        }).then((result) => {
+        if (result.isConfirmed) {
+        Swal.fire({ title: 'Đang xóa và lùi trạng thái...', didOpen: () => Swal.showLoading() });
+        fetch('/Invoice/Delete/' + id, { method: 'POST' })
+        .then(res => res.json())
+        .then(res => {
+        if (res.success) { Swal.fire('Đã xóa!', res.message, 'success').then(() => location.reload()); }
+        else { Swal.fire('Lỗi', res.message, 'error'); }
+        }).catch(err => { Swal.fire('Lỗi', 'Không thể kết nối máy chủ.', 'error'); });
+        }
+        });
+        }
+    </script>
+}

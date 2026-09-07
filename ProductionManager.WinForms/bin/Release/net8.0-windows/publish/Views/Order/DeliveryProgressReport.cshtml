@@ -1,0 +1,244 @@
+﻿@model IEnumerable<ProductionApp.Web.Controllers.OrderController.DeliveryProgressVM>
+@{
+    ViewData["Title"] = "Báo cáo Tiến độ Giao Hàng";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Quản lý Đơn hàng", Url.Action("Index", "Order")), 
+        ("Tiến độ Giao Hàng", "") 
+    };
+    var fVal = ViewBag.FromDate != null ? ((DateTime)ViewBag.FromDate).ToString("yyyy-MM-dd") : "";
+    var tVal = ViewBag.ToDate != null ? ((DateTime)ViewBag.ToDate).ToString("yyyy-MM-dd") : "";
+}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/rowgroup/1.4.1/css/rowGroup.bootstrap5.min.css">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/rowgroup/1.4.1/js/dataTables.rowGroup.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<style>
+    body {
+        background-color: #f8fafc;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .erp-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    /* Bảng */
+    .table-erp thead th {
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        font-weight: 700;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .table-erp tbody td {
+        vertical-align: middle;
+        border-bottom: 1px dashed #e2e8f0;
+        font-size: 0.9rem;
+    }
+
+    /* Row Group Styling */
+    table.dataTable tr.dtrg-group td {
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
+        font-weight: 700;
+        font-size: 0.95rem;
+        border-top: 2px solid #cbd5e1;
+        border-bottom: 2px solid #cbd5e1;
+    }
+
+    /* Thanh tiến độ */
+    .progress-thin {
+        height: 6px;
+        background-color: #e2e8f0;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-top: 6px;
+        width: 100px;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.6s ease;
+    }
+
+    .select2-container .select2-selection--single {
+        height: 38px !important;
+        padding: 5px 8px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+    }
+</style>
+
+<div class="container-fluid pt-4 px-4 pb-5">
+
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <h4 class="fw-bold text-dark mb-1"><i class="fa-solid fa-truck-ramp-box text-primary me-2"></i>BÁO CÁO TIẾN ĐỘ GIAO HÀNG</h4>
+            <div class="text-muted small">Kiểm soát lượng hàng Đã Giao và Còn Nợ theo từng Đơn hàng</div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="@Url.Action("ExportDeliveryProgressExcel", new { fromDate = ViewBag.FromDate, toDate = ViewBag.ToDate, customerId = Context.Request.Query["customerId"] })"
+               class="btn btn-success fw-bold shadow-sm d-flex align-items-center gap-2 rounded-pill px-4">
+                <i class="fa-solid fa-file-excel"></i> Xuất Excel
+            </a>
+            <button onclick="exportToPDF()" class="btn btn-danger fw-bold shadow-sm d-flex align-items-center gap-2 rounded-pill px-4">
+                <i class="fa-solid fa-file-pdf"></i> Tải PDF
+            </button>
+        </div>
+    </div>
+
+    <div class="erp-card p-3 mb-4">
+        <form asp-action="DeliveryProgressReport" method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="small fw-bold text-muted mb-1"><i class="fa-regular fa-calendar text-primary me-1"></i> Đặt từ ngày</label>
+                <input type="text" name="fromDate" class="form-control datepicker bg-white" value="@fVal" />
+            </div>
+            <div class="col-md-3">
+                <label class="small fw-bold text-muted mb-1"><i class="fa-regular fa-calendar-check text-primary me-1"></i> Đến ngày</label>
+                <input type="text" name="toDate" class="form-control datepicker bg-white" value="@tVal" />
+            </div>
+            <div class="col-md-4">
+                <label class="small fw-bold text-muted mb-1"><i class="fa-solid fa-users text-primary me-1"></i> Khách hàng</label>
+                <select name="customerId" id="ddlCustomer" class="form-select" asp-items="ViewBag.CustomerList">
+                    <option value="">-- Tất cả khách hàng --</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm"><i class="fa-solid fa-filter me-1"></i> Phân tích</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="erp-card" id="pdf-content">
+
+        <div class="card-header bg-white py-4 border-bottom d-none d-print-block text-center" id="pdf-header" style="display:none !important;">
+            <h3 class="fw-bold mb-1">BÁO CÁO TIẾN ĐỘ GIAO HÀNG TỔNG HỢP</h3>
+            <p class="mb-0 text-muted fst-italic">Kỳ báo cáo: @(((DateTime)ViewBag.FromDate).ToString("dd/MM/yyyy")) đến @(((DateTime)ViewBag.ToDate).ToString("dd/MM/yyyy"))</p>
+        </div>
+
+        <div class="card-body p-0">
+            @if (!Model.Any())
+            {
+                <div class="text-center py-5 text-muted fst-italic">
+                    <div class="opacity-25 mb-3"><i class="fa-solid fa-box-open fa-3x"></i></div>
+                    Không có đơn hàng nào trong khoảng thời gian này.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive p-3">
+                    <table class="table table-hover table-erp w-100" id="progressTable">
+                        <thead>
+                            <tr>
+                                <th>Nhóm Đơn Hàng (Ẩn)</th>
+                                <th width="25%">Sản phẩm Đặt</th>
+                                <th>Quy cách</th>
+                                <th class="text-center text-primary">SL Đặt 📦</th>
+                                <th class="text-center text-success">Đã Giao 🚚</th>
+                                <th class="text-center text-danger">Còn Nợ ⚠️</th>
+                                <th class="text-center">Tiến độ (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model)
+                            {
+                                // Tạo chuỗi Header của Nhóm
+                                string deadlineStr = item.DeliveryDeadline.HasValue ? item.DeliveryDeadline.Value.ToString("dd/MM/yyyy") : "Chưa hẹn";
+                                string groupHeader = $"Đơn: {item.OrderCode} | Khách: {item.CustomerName} | Hẹn giao: {deadlineStr}";
+
+                                string progressColor = item.ProgressPercent >= 100 ? "bg-success" : (item.ProgressPercent > 0 ? "bg-primary" : "bg-secondary opacity-50");
+
+                                <tr>
+                                    <td>@groupHeader</td>
+                                    <td class="fw-bold text-dark">@item.ProductName</td>
+                                    <td class="text-muted small">@item.Specifications</td>
+                                    <td class="text-center fw-bold text-primary bg-primary bg-opacity-10 fs-6">@item.QuantityOrdered.ToString("N0")</td>
+
+                                    <td class="text-center fw-bold text-success">@item.QuantityShipped.ToString("N0")</td>
+
+                                    @if (item.QuantityRemaining > 0)
+                                    {
+                                        <td class="text-center fw-bold text-danger bg-danger bg-opacity-10 fs-6">@item.QuantityRemaining.ToString("N0")</td>
+                                    }
+                                    else
+                                    {
+                                        <td class="text-center text-muted"><i class="fa-solid fa-check text-success"></i> Xong</td>
+                                    }
+
+                                    <td class="text-center">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <span class="small fw-bold text-dark">@item.ProgressPercent.ToString("0")%</span>
+                                            <div class="progress-thin"><div class="progress-bar-fill @progressColor" style="width: @item.ProgressPercent%"></div></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function () {
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn" });
+        $('#ddlCustomer').select2({ placeholder: "🔍 Tìm khách hàng...", allowClear: true });
+
+        if (document.getElementById('progressTable')) {
+            $('#progressTable').DataTable({
+                "language": {
+                    "search": "🔍 Tìm kiếm sản phẩm:",
+                    "lengthMenu": "Hiển thị _MENU_ dòng",
+                    "info": "Hiển thị _START_ - _END_ / _TOTAL_ sản phẩm",
+                    "infoEmpty": "Không có dữ liệu"
+                },
+                "ordering": false, // Tắt sắp xếp để giữ nguyên order của C#
+                "pageLength": 100,
+                "columnDefs": [{ "visible": false, "targets": 0 }], // Ẩn cột Nhóm
+                // Kích hoạt gom nhóm theo Đơn hàng
+                rowGroup: {
+                    dataSrc: 0,
+                    startRender: function (rows, group) {
+                        return $('<tr class="dtrg-group"/>')
+                            .append('<td colspan="6"><i class="fa-solid fa-folder-open text-warning me-2"></i> ' + group + '</td>');
+                    }
+                }
+            });
+        }
+    });
+
+    function exportToPDF() {
+        document.getElementById('pdf-header').style.setProperty('display', 'block', 'important');
+        var element = document.getElementById('pdf-content');
+        var opt = {
+            margin: [0.5, 0.5, 0.5, 0.5],
+            filename: 'TienDoGiaoHang.pdf',
+            image: { type: 'jpeg', quality: 1 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+        };
+        html2pdf().set(opt).from(element).save().then(() => {
+            document.getElementById('pdf-header').style.setProperty('display', 'none', 'important');
+        });
+    }
+</script>

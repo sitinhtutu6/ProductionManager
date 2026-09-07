@@ -1,0 +1,254 @@
+﻿@model ProductionApp.Web.Models.ViewModels.BomDetailVM
+@{
+    ViewData["Title"] = "Chi tiết Định Mức (BOM)";
+
+    // --- 🔥 LOGIC TÍNH TOÁN HIỆU SUẤT (YIELD RATE) ---
+    // 1. Tính tổng m3 gỗ tiêu hao cho 1 sản phẩm (Chỉ cộng các chi tiết có kích thước)
+    double totalWoodM3 = Model.Materials
+        .Where(x => x.Length > 0 && x.Width > 0 && x.Height > 0)
+        .Sum(x => x.Quantity);
+
+    // 2. Tính số lượng sản phẩm làm được từ 1 m3 gỗ
+    double yieldRate = totalWoodM3 > 0 ? (1 / totalWoodM3) : 0;
+}
+
+<style>
+    /* Custom Scrollbar */
+    .table-responsive::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 4px;
+    }
+
+    /* Sticky Sidebar */
+    .sticky-summary {
+        position: -webkit-sticky;
+        position: sticky;
+        top: 20px;
+        z-index: 99;
+    }
+
+    /* Hiệu ứng Card */
+    .hover-card {
+        transition: transform 0.2s;
+    }
+
+        .hover-card:hover {
+            transform: translateY(-2px);
+        }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold text-uppercase mb-1"><i class="fa-solid fa-file-invoice me-2 text-primary"></i>CHI TIẾT BOM & ĐỊNH MỨC</h4>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0 small">
+                    <li class="breadcrumb-item"><a asp-action="Index" class="text-decoration-none">Danh sách BOM</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">@Model.Product.ProductCode</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-action="Index" class="btn btn-outline-secondary fw-bold shadow-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Quay lại
+            </a>
+            <a asp-action="Create" asp-route-productId="@Model.Product.Id" class="btn btn-warning text-dark fw-bold shadow-sm">
+                <i class="fa-solid fa-pen-to-square me-1"></i> Cập nhật BOM
+            </a>
+            <a asp-action="ExportOptions" asp-route-id="@Model.Product.Id" class="btn btn-success fw-bold shadow-sm">
+                <i class="fa-solid fa-file-excel me-1"></i> Xuất Excel / In
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4 bg-primary bg-opacity-10 border-start border-5 border-primary">
+        <div class="card-body py-3">
+            <div class="row align-items-center">
+                <div class="col-auto">
+                    <div class="bg-white p-3 rounded-circle shadow-sm text-primary">
+                        <i class="fa-solid fa-box-open fa-2x"></i>
+                    </div>
+                </div>
+
+                <div class="col">
+                    <h5 class="fw-bold text-primary mb-1">@Model.Product.ProductName</h5>
+                    <div class="d-flex gap-3 text-muted small">
+                        <span><i class="fa-solid fa-barcode me-1"></i>Mã: <strong>@Model.Product.ProductCode</strong></span>
+                        <span><i class="fa-solid fa-ruler-combined me-1"></i>Quy cách: <strong>@Model.Product.Length x @Model.Product.Width x @Model.Product.Thick</strong> mm</span>
+                        <span><i class="fa-solid fa-scale-balanced me-1"></i>ĐVT: <strong>@Model.Product.Unit</strong></span>
+                    </div>
+                </div>
+
+                <div class="col-auto text-end px-4 border-end border-2 border-secondary border-opacity-25">
+                    <div class="small text-muted text-uppercase fw-bold">Hiệu suất (Est)</div>
+                    <div class="h4 fw-bold text-warning mb-0" title="Tổng lượng gỗ: @totalWoodM3.ToString("N4") m3">
+                        <i class="fa-solid fa-bolt me-1"></i>@yieldRate.ToString("N1") <small class="fs-6 text-secondary fw-normal">sp / 1m³</small>
+                    </div>
+                </div>
+
+                <div class="col-auto text-end ps-4">
+                    <div class="small text-muted text-uppercase fw-bold">Chi phí dự kiến</div>
+                    <div class="h4 fw-bold text-success mb-0">@Model.TotalCost.ToString("N0") ₫</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow border-0 rounded-3 h-100">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold text-dark text-uppercase"><i class="fa-solid fa-list-ul me-2 text-primary"></i>I. Chi tiết cấu thành (Components)</h6>
+                    <span class="badge bg-light text-dark border">@Model.Materials.Count mục</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-secondary small text-uppercase">
+                                <tr>
+                                    <th class="ps-4" style="width: 30%">🧩 Tên Chi tiết / Bộ phận</th>
+                                    <th style="width: 20%">📦 Vật tư</th>
+                                    <th class="text-center">📏 Quy cách (mm)</th>
+                                    <th class="text-center">🔢 SL Cắt</th>
+                                    <th class="text-center">✖ HS</th>
+                                    <th class="text-end pe-3">📊 Tổng Tiêu hao</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Materials != null && Model.Materials.Any())
+                                {
+                                    foreach (var item in Model.Materials)
+                                    {
+                                        <tr>
+                                            <td class="ps-4">
+                                                <span class="fw-bold text-primary">@item.ComponentName</span>
+                                                @if (!string.IsNullOrEmpty(item.Note))
+                                                {
+                                                    <div class="small text-muted fst-italic"><i class="fa-regular fa-note-sticky me-1"></i>@item.Note</div>
+                                                }
+                                            </td>
+                                            <td class="fw-bold text-dark">
+                                                @item.MaterialName
+                                            </td>
+                                            <td class="text-center small font-monospace text-muted">
+                                                @(item.Length > 0 ? $"{item.Length} x {item.Width} x {item.Height}" : "-")
+                                            </td>
+                                            <td class="text-center fw-bold">@item.CutQuantity.ToString("0.##")</td>
+                                            <td class="text-center text-muted small">x @item.Coefficient.ToString("0.##")</td>
+                                            <td class="text-end pe-3">
+                                                @if (!string.IsNullOrEmpty(item.Unit) && item.Unit.ToLower().Contains("m3"))
+                                                {
+                                                    <span class="badge bg-success bg-opacity-10 text-success border border-success">
+                                                        @item.Quantity.ToString("N5") @item.Unit
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-warning bg-opacity-10 text-dark border border-warning">
+                                                        @item.Quantity.ToString("0.##") @item.Unit
+                                                    </span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr><td colspan="6" class="text-center text-muted py-5 fst-italic">Chưa có dữ liệu chi tiết.</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="sticky-summary">
+                <div class="card shadow-lg border-0 rounded-3 mb-3">
+                    <div class="card-header bg-gradient bg-success text-white py-3">
+                        <h6 class="m-0 fw-bold text-uppercase"><i class="fa-solid fa-calculator me-2"></i>II. Tổng hợp vật tư</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-striped mb-0">
+                            <thead class="bg-light text-muted small">
+                                <tr>
+                                    <th class="ps-3">Tên Vật Tư</th>
+                                    <th class="text-end pe-3">Tổng Nhu Cầu</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Summary != null && Model.Summary.Any())
+                                {
+                                    foreach (var sum in Model.Summary)
+                                    {
+                                        <tr>
+                                            <td class="ps-3 fw-bold text-secondary">
+                                                @if (sum.Unit.Contains("m3"))
+                                                {
+                                                    <i class="fa-solid fa-tree text-success me-1"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="fa-solid fa-screwdriver-wrench text-warning me-1"></i>
+                                                }
+                                                @sum.MaterialName
+                                            </td>
+                                            <td class="text-end pe-3 fw-bold text-dark">
+                                                @if (sum.Unit.Contains("m3"))
+                                                {
+                                                    @sum.TotalQuantity.ToString("N5") <small class="text-muted fw-normal">@sum.Unit</small>
+                                                }
+                                                else
+                                                {
+                                                    @sum.TotalQuantity.ToString("N2") <small class="text-muted fw-normal">@sum.Unit</small>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                    <tr class="table-warning border-top border-warning">
+                                        <td class="ps-3 fw-bold text-uppercase small pt-3">Tổng Giá Vốn (Est):</td>
+                                        <td class="text-end pe-3 fw-bold text-danger fs-5 pt-3">@Model.TotalCost.ToString("N0") ₫</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    <tr><td colspan="2" class="text-center text-muted py-3 small">Chưa có dữ liệu tổng hợp.</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer bg-white small text-muted border-top-0 py-3">
+                        <i class="fa-solid fa-circle-info text-primary me-1"></i>
+                        Định mức này tính cho <strong>01</strong> sản phẩm. <br />
+                        <span class="text-danger fw-bold">*</span> 1m³ gỗ làm được khoảng <strong>@yieldRate.ToString("N1")</strong> sản phẩm.
+                    </div>
+                </div>
+
+                <div class="card border-0 bg-transparent">
+                    <div class="d-grid">
+                        <button class="btn btn-outline-primary fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNote">
+                            <i class="fa-regular fa-comment-dots me-2"></i>Xem Ghi chú sản phẩm
+                        </button>
+                        <div class="collapse mt-2" id="collapseNote">
+                            <div class="card card-body shadow-sm border-0 bg-white small">
+                                @if (!string.IsNullOrEmpty(Model.Product.Note))
+                                {
+                                    @Model.Product.Note
+                                }
+                                else
+                                {
+                                    <span class="text-muted fst-italic">Không có ghi chú.</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

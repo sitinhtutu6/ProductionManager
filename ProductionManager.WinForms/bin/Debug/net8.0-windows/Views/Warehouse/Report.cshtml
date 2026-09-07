@@ -1,0 +1,334 @@
+﻿@model ProductionApp.Web.Models.StockReportViewModel
+@{
+    ViewData["Title"] = "Báo cáo tồn kho";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Kho Vật Tư", Url.Action("Index", "Warehouse")), 
+        ("Báo Cáo Tồn Kho", "") 
+    };
+
+    var fVal = Model.FromDate?.ToString("yyyy-MM-dd");
+    var tVal = Model.ToDate?.ToString("yyyy-MM-dd");
+
+    double totalOpen = Model.Items.Sum(x => x.OpeningStock);
+    double totalImport = Model.Items.Sum(x => x.ImportQty);
+    double totalExport = Model.Items.Sum(x => x.ExportQty);
+    double totalClose = Model.Items.Sum(x => x.ClosingStock);
+}
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<style>
+    body {
+        background-color: #f8fafc;
+    }
+
+    .report-card {
+        border: none;
+        border-radius: 12px;
+        transition: transform 0.2s;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        background: #fff;
+    }
+
+        .report-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        }
+
+    /* Làm đẹp Search Box */
+    .dataTables_wrapper .row {
+        margin-bottom: 15px;
+        align-items: center;
+    }
+
+    .dataTables_filter input {
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        padding: 6px 12px;
+    }
+
+        .dataTables_filter input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            outline: none;
+        }
+
+    /* Bảng dữ liệu */
+    .table-erp thead th {
+        background: #f1f5f9 !important;
+        color: #475569;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        font-weight: 700;
+        vertical-align: middle;
+        cursor: pointer;
+    }
+
+    .table-erp tbody td {
+        vertical-align: middle;
+        border-bottom: 1px dashed #e2e8f0;
+        font-size: 0.9rem;
+    }
+
+    .num-cell {
+        font-family: 'Consolas', monospace;
+        font-size: 0.95rem;
+    }
+
+    /* CSS cho dòng Header Nhóm */
+    table.dataTable tr.group-header td {
+        background-color: #e2e8f0 !important;
+        border-top: 2px solid #cbd5e1 !important;
+        border-bottom: 2px solid #cbd5e1 !important;
+        transition: background-color 0.2s;
+    }
+
+    table.dataTable tr.group-header:hover td {
+        background-color: #cbd5e1 !important;
+    }
+
+    table.dataTable tbody tr.detail-row {
+        transition: all 0.2s;
+    }
+</style>
+
+<div class="container-fluid pt-4 px-4 pb-5">
+
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <h4 class="fw-bold text-dark mb-1"><i class="fa-solid fa-chart-pie text-primary me-2"></i>BÁO CÁO NHẬP XUẤT TỒN</h4>
+            <div class="text-muted small">Quản lý biến động số lượng và giá trị kho (Hỗ trợ Gom nhóm & Đóng mở)</div>
+        </div>
+    </div>
+
+    @if (Model.FromDate != null)
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="report-card p-3 border-start border-4 border-info d-flex align-items-center gap-3">
+                    <div class="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;"><i class="fa-solid fa-boxes-stacked fa-lg"></i></div>
+                    <div><div class="text-uppercase small fw-bold text-muted mb-1">Tồn Đầu Kỳ</div><div class="h4 mb-0 fw-bold text-dark">@totalOpen.ToString("N0")</div></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="report-card p-3 border-start border-4 border-success d-flex align-items-center gap-3">
+                    <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;"><i class="fa-solid fa-arrow-down fa-lg"></i></div>
+                    <div><div class="text-uppercase small fw-bold text-muted mb-1">Nhập Trong Kỳ</div><div class="h4 mb-0 fw-bold text-dark">@totalImport.ToString("N0")</div></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="report-card p-3 border-start border-4 border-warning d-flex align-items-center gap-3">
+                    <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;"><i class="fa-solid fa-arrow-up fa-lg"></i></div>
+                    <div><div class="text-uppercase small fw-bold text-muted mb-1">Xuất Trong Kỳ</div><div class="h4 mb-0 fw-bold text-dark">@totalExport.ToString("N0")</div></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="report-card p-3 border-start border-4 border-primary d-flex align-items-center gap-3 bg-primary bg-opacity-10">
+                    <div class="bg-white text-primary rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 50px; height: 50px;"><i class="fa-solid fa-scale-balanced fa-lg"></i></div>
+                    <div>
+                        <div class="text-uppercase small fw-bold text-primary mb-1">Tồn Cuối Kỳ</div>
+                        <div class="h4 mb-0 fw-bold text-primary">@totalClose.ToString("N0")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="report-card p-3 mb-4">
+        <form asp-action="Report" method="get" class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex gap-2 align-items-center">
+                <div class="btn-group shadow-sm">
+                    <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="setPeriod('thisMonth')">Tháng này</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="setPeriod('lastMonth')">Tháng trước</button>
+                </div>
+                <div class="input-group input-group-sm shadow-sm" style="width: 300px;">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-regular fa-calendar"></i></span>
+                    <input type="text" name="fromDate" id="fromDate" class="form-control border-start-0 datepicker" value="@fVal" required placeholder="Từ ngày">
+                    <span class="input-group-text bg-light border-start-0 border-end-0 text-muted"><i class="fa-solid fa-arrow-right"></i></span>
+                    <input type="text" name="toDate" id="toDate" class="form-control border-start-0 datepicker" value="@tVal" required placeholder="Đến ngày">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm fw-bold shadow-sm px-4"><i class="fa-solid fa-filter me-1"></i> Lọc KQ</button>
+            </div>
+
+            @if (Model.FromDate != null)
+            {
+                <button type="submit" asp-action="ExportReportExcel" class="btn btn-success fw-bold shadow-sm px-4 rounded-pill">
+                    <i class="fa-solid fa-file-excel me-2"></i> Tải Excel
+                </button>
+            }
+        </form>
+    </div>
+
+    <div class="report-card">
+        <div class="card-body p-4">
+            @if (Model.FromDate == null)
+            {
+                <div class="text-center py-5">
+                    <div class="opacity-25 mb-3"><i class="fa-solid fa-filter-circle-dollar fa-4x text-primary"></i></div>
+                    <h5 class="text-muted fw-bold">Vui lòng chọn khoảng thời gian để xem báo cáo</h5>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover table-erp w-100" id="reportTable">
+                        <thead>
+                            <tr>
+                                <th class="text-center">Mã VT 🏷️</th>
+                                <th>Tên Vật Tư 📦</th>
+                                <th>Nhóm Phân Loại</th>
+                                <th class="text-center">ĐVT</th>
+                                <th class="text-center text-info">Tồn Đầu ⏸️</th>
+                                <th class="text-center text-success">Nhập 📥</th>
+                                <th class="text-center text-danger">Xuất 📤</th>
+                                <th class="text-center text-primary">Tồn Cuối ⚖️</th>
+                                <th class="text-end">Giá Trị Tồn 💰</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Items.Any())
+                            {
+                                foreach (var item in Model.Items)
+                                {
+                                    <tr>
+                                        <td class="text-center fw-bold text-muted small">@item.Code</td>
+                                        <td class="fw-bold text-dark">@item.Name</td>
+                                        <td>@(string.IsNullOrEmpty(item.Category) ? "CHƯA PHÂN LOẠI" : item.Category.ToUpper())</td>
+                                        <td class="text-center text-muted small fw-bold">@item.Unit</td>
+                                        <td class="text-center fw-bold text-info bg-info bg-opacity-10 num-cell">@item.OpeningStock.ToString("N2")</td>
+                                        <td class="text-center @(item.ImportQty > 0 ? "text-success fw-bold bg-success bg-opacity-10" : "text-muted opacity-50") num-cell">@item.ImportQty.ToString("N2")</td>
+                                        <td class="text-center @(item.ExportQty > 0 ? "text-danger fw-bold bg-danger bg-opacity-10" : "text-muted opacity-50") num-cell">@item.ExportQty.ToString("N2")</td>
+                                        <td class="text-center fw-bold text-primary bg-primary bg-opacity-10 num-cell">@item.ClosingStock.ToString("N2")</td>
+                                        <td class="text-end fw-bold text-dark num-cell" data-sort="@item.TotalValue">@item.TotalValue.ToString("N0")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-white border-top border-2 border-primary">
+                                <th colspan="8" class="text-end text-uppercase text-primary pe-3 fs-6">TỔNG CỘNG TOÀN KHO:</th>
+                                <th class="text-end text-danger fs-5 fw-bold num-cell">@Model.TotalValue.ToString("N0") ₫</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        flatpickr(".datepicker", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn", allowInput: true });
+
+        if (document.getElementById('reportTable')) {
+            var table = $('#reportTable').DataTable({
+                "language": {
+                    "search": "🔍 Tìm nhanh vật tư:",
+                    "lengthMenu": "Hiển thị _MENU_ dòng",
+                    "info": "Hiển thị _START_ - _END_ / _TOTAL_ vật tư",
+                    "infoEmpty": "Không có dữ liệu",
+                    "zeroRecords": "Không tìm thấy"
+                },
+                "ordering": true,
+                "pageLength": 100,
+                "lengthMenu": [[50, 100, 200, -1], [50, 100, 200, "Tất cả"]],
+                "columnDefs": [
+                    { "visible": false, "targets": 2 } // Ẩn cột Nhóm (Index 2)
+                ],
+                "order": [[2, 'asc']], // Luôn sort theo cột nhóm trước
+
+                // 🔥 THUẬT TOÁN GOM NHÓM NGUYÊN BẢN (KHÔNG DÙNG PLUGIN) 🔥
+                "drawCallback": function (settings) {
+                    var api = this.api();
+                    var rows = api.rows({ page: 'current' }).nodes();
+                    var last = null;
+                    var currentGroupId = '';
+
+                    // Duyệt qua từng dòng của cột 2 (Cột Nhóm)
+                    api.column(2, { page: 'current' }).data().each(function (group, i) {
+                        if (last !== group) {
+                            // Tạo ID chuẩn xác cho nhóm này
+                            currentGroupId = 'group-' + group.replace(/[^a-zA-Z0-9]/g, '') + '-' + i;
+
+                            // Tính tổng tiền của nhóm
+                            var groupSum = 0;
+                            var count = 0;
+                            api.rows({ page: 'current' }).every(function () {
+                                if (this.data()[2] === group) {
+                                    // Parse tiền từ dạng chuỗi "1,000,000" thành số
+                                    var rowMoney = parseInt(this.data()[8].toString().replace(/[^\d]/g, '') || 0);
+                                    groupSum += rowMoney;
+                                    count++;
+                                }
+                            });
+
+                            var sumFormatted = new Intl.NumberFormat('vi-VN').format(groupSum);
+
+                            // Chèn 1 dòng Header của Nhóm lên phía trên các dòng con
+                            $(rows).eq(i).before(
+                                '<tr class="group-header" data-group="' + currentGroupId + '" style="cursor: pointer;">' +
+                                '<td colspan="7" class="fw-bold text-dark text-uppercase py-3">' +
+                                '<i class="fa-regular fa-square-minus me-2 text-primary toggle-icon" style="font-size: 1.2rem; vertical-align: middle;"></i>' +
+                                '🏷️ Nhóm: ' + group + ' <span class="badge bg-white text-dark border shadow-sm ms-2">' + count + ' mã</span>' +
+                                '</td>' +
+                                '<td class="text-end text-danger fw-bold fs-6 py-3">' + sumFormatted + ' ₫</td>' +
+                                '</tr>'
+                            );
+                            last = group;
+                        }
+
+                        // Gắn class cho dòng con để dễ bề ẩn/hiện
+                        $(rows).eq(i).addClass(currentGroupId + '-row detail-row');
+                    });
+                }
+            });
+
+            // 🔥 SỰ KIỆN CLICK ĐỂ MỞ / ĐÓNG NHÓM (+ / -) 🔥
+            $('#reportTable tbody').on('click', 'tr.group-header', function () {
+                var groupId = $(this).data('group');
+                var $rows = $('.' + groupId + '-row');
+                var $icon = $(this).find('.toggle-icon');
+
+                if ($rows.is(':visible')) {
+                    $rows.hide(); // Ẩn đi
+                    $icon.removeClass('fa-square-minus text-primary').addClass('fa-square-plus text-secondary');
+                } else {
+                    $rows.show(); // Mở ra
+                    $icon.removeClass('fa-square-plus text-secondary').addClass('fa-square-minus text-primary');
+                }
+            });
+        }
+    });
+
+    // Helper set ngày tháng
+    function setPeriod(type) {
+        const today = new Date();
+        let from, to;
+        if (type === 'thisMonth') {
+            from = new Date(today.getFullYear(), today.getMonth(), 1);
+            to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        } else if (type === 'lastMonth') {
+            from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            to = new Date(today.getFullYear(), today.getMonth(), 0);
+        }
+
+        const formatDate = (date) => {
+            var d = new Date(date), month = '' + (d.getMonth() + 1), day = '' + d.getDate(), year = d.getFullYear();
+            if (month.length < 2) month = '0' + month;
+            if (day.length < 2) day = '0' + day;
+            return [year, month, day].join('-');
+        }
+        document.getElementById('fromDate')._flatpickr.setDate(formatDate(from));
+        document.getElementById('toDate')._flatpickr.setDate(formatDate(to));
+    }
+</script>

@@ -1,0 +1,74 @@
+﻿@{ ViewData["Title"] = "Trợ lý Giám Đốc (AI)"; }
+
+<div class="container mt-4">
+    <div class="card shadow" style="height: 80vh;">
+        <div class="card-header bg-dark text-white d-flex justify-content-between">
+            <h5 class="mb-0"><i class="fa-solid fa-brain me-2"></i>CEO Assistant</h5>
+            <span class="badge bg-success">Online</span>
+        </div>
+        
+        <div class="card-body overflow-auto bg-light" id="chatBox">
+            <div class="text-center text-muted mt-5 pt-5">
+                <i class="fa-solid fa-comments fa-3x mb-3"></i>
+                <p>Gõ từ khóa: <strong>"Doanh thu", "Công nợ", "Tồn kho", "Sổ quỹ"</strong> để xem báo cáo nhanh.</p>
+            </div>
+        </div>
+
+        <div class="card-footer bg-white">
+            <div class="input-group">
+                <input type="text" id="txtMsg" class="form-control" placeholder="Hỏi gì đó..." onkeypress="if(event.keyCode==13) sendMsg()">
+                <button class="btn btn-primary px-4" onclick="sendMsg()" id="btnSend">
+                    <i class="fa-solid fa-paper-plane"></i> Gửi
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script> <script>
+        async function sendMsg() {
+            let txt = document.getElementById("txtMsg");
+            let msg = txt.value.trim();
+            if (!msg) return;
+
+            let box = document.getElementById("chatBox");
+            
+            // Hiện câu hỏi user
+            box.innerHTML += `<div class="d-flex justify-content-end mb-3"><div class="bg-primary text-white p-3 rounded shadow-sm" style="max-width:80%">${msg}</div></div>`;
+            txt.value = "";
+            box.scrollTop = box.scrollHeight;
+
+            // Hiện trạng thái đang nghĩ
+            let btn = document.getElementById("btnSend");
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+            try {
+                let res = await fetch('/Ai/Ask', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ question: msg })
+                });
+                let data = await res.json();
+                
+                // Render câu trả lời (Dùng marked để chuyển Markdown sang HTML)
+                let htmlAns = marked.parse(data.answer);
+                
+                box.innerHTML += `
+                    <div class="d-flex justify-content-start mb-3">
+                        <div class="bg-white border p-3 rounded shadow-sm" style="max-width:85%">
+                            <div class="fw-bold text-success mb-1"><i class="fa-solid fa-robot"></i> AI:</div>
+                            <div class="text-dark">${htmlAns}</div>
+                        </div>
+                    </div>`;
+            } catch (e) {
+                box.innerHTML += `<div class="text-danger text-center">Mất kết nối server!</div>`;
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Gửi';
+            box.scrollTop = box.scrollHeight;
+        }
+    </script>
+}

@@ -1,0 +1,243 @@
+﻿@model ProductionApp.Web.Models.ViewModels.ProductProfileViewModel
+@inject ProductionManager.Data.AppDbContext DbContext
+
+@{
+    ViewData["Title"] = "Hồ sơ Sản phẩm: " + Model.Product.ProductCode;
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Sản Phẩm", Url.Action("Index", "Product")), 
+        ("Thông Tin Sản Phẩm", "") 
+    };
+    
+    var companyName = DbContext.CompanyConfigs.FirstOrDefault()?.CompanyName ?? "CÔNG TY CHƯA CẤU HÌNH TRONG SETTING";
+}
+
+<style>
+    body { background-color: #f8f9fa; }
+    
+    /* Timeline CSS */
+    .timeline { position: relative; padding-left: 2rem; margin: 2rem 0; list-style: none; }
+    .timeline::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: #e9ecef; }
+    .timeline-item { position: relative; margin-bottom: 2rem; page-break-inside: avoid; }
+    .timeline-icon { position: absolute; left: -2.8rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 4px solid #f8f9fa; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 1; }
+    .timeline-content { background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #f1f3f5; }
+    .timeline-date { font-size: 0.85rem; color: #adb5bd; font-weight: 600; margin-bottom: 0.5rem; }
+
+    @@media print {
+        /* 1. Ẩn các thành phần không cần thiết */
+        .btn, a.btn, .no-print, header, footer, nav, .sidebar, .dropdown, .modal {
+            display: none !important;
+        }
+
+        /* 2. Căn chỉnh lại khổ giấy trắng bóc */
+        body, .container-fluid {
+            background-color: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+        }
+
+        /* 3. Ép trình duyệt in màu nền (để thấy được màu của icon) */
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* 4. Tùy chỉnh Timeline khi in cho gọn gàng */
+        .timeline::before { background: #ccc !important; }
+        .timeline-content {
+            box-shadow: none !important;
+            border: 1px solid #ddd !important;
+            padding: 15px !important;
+        }
+        
+        /* 5. Hiển thị đường dẫn file rõ ràng vì trên giấy không click được */
+        a[href^="/sanpham"]::after {
+            content: " (Lưu tại: " attr(href) ")";
+            font-size: 0.85rem;
+            color: #555;
+            font-style: italic;
+            display: block;
+            margin-top: 5px;
+        }
+
+        /* 6. Cho phép hiển thị khối Header In ấn */
+        .d-print-block {
+            display: block !important;
+        }
+    }
+</style>
+
+<div class="container-fluid py-4">
+
+    <div class="d-none d-print-block text-center mb-5 pb-3 border-bottom border-2 border-dark">
+        <div class="d-flex align-items-center justify-content-center flex-column">
+            <img src="/images/logo.png" alt="Company Logo" style="height: 70px; margin-bottom: 15px;" onerror="this.style.display='none'" />
+            
+            <h4 class="fw-bold text-uppercase mb-1" style="color: #0d6efd;">@companyName</h4>
+            <h3 class="fw-bold text-uppercase mb-2">HỒ SƠ SẢN PHẨM</h3>
+            <p class="mb-0 text-dark fst-italic">Ngày In: @DateTime.Now.ToString("dd/MM/yyyy HH:mm")</p>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <div>
+            <h3 class="fw-bold text-dark mb-1"><i class="fa-solid fa-folder-open text-primary me-2"></i>HỒ SƠ: @Model.Product.ProductName</h3>
+            <span class="text-muted">Mã SP: <b class="text-dark">@Model.Product.ProductCode</b> | Giá hiện tại: <b class="text-success">@Model.Product.DefaultPrice.ToString("N0") đ</b></span>
+        </div>
+        <div>
+            <button onclick="window.print()" class="btn btn-dark fw-bold px-3 shadow-sm me-2">
+                <i class="fa-solid fa-print me-1"></i> In Hồ Sơ
+            </button>
+            <button class="btn btn-primary fw-bold px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                <i class="fa-solid fa-cloud-arrow-up me-1"></i> Thêm Tài liệu
+            </button>
+            <a asp-action="Index" class="btn btn-light border fw-bold ms-2 shadow-sm"><i class="fa-solid fa-arrow-left"></i> Quay lại</a>
+        </div>
+    </div>
+
+    <div class="d-none d-print-block mb-4">
+        <h4 class="fw-bold text-dark">Sản phẩm: @Model.Product.ProductName</h4>
+        <p class="mb-1 text-dark"><strong>Mã sản phẩm:</strong> @Model.Product.ProductCode</p>
+        <p class="mb-1 text-dark"><strong>Giá niêm yết hiện tại:</strong> @Model.Product.DefaultPrice.ToString("N0") VNĐ</p>
+        <p class="mb-1 text-dark"><strong>Quy cách:</strong> Dày @Model.Product.Thick x Rộng @Model.Product.Width x Dài @Model.Product.Length (@Model.Product.Unit)</p>
+        <hr />
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <ul class="timeline">
+                @if(!Model.Timeline.Any())
+                {
+                    <li class="text-center text-muted fst-italic py-4">Chưa có lịch sử thay đổi hay bản vẽ nào được lưu.</li>
+                }
+                
+                @foreach(var item in Model.Timeline)
+                {
+                    <li class="timeline-item" id="item_@(item.Type)_@item.Id">
+                        <div class="timeline-icon @item.ColorClass bg-opacity-75">
+                            <i class="fa-solid @item.Icon"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="timeline-date"><i class="fa-regular fa-clock me-1"></i> @item.Date.ToString("dd/MM/yyyy HH:mm")</div>
+                                    <h5 class="fw-bold text-dark mb-2">@item.Title</h5>
+                                </div>
+                                
+                                @if (item.Type == "Document")
+                                {
+                                    <div class="dropdown no-print">
+                                        <button class="btn btn-sm btn-light rounded-circle" data-bs-toggle="dropdown"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                                        <ul class="dropdown-menu shadow-sm border-0">
+                                            <li><a class="dropdown-item" href="#" onclick="openEditModal(@item.Id, '@item.Title', '@item.Detail')"><i class="fa-solid fa-pen text-primary me-2"></i>Sửa ghi chú</a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteDoc(@item.Id)"><i class="fa-solid fa-trash-can me-2"></i>Xóa tài liệu</a></li>
+                                        </ul>
+                                    </div>
+                                }
+                            </div>
+                            
+                            <p class="text-secondary mb-3">@item.Detail</p>
+                            
+                            @if (!string.IsNullOrEmpty(item.FilePath))
+                            {
+                                <div class="bg-light p-3 rounded border border-dashed d-flex align-items-center justify-content-between">
+                                    <div class="small fw-bold text-muted"><i class="fa-solid fa-paperclip me-2"></i> @item.FilePath.Split('/').Last()</div>
+                                    <a href="/@item.FilePath" target="_blank" class="btn btn-sm btn-dark fw-bold no-print"><i class="fa-solid fa-download me-1"></i> Tải / Xem</a>
+                                </div>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form asp-action="SaveDocument" method="post" enctype="multipart/form-data" class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="modalTitle"><i class="fa-solid fa-cloud-arrow-up me-2"></i> Lưu Trữ Tài Liệu Mới</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <input type="hidden" name="ProductId" value="@Model.Product.Id" />
+                <input type="hidden" name="DocumentId" id="docId" value="0" />
+                
+                <div class="mb-3">
+                    <label class="fw-bold small text-muted mb-1">Tên tài liệu / Phiên bản <span class="text-danger">*</span></label>
+                    <input type="text" name="Title" id="docTitle" class="form-control fw-bold" required placeholder="VD: Bản vẽ kỹ thuật V2.1..." />
+                </div>
+                
+                <div class="mb-3">
+                    <label class="fw-bold small text-muted mb-1">Nội dung thay đổi / Ghi chú</label>
+                    <textarea name="Note" id="docNote" class="form-control" rows="3" placeholder="Ghi chú các thay đổi so với bản cũ..."></textarea>
+                </div>
+                
+                <div class="mb-3" id="fileUploadDiv">
+                    <label class="fw-bold small text-muted mb-1">Đính kèm File (PDF, Hình ảnh, CAD...)</label>
+                    <input type="file" name="FileUpload" class="form-control" />
+                    <small class="text-primary mt-1 d-block"><i class="fa-solid fa-circle-info"></i> File sẽ được lưu vật lý vào hệ thống theo năm hiện tại.</small>
+                </div>
+            </div>
+            <div class="modal-footer bg-white">
+                <button type="button" class="btn btn-light border fw-bold" data-bs-dismiss="modal">Hủy</button>
+                <button type="submit" class="btn btn-primary fw-bold px-4"><i class="fa-solid fa-floppy-disk me-1"></i> Lưu Hồ Sơ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Mở Form Sửa
+        function openEditModal(id, title, note) {
+            $('#docId').val(id);
+            $('#docTitle').val(title);
+            $('#docNote').val(note);
+            $('#fileUploadDiv').hide(); 
+            $('#modalTitle').html('<i class="fa-solid fa-pen me-2"></i> Sửa Thông Tin');
+            $('#uploadModal').modal('show');
+        }
+
+        // Reset form khi đóng
+        $('#uploadModal').on('hidden.bs.modal', function () {
+            $('#docId').val(0);
+            $('#docTitle').val('');
+            $('#docNote').val('');
+            $('#fileUploadDiv').show();
+            $('#modalTitle').html('<i class="fa-solid fa-cloud-arrow-up me-2"></i> Lưu Trữ Tài Liệu Mới');
+        });
+
+        // Xóa giả bằng AJAX
+        function deleteDoc(id) {
+            Swal.fire({
+                title: 'Xóa tài liệu này?',
+                text: "Tài liệu sẽ bị ẩn khỏi hồ sơ (Soft Delete) nhưng vẫn giữ trên Server.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Đồng ý xóa'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.post('/Product/DeleteDocument', { id: id }, function(res) {
+                        if(res.success) {
+                            $('#item_Document_' + id).slideUp(300, function(){ $(this).remove(); });
+                            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Đã xóa tài liệu', showConfirmButton: false, timer: 2000 });
+                        } else {
+                            Swal.fire('Lỗi', res.message, 'error');
+                        }
+                    });
+                }
+            });
+        }
+        
+        @if (TempData["Success"] != null)
+        {
+            <text>Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: '@Html.Raw(TempData["Success"])', showConfirmButton: false, timer: 3000 });</text>
+        }
+    </script>
+}

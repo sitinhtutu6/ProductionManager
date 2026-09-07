@@ -1,0 +1,587 @@
+﻿@using System.Text.Json
+@{
+    bool isImport = ViewBag.Type == "Import";
+    bool isFromPO = ViewBag.PoId != null; // Biến cờ kiểm tra xem có phải nhập từ PO không
+    ViewData["Title"] = ViewBag.Title ?? (isImport ? "Tạo Phiếu Nhập Kho" : "Tạo Phiếu Xuất Kho");
+    var today = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Quản lý Kho", Url.Action("Index", "Warehouse")),
+        (ViewData["Title"].ToString(), "")
+    };
+}
+
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<style>
+    body {
+        background-color: #f8fafc;
+    }
+
+    .transaction-header {
+        background: @(isImport ? "linear-gradient(135deg, #10b981 0%, #059669 100%)" : "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)");
+        color: #fff;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+
+    .scan-input {
+        height: 56px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        padding-left: 20px;
+        border-radius: 28px;
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s;
+    }
+
+        .scan-input:focus {
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+            border-color: #3b82f6;
+            outline: none;
+        }
+
+    .cart-card {
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        background: #fff;
+    }
+
+    .qty-input {
+        width: 90px;
+        text-align: center;
+        font-weight: bold;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        padding: 6px;
+    }
+
+        .qty-input:focus {
+            border-color: #3b82f6;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+    .price-input {
+        text-align: right;
+        font-weight: bold;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        padding: 6px 10px;
+        width: 100%;
+        transition: all 0.2s;
+    }
+
+        .price-input:focus {
+            border-color: #3b82f6;
+            outline: none;
+            background: #fff !important;
+        }
+
+    .input-locked {
+        background-color: #f1f5f9 !important;
+        color: #64748b !important;
+        cursor: not-allowed;
+        border-color: #e2e8f0;
+    }
+
+    .suggestion-box {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        display: none;
+    }
+
+    .select2-container .select2-selection--single {
+        height: 40px !important;
+        padding: 6px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 38px !important;
+        right: 8px;
+    }
+</style>
+
+<div class="container-fluid py-4" style="max-width: 1400px;">
+    <div class="transaction-header d-flex justify-content-between align-items-center">
+        <div>
+            <h3 class="fw-bold mb-1">
+                @if (isImport)
+                {
+                    <i class="fa-solid fa-boxes-packing me-2"></i>
+                }
+                else
+                {
+                    <i class="fa-solid fa-truck-fast me-2"></i>
+                }
+                @ViewBag.Title
+            </h3>
+            <p class="mb-0 opacity-75 fs-6"><i class="fa-solid fa-user-pen me-1"></i> Người lập: <strong>@ViewBag.CurrentUser</strong> &nbsp;|&nbsp; <i class="fa-regular fa-clock me-1"></i> @today</p>
+        </div>
+        <a href="/Warehouse/Index" class="btn btn-light fw-bold rounded-pill shadow-sm px-4 text-dark">
+            <i class="fa-solid fa-arrow-left me-1"></i> Về danh sách
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card cart-card h-100">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center">
+                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                        <i class="fa-solid fa-file-invoice fs-5"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark mb-0">Thông tin chứng từ</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-4">
+                        <label class="small fw-bold text-muted text-uppercase mb-1">Mã chứng từ</label>
+                        <input type="text" id="txtDocumentCode" class="form-control fw-bold bg-light" value="@ViewBag.AutoCode" readonly>
+                    </div>
+
+                    @if (isImport && !isFromPO)
+                    {
+                        <div class="mb-4 bg-primary bg-opacity-10 p-3 rounded-3 border border-primary border-opacity-25">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="chkCustomerSupplied" onchange="toggleCustomerSupplied()">
+                                <label class="form-check-label fw-bold text-primary" for="chkCustomerSupplied">Hàng Khách Hàng cung cấp (Giá = 0)</label>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="mb-4">
+                        <label class="small fw-bold text-muted text-uppercase mb-1">Tham chiếu Đơn hàng</label>
+                        @if (isFromPO)
+                        {
+                            <input type="text" class="form-control fw-bold text-primary bg-primary bg-opacity-10" value="Nhập từ Đơn Đặt Hàng" readonly />
+                            <input type="hidden" id="ddlOrder" value="" />
+                        }
+                        else
+                        {
+                            <select id="ddlOrder" class="form-select"></select>
+                        }
+                    </div>
+
+                    @if (!isImport)
+                    {
+                        <div class="mb-4">
+                            <label class="small fw-bold text-muted text-uppercase mb-1">Lý do xuất kho</label>
+                            <select id="ddlExportReason" class="form-select fw-bold text-dark">
+                                <option value="0">Sản xuất Đơn hàng</option>
+                                <option value="1">Hao hụt / Hư hỏng</option>
+                                <option value="2">Bảo hành / Khách trả</option>
+                                <option value="3">Xuất bán thương mại</option>
+                            </select>
+                        </div>
+                    }
+
+                    <div class="mb-4">
+                        <label class="small fw-bold text-muted text-uppercase mb-1">@(isImport ? "Người giao / Nhà cung cấp" : "Người nhận hàng")</label>
+                        <input type="text" id="txtReceiver" class="form-control fw-bold text-primary" list="partnerSuggestions" placeholder="Gõ tên..." autocomplete="off" @(isFromPO ? "readonly class='form-control fw-bold bg-light'" : "")>
+                        <datalist id="partnerSuggestions">
+                            @if (ViewBag.Partners != null)
+                            {
+                                foreach (var partner in ViewBag.Partners)
+                                {
+                                    <option value="@partner"></option>
+                                }
+                            }
+                        </datalist>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="small fw-bold text-muted text-uppercase mb-1">Ghi chú</label>
+                        <textarea id="txtNote" class="form-control" rows="2" placeholder="Ghi chú nội bộ..."></textarea>
+                    </div>
+
+                    @if (isImport && !isFromPO)
+                    {
+                        <div class="mb-3 bg-success bg-opacity-10 p-3 border border-success border-opacity-50 rounded-3">
+                            <label class="small fw-bold text-success mb-2 text-uppercase"><i class="fa-solid fa-money-bill-wave me-2"></i>Thanh toán / Công nợ</label>
+                            <select id="ddlPaymentMethod" class="form-select border-success fw-bold text-dark shadow-sm mb-3" onchange="togglePayment()">
+                                <option value="0">👉 Ghi vào Công Nợ Phải Trả</option>
+                                <option value="1">👉 Trả Tiền Mặt (Trả đủ)</option>
+                                <option value="2">👉 Chuyển Khoản (Trả đủ)</option>
+                            </select>
+                            <div id="boxPaidAmount">
+                                <label class="small fw-bold text-danger mb-1">Đã cọc / Trả trước (VNĐ)</label>
+                                <input type="number" id="txtPaidAmount" class="form-control fw-bold text-end text-danger fs-5" value="0" min="0" placeholder="0">
+                            </div>
+                        </div>
+                    }
+                    else if (isImport && isFromPO)
+                    {
+                        <div class="alert alert-info border-0 shadow-sm d-flex align-items-center">
+                            <i class="fa-solid fa-shield-check fa-2x me-3 text-info"></i>
+                            <div class="small text-dark">
+                                <strong>Công Nợ An Toàn</strong><br />
+                                Đơn giá đã được khóa = 0. Công nợ được Kế toán quản lý tại Đơn Đặt Hàng.
+                            </div>
+                        </div>
+                        <input type="hidden" id="ddlPaymentMethod" value="0" />
+                        <input type="hidden" id="txtPaidAmount" value="0" />
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card cart-card h-100 d-flex flex-column">
+                <div class="card-body p-4 flex-grow-1">
+                    <div class="row mb-4 position-relative">
+                        <div class="col-md-9">
+                            <div class="input-group shadow-sm rounded-pill">
+                                <span class="input-group-text bg-white border-end-0 rounded-start-pill ps-4 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                                <input type="text" id="scanInput" class="form-control scan-input border-start-0" placeholder="Quét mã vạch hoặc gõ tên vật tư..." autocomplete="off" autofocus>
+                            </div>
+                            <div id="suggestionList" class="suggestion-box list-group"></div>
+                        </div>
+                        <div class="col-md-3 d-grid">
+                            <button type="button" class="btn btn-dark btn-lg rounded-pill shadow-sm fw-bold" onclick="startScanner()"><i class="fa-solid fa-camera me-2"></i> Quét Code</button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="bg-light text-muted small text-uppercase">
+                                <tr>
+                                    <th class="ps-4">Mã VT</th>
+                                    <th>Tên vật tư</th>
+                                    <th class="text-center">ĐVT</th>
+                                    <th class="text-center" width="120">Số lượng</th>
+                                    <th class="text-end" width="150">Đơn giá</th>
+                                    <th class="text-end pe-4" width="150">Thành tiền</th>
+                                    <th width="50"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="cartBody">
+                                <tr><td colspan="7" class="text-center py-5 text-muted fst-italic"><i class="fa-solid fa-box-open fa-3x mb-3 text-light"></i><br>Bảng vật tư đang trống.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-white p-4 border-top d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted fw-bold text-uppercase small">Tổng mục:</span>
+                        <span class="badge bg-dark fs-6 ms-2 px-3 py-2 rounded-pill" id="itemCountBadge">0</span>
+                    </div>
+                    <div class="text-end d-flex align-items-center">
+                        <div class="me-4 text-end">
+                            <span class="text-muted fw-bold text-uppercase small d-block mb-1">TỔNG TIỀN @(isFromPO ? "(KHÔNG TÍNH)" : "")</span>
+                            <span class="fs-3 fw-bold text-danger lh-1" id="lblTotalAmount">0</span> <span class="text-muted fw-bold">₫</span>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-lg fw-bold rounded-pill px-5 py-3 shadow" onclick="saveTransaction()">
+                            <i class="fa-solid fa-floppy-disk me-2"></i> LƯU PHIẾU KHO
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="scannerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header bg-dark text-white py-3"><h5 class="modal-title fw-bold"><i class="fa-solid fa-qrcode me-2"></i> Quét mã QR / Barcode</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="stopScanner()"></button></div>
+            <div class="modal-body p-0"><div id="reader" width="100%"></div></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        const allItems = @Html.Raw(ViewBag.ItemsJson ?? "[]");
+        const allOrders = @Html.Raw(ViewBag.OrdersJson ?? "[]");
+        const poItemsData = @Html.Raw(ViewBag.PoItemsJson ?? "null");
+        const isImport = @(isImport.ToString().ToLower());
+        const isFromPO = @(isFromPO.ToString().ToLower());
+        let cartItems = [];
+        let isCustomerSupplied = false;
+
+        $(document).ready(function () {
+            // Nạp Dropdown Đơn Hàng (Nếu không phải từ PO)
+            if (!isFromPO) {
+                let orderHtml = '<option value="">-- Không tham chiếu / Xuất chung --</option>';
+                allOrders.forEach(o => { orderHtml += `<option value="${o.Id}">[${o.OrderCode}] - ${o.CustomerName}</option>`; });
+                $('#ddlOrder').html(orderHtml).select2({ theme: 'bootstrap-5', placeholder: "Gõ tìm mã đơn..." });
+
+                $('#ddlOrder').on('change', function () {
+                    const selectedText = $("#ddlOrder option:selected").text();
+                    if (this.value && !document.getElementById("txtNote").value.includes(selectedText)) {
+                        document.getElementById("txtNote").value += (document.getElementById("txtNote").value ? ", " : "") + selectedText;
+                    }
+                });
+            }
+
+            // AUTO-FILL TỪ ĐƠN ĐẶT HÀNG
+            if (isImport && isFromPO && poItemsData && poItemsData.length > 0) {
+                document.getElementById("txtReceiver").value = '@Html.Raw(ViewBag.Receiver)';
+                poItemsData.forEach(item => {
+                    cartItems.push({
+                        WarehouseItemId: item.WarehouseItemId, Code: item.Code, Name: item.Name,
+                        Unit: item.Unit, Quantity: item.Quantity, Price: 0, OriginalQty: 0
+                    });
+                });
+                renderCart();
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Đã nạp vật tư từ Đơn đặt hàng!', timer: 3000, showConfirmButton: false });
+            }
+        });
+
+        function togglePayment() {
+            var method = document.getElementById("ddlPaymentMethod");
+            if (method && method.value === "0") document.getElementById("boxPaidAmount").style.display = "block";
+            else if (method) document.getElementById("boxPaidAmount").style.display = "none";
+        }
+
+        function toggleCustomerSupplied() {
+            let chk = document.getElementById("chkCustomerSupplied");
+            isCustomerSupplied = chk ? chk.checked : false;
+
+            if (isCustomerSupplied) {
+                document.getElementById("txtReceiver").value = "Vật tư khách cung cấp";
+                cartItems.forEach(item => item.Price = 0);
+            } else {
+                document.getElementById("txtReceiver").value = "";
+                cartItems.forEach(item => {
+                    const exactItem = allItems.find(x => x.Id === item.WarehouseItemId);
+                    if (exactItem) item.Price = isImport ? 0 : exactItem.CostPrice;
+                });
+            }
+            renderCart();
+        }
+
+        // TÌM KIẾM VẬT TƯ GỢI Ý
+        const scanInput = document.getElementById("scanInput");
+        const suggestionList = document.getElementById("suggestionList");
+
+        scanInput.addEventListener("keyup", function (e) {
+            const val = scanInput.value.trim().toLowerCase();
+            if (e.key === "Enter") {
+                if (val) {
+                    const exactItem = allItems.find(x => x.Code.toLowerCase() === val);
+                    if (exactItem) {
+                        addToCart(exactItem);
+                        scanInput.value = ""; suggestionList.style.display = "none";
+                    } else { Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Không tìm thấy mã!', timer: 2000, showConfirmButton: false }); }
+                }
+                return;
+            }
+
+            if (val.length > 0) {
+                const matches = allItems.filter(x => x.Code.toLowerCase().includes(val) || x.Name.toLowerCase().includes(val)).slice(0, 10);
+                renderSuggestions(matches);
+            } else { suggestionList.style.display = "none"; }
+        });
+
+        function renderSuggestions(items) {
+            if (items.length === 0) { suggestionList.style.display = "none"; return; }
+            let html = "";
+            items.forEach(item => {
+                html += `<a href="#" class="list-group-item list-group-item-action border-0 border-bottom py-3" onclick="selectItem(${item.Id}); return false;">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div><strong class="text-primary">${item.Name}</strong><br><small class="text-muted">Mã: ${item.Code}</small></div>
+                                        <span class="badge bg-light text-dark border">Tồn: ${item.StockQuantity} ${item.Unit}</span>
+                                    </div>
+                                </a>`;
+            });
+            suggestionList.innerHTML = html;
+            suggestionList.style.display = "block";
+        }
+
+        function selectItem(id) {
+            const item = allItems.find(x => x.Id === id);
+            if (item) addToCart(item);
+            scanInput.value = ""; suggestionList.style.display = "none"; scanInput.focus();
+        }
+
+        // GIỎ HÀNG
+        function addToCart(item) {
+            const existing = cartItems.find(x => x.WarehouseItemId === item.Id);
+            if (existing) {
+                existing.Quantity++; playBeep();
+            } else {
+                let price = (isCustomerSupplied || isFromPO) ? 0 : (isImport ? 0 : item.CostPrice);
+                cartItems.unshift({
+                    WarehouseItemId: item.Id, Code: item.Code, Name: item.Name, Unit: item.Unit,
+                    Quantity: 1, Price: price, OriginalQty: 0
+                });
+                playBeep();
+            }
+            renderCart();
+        }
+
+        function removeFromCart(index) { cartItems.splice(index, 1); renderCart(); }
+        function updateQty(index, newQty) { if (newQty < 0) newQty = 0; cartItems[index].Quantity = parseFloat(newQty); renderCart(); }
+        function updatePrice(index, newPrice) { cartItems[index].Price = parseFloat(newPrice); renderCart(); }
+
+        function renderCart() {
+            const tbody = document.getElementById("cartBody");
+            const lblTotal = document.getElementById("lblTotalAmount");
+            const badge = document.getElementById("itemCountBadge");
+
+            if (cartItems.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted fst-italic"><i class="fa-solid fa-box-open fa-3x mb-3 text-light"></i><br>Chưa có hàng hóa nào.</td></tr>`;
+                lblTotal.innerText = "0"; badge.innerText = "0"; return;
+            }
+
+            let html = ""; let grandTotal = 0;
+            cartItems.forEach((item, index) => {
+                const total = item.Quantity * item.Price;
+                grandTotal += total;
+
+                // Khóa Giá nếu là hàng PO hoặc Khách cung cấp
+                const isPriceLocked = isFromPO || isCustomerSupplied;
+                const priceClass = isPriceLocked ? "price-input input-locked" : "price-input";
+                const readonlyAttr = isPriceLocked ? "readonly" : "";
+
+                let stockInfoHtml = ""; let inputClass = "qty-input";
+
+                // Âm kho cảnh báo
+                if (!isImport) {
+                    const exactItem = allItems.find(x => x.Id === item.WarehouseItemId);
+                    if (exactItem) {
+                        const realAvailableStock = exactItem.StockQuantity + (item.OriginalQty || 0);
+                        const remaining = realAvailableStock - item.Quantity;
+                        if (remaining < 0) {
+                            inputClass += " text-danger border-danger bg-danger bg-opacity-10";
+                            stockInfoHtml = `<div class="text-danger fw-bold mt-1" style="font-size: 0.7rem;"><i class="fa-solid fa-triangle-exclamation"></i> Kho sẽ âm: ${remaining}</div>`;
+                        } else {
+                            stockInfoHtml = `<div class="text-success mt-1" style="font-size: 0.7rem;">Tồn sau xuất: ${remaining}</div>`;
+                        }
+                    }
+                }
+
+                html += `<tr class="border-bottom border-light">
+                                    <td class="ps-4 fw-bold text-primary font-monospace">${item.Code}</td>
+                                    <td class="fw-bold text-dark">${item.Name}</td>
+                                    <td class="text-center"><span class="badge bg-light text-dark border px-2 py-1">${item.Unit}</span></td>
+                                    <td class="text-center">
+                                        <input type="number" class="${inputClass}" value="${item.Quantity}" onchange="updateQty(${index}, this.value)" min="0.1" step="any">
+                                        ${stockInfoHtml}
+                                    </td>
+                                    <td class="text-end">
+                                        <input type="number" class="${priceClass}" ${readonlyAttr} value="${item.Price}" onchange="updatePrice(${index}, this.value)">
+                                    </td>
+                                    <td class="text-end pe-4 fw-bold text-dark fs-6">${total.toLocaleString()}</td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-light text-danger rounded-circle shadow-sm" onclick="removeFromCart(${index})"><i class="fa-solid fa-times"></i></button>
+                                    </td>
+                                </tr>`;
+            });
+            tbody.innerHTML = html; lblTotal.innerText = grandTotal.toLocaleString(); badge.innerText = cartItems.length;
+        }
+
+        function saveTransaction() {
+            if (cartItems.length === 0) { Swal.fire("Lỗi", "Chưa có hàng hóa nào trong phiếu!", "warning"); return; }
+
+            if (!isImport) {
+                let willBeNegative = false; let negativeItemsList = "";
+                cartItems.forEach(item => {
+                    const exactItem = allItems.find(x => x.Id === item.WarehouseItemId);
+                    if (exactItem) {
+                        const realAvailableStock = exactItem.StockQuantity + (item.OriginalQty || 0);
+                        if (item.Quantity > realAvailableStock) {
+                            willBeNegative = true;
+                            let negativeAmt = realAvailableStock - item.Quantity;
+                            negativeItemsList += `<li><strong>${item.Name}</strong> (Kho có: ${realAvailableStock} -> <span class="text-danger">Âm: ${negativeAmt}</span>)</li>`;
+                        }
+                    }
+                });
+                if (willBeNegative) {
+                    Swal.fire({
+                        title: '⚠️ XÁC NHẬN KHO ÂM',
+                        html: `<div class="text-start">Các vật tư sau sẽ bị âm kho:<ul class="mt-2 mb-3 text-danger">${negativeItemsList}</ul>Bạn có chắc chắn muốn xuất không?</div>`,
+                        icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d',
+                        confirmButtonText: '<i class="fa-solid fa-check"></i> Vẫn Xuất', cancelButtonText: 'Hủy'
+                    }).then((result) => { if (result.isConfirmed) executeAjaxSave(); });
+                    return;
+                }
+            }
+            executeAjaxSave();
+        }
+
+        function executeAjaxSave() {
+            let reasonVal = null;
+            if (!isImport) {
+                const selectEl = document.getElementById("ddlExportReason");
+                if (selectEl) reasonVal = parseInt(selectEl.value);
+            }
+
+            let orderIdVal = isFromPO ? null : document.getElementById("ddlOrder").value;
+            let paymentMethod = 0; let paidAmount = 0;
+
+            if (isImport) {
+                let pMethodEl = document.getElementById("ddlPaymentMethod");
+                if (pMethodEl) {
+                    paymentMethod = parseInt(pMethodEl.value);
+                    if (paymentMethod === 0) paidAmount = parseFloat(document.getElementById("txtPaidAmount").value) || 0;
+                }
+            }
+
+            const data = {
+                Type: '@ViewBag.Type', DocumentCode: document.getElementById("txtDocumentCode").value,
+                Receiver: document.getElementById("txtReceiver").value, Note: document.getElementById("txtNote").value,
+                Date: new Date().toISOString(), Items: cartItems, Reason: reasonVal,
+                OrderId: orderIdVal ? parseInt(orderIdVal) : null,
+                PurchaseOrderId: @(ViewBag.PoId != null ? ViewBag.PoId : "null"),
+                PaymentMethod: paymentMethod, PaidAmount: paidAmount
+            };
+
+            Swal.fire({ title: 'Đang lưu phiếu...', didOpen: () => Swal.showLoading() });
+
+            let actionUrl = '@(ViewBag.IsEditMode == true ? "/Warehouse/UpdateTransaction" : "/Warehouse/SaveBulk")';
+            $.ajax({
+                url: actionUrl, type: 'POST', contentType: 'application/json', data: JSON.stringify(data),
+                success: function (res) {
+                    if (res.success) {
+                        Swal.fire("Thành công", "Đã lưu phiếu thành công!", "success").then(() => {
+                            if (@(ViewBag.PoId != null ? "true" : "false")) window.location.href = '/PurchaseOrder/Details/@ViewBag.PoId';
+                            else window.location.href = '/Warehouse/Index';
+                        });
+                    } else Swal.fire("Lỗi", res.message, "error");
+                },
+                error: function () { Swal.fire("Lỗi mạng", "Không thể kết nối server", "error"); }
+            });
+        }
+
+        // CAMERA SCANNER
+        let html5QrcodeScanner;
+        function startScanner() {
+            const modal = new bootstrap.Modal(document.getElementById('scannerModal')); modal.show();
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+            html5QrcodeScanner.render(onScanSuccess, (err) => { });
+        }
+
+        function onScanSuccess(decodedText) {
+            if (html5QrcodeScanner) html5QrcodeScanner.clear();
+            bootstrap.Modal.getInstance(document.getElementById('scannerModal')).hide();
+            const exactItem = allItems.find(x => x.Code.toLowerCase() === decodedText.toLowerCase());
+            if (exactItem) {
+                addToCart(exactItem);
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Đã quét: ' + exactItem.Name, timer: 1500, showConfirmButton: false });
+            } else { Swal.fire("Lỗi quét", "Mã không tồn tại: " + decodedText, "warning"); }
+        }
+
+        function stopScanner() { if (html5QrcodeScanner) html5QrcodeScanner.clear(); }
+        function playBeep() { new Audio('https://media.geeksforgeeks.org/wp-content/uploads/20190531135120/beep.mp3').play(); }
+    </script>
+}

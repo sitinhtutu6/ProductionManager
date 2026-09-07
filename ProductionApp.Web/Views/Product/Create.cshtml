@@ -1,0 +1,100 @@
+﻿@model ProductionManager.Data.Product
+@{
+    ViewData["Title"] = "Thêm Sản phẩm";
+    ViewData["Breadcrumbs"] = new List<(string Title, string Url)>
+    {
+        ("Sản Phẩm", Url.Action("Index", "Product")), 
+        ("Tạo Sản Phẩm Mới", "") 
+    };
+}
+
+<div class="container mt-3" style="max-width: 900px;">
+    <div class="card shadow">
+        <div class="card-header bg-success text-white"><h5>Thêm Sản phẩm mới</h5></div>
+        <div class="card-body">
+            <form asp-action="Create" enctype="multipart/form-data">
+
+                <div class="row">
+                    <div class="col-md-4 text-center border-end">
+                        <label class="form-label fw-bold">Hình ảnh sản phẩm</label>
+                        <div class="mb-3">
+                            <img id="imgPreview" src="https://via.placeholder.com/300x300?text=Chưa+có+ảnh"
+                                 class="img-thumbnail shadow-sm"
+                                 style="width: 100%; height: 250px; object-fit: contain; background-color: #f8f9fa;">
+                        </div>
+                        <div class="d-grid">
+                            <label class="btn btn-outline-primary">
+                                <i class="fa-solid fa-upload me-2"></i> Chọn hình ảnh
+                                <input type="file" name="imageFile" class="d-none" accept="image/*" onchange="previewImage(this)">
+                            </label>
+                        </div>
+                        <div class="form-text text-muted small mt-2">Định dạng: .jpg, .png, .jpeg</div>
+                    </div>
+
+                    <div class="col-md-8">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="fw-bold">Mã SP (*)</label>
+                                <input asp-for="ProductCode" class="form-control" required placeholder="VD: SP-001" />
+                            </div>
+                            <div class="col-md-8">
+                                <label class="fw-bold">Tên Sản Phẩm (*)</label>
+                                <input asp-for="ProductName" class="form-control" required />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4"><label>Màu sắc</label><input asp-for="Color" class="form-control" /></div>
+                            <div class="col-md-4"><label>Loại vật tư</label><input asp-for="MaterialType" class="form-control" placeholder="Gỗ, Sắt..." /></div>
+                            <div class="col-md-4"><label>ĐVT</label><input asp-for="Unit" class="form-control" /></div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="fw-bold text-success">Giá Mặc Định</label>
+                                <input asp-for="DefaultPrice" type="number" class="form-control fw-bold text-success" />
+                            </div>
+                        </div>
+
+                        <label class="fw-bold">Quy cách tổng (mm):</label>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="input-group"><span class="input-group-text small">Dày</span><input asp-for="Thick" type="number" step="0.1" class="form-control" /></div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="input-group"><span class="input-group-text small">Rộng</span><input asp-for="Width" type="number" step="0.1" class="form-control" /></div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="input-group"><span class="input-group-text small">Dài</span><input asp-for="Length" type="number" step="0.1" class="form-control" /></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label>Ghi chú</label>
+                            <textarea asp-for="Note" class="form-control" rows="2"></textarea>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" asp-for="HasVariants" id="chkVar" checked>
+                            <label class="form-check-label fw-bold" for="chkVar">Sản phẩm có chi tiết con?</label>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100 fw-bold py-2"><i class="fa-solid fa-check me-2"></i> TẠO SẢN PHẨM</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById('imgPreview').src = e.target.result;
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+</script>

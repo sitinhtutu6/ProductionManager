@@ -1,0 +1,434 @@
+﻿@model IEnumerable<ProductionManager.Data.Entities.WorkOrder>
+@using ProductionManager.Data.Entities
+
+@{
+    ViewData["Title"] = "Điều Phối Kế Hoạch Sản Xuất";
+    
+    var groupedOrders = Model.GroupBy(x => x.Order?.Customer?.CompanyName ?? "Khách lẻ").ToList();
+    
+    var missingSequences = ViewBag.MissingSequences as List<dynamic> ?? new List<dynamic>();
+    var auditDelayList = ViewBag.AuditDelayList as IEnumerable<dynamic> ?? new List<dynamic>();
+}
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+    body { background-color: #f1f5f9; font-family: 'Inter', system-ui, sans-serif; color: #1e293b; }
+
+    /* --- TOOLBAR --- */
+    .erp-toolbar { 
+        background: #ffffff; border-radius: 12px; padding: 15px 24px; 
+        border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+        margin-bottom: 24px; border-left: 5px solid #0284c7;
+    }
+    .erp-title { font-weight: 800; font-size: 1.2rem; color: #0f172a; text-transform: uppercase; margin: 0; }
+
+    /* --- TABS CHUYỂN CHẾ ĐỘ --- */
+    .nav-custom { display: inline-flex; background: #f1f5f9; padding: 6px; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .nav-custom .nav-link { 
+        border-radius: 8px; font-weight: 700; font-size: 13px; color: #64748b; 
+        padding: 8px 20px; transition: 0.2s; border: none; margin-right: 4px;
+    }
+    .nav-custom .nav-link.active { background: #ffffff; color: #0284c7 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .nav-custom .nav-link:hover:not(.active) { color: #334155; }
+
+    /* --- BẢNG DỮ LIỆU ĐẸP & MƯỢT --- */
+    .table-container { 
+        background: #fff; border-radius: 12px; overflow: hidden; 
+        border: 1px solid #cbd5e1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+    }
+    .table-responsive { max-height: calc(100vh - 220px); overflow-y: auto; overflow-x: auto; }
+    
+    .table-modern { width: 100%; border-collapse: collapse; margin: 0; }
+    .table-modern th, .table-modern td { border-bottom: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; padding: 14px 16px; vertical-align: middle; }
+    .table-modern th:last-child, .table-modern td:last-child { border-right: none; }
+    
+    .table-modern thead th { 
+        position: sticky; top: 0; z-index: 10; background-color: #f8fafc; color: #475569; 
+        font-weight: 700; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #cbd5e1;
+    }
+
+    /* 🔥 FIX LỖI MẤT MÀU NỀN CỦA DÒNG */
+    .table-modern tbody tr.item-row td { background-color: transparent !important; } 
+    .item-row { transition: 0.15s; }
+    .item-row:hover { filter: brightness(0.96); }
+
+    .group-header td { background-color: #f1f5f9 !important; font-weight: 800; font-size: 13px; color: #0f172a; position: sticky; top: 48px; z-index: 9; border-top: 1px solid #cbd5e1; }
+
+    /* --- CÁC THÀNH PHẦN NỘI DUNG --- */
+    .drag-handle { cursor: grab; color: #94a3b8; font-size: 18px; transition: 0.2s; }
+    .drag-handle:hover { color: #0284c7; }
+    .drag-handle:active { cursor: grabbing; color: #0284c7; }
+    .sortable-ghost { opacity: 0.6; background-color: #e0f2fe !important; outline: 2px dashed #0284c7; }
+    
+    .badge-wo { 
+        background: #ffffff; color: #0f172a; font-family: 'Consolas', monospace; 
+        font-weight: 700; font-size: 12px; border: 1px solid #cbd5e1; 
+        padding: 6px 12px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    
+    /* 🔥 FIX LỖI Ô CHỌN MÀU: Đổi thành hình tròn có viền rõ ràng */
+    .color-picker { 
+        -webkit-appearance: none; border: 2px solid #cbd5e1; width: 28px; height: 28px; 
+        border-radius: 50%; cursor: pointer; padding: 0; background: #ffffff; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: 0.2s; flex-shrink: 0;
+    }
+    .color-picker::-webkit-color-swatch-wrapper { padding: 2px; border-radius: 50%; }
+    .color-picker::-webkit-color-swatch { border: none; border-radius: 50%; }
+    .color-picker:hover { transform: scale(1.1); border-color: #94a3b8; }
+    
+    /* Dropdown trạng thái */
+    .status-select { 
+        border-radius: 6px; font-weight: 700; font-size: 12px; text-transform: uppercase;
+        border: 1px solid transparent; padding: 8px 12px; cursor: pointer; width: 100%; 
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none; transition: 0.2s;
+    }
+    .status-select:hover { filter: brightness(0.95); }
+    .status-pending { background-color: #fef3c7; color: #b45309; border-color: #fde68a; }
+    .status-running { background-color: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
+
+    /* Cảnh báo */
+    .late-row { border-left: 4px solid #ef4444 !important; }
+    .missing-row { background-color: #fff1f2 !important; border-left: 4px solid #ef4444 !important; }
+    
+    /* --- NÚT LƯU THÔNG MINH --- */
+    .btn-floating-save {
+        position: fixed; bottom: 30px; right: 30px; z-index: 1000;
+        padding: 14px 28px; font-weight: 800; border-radius: 50px; font-size: 14px;
+        box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.4); display: none; transition: 0.3s;
+    }
+    .btn-floating-save:hover { transform: translateY(-3px); }
+
+    /* Empty State (Màn hình trống) */
+    .empty-state { text-align: center; padding: 60px 20px; }
+    .empty-state i { font-size: 4rem; color: #cbd5e1; margin-bottom: 16px; }
+    .empty-state h5 { font-weight: 800; color: #475569; }
+    .empty-state p { color: #64748b; font-size: 14px; max-width: 400px; margin: 0 auto; }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="erp-toolbar d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="erp-title"><i class="fa-solid fa-microchip text-primary me-2"></i> Kế Hoạch Sản Xuất Xưởng</h1>
+            <ul class="nav nav-custom mt-3" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tab-1" data-bs-toggle="tab" data-bs-target="#mode-1" type="button" role="tab">
+                        <i class="fa-solid fa-arrows-up-down-left-right me-1"></i> 1. ĐIỀU PHỐI (KÉO THẢ)
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-2" data-bs-toggle="tab" data-bs-target="#mode-2" type="button" role="tab">
+                        <i class="fa-solid fa-shield-halved me-1"></i> 2. KIỂM TOÁN CHUỖI ĐƠN
+                        @if (missingSequences.Count > 0) { <span class="badge bg-danger ms-1">@missingSequences.Count</span> }
+                    </button>
+                </li>
+            </ul>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/ProductionPlan/Index" class="btn btn-outline-secondary fw-bold btn-sm px-3 shadow-sm"><i class="fa-solid fa-timeline me-1"></i> Timeline</a>
+            <button class="btn btn-outline-secondary fw-bold btn-sm px-3 shadow-sm" onclick="viewHistory()"><i class="fa-solid fa-clock-rotate-left me-1"></i> Nhật ký</button>
+            <a href="/ProductionPlan/Tracking" class="btn btn-dark fw-bold btn-sm px-3 shadow-sm position-relative">
+                <i class="fa-solid fa-radar text-warning me-1"></i> Trạm Giám Sát
+                @if (ViewBag.MissingCount != null && ViewBag.MissingCount > 0)
+                {
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">@ViewBag.MissingCount</span>
+                }
+            </a>
+            <a href="/ProductionPlan/ExportTablePlanExcel" class="btn btn-success fw-bold btn-sm px-3 shadow-sm">
+                <i class="fa-solid fa-file-excel me-1"></i> Xuất Excel
+            </a>
+        </div>
+    </div>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="mode-1" role="tabpanel">
+            
+            <button id="btnSaveFloating" class="btn btn-primary btn-floating-save" onclick="saveSortOrder()">
+                <i class="fa-solid fa-floppy-disk me-2"></i> LƯU THỨ TỰ ƯU TIÊN
+            </button>
+
+            <div class="table-container">
+                <div class="table-responsive">
+                    <table class="table-modern text-center">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;"><i class="fa-solid fa-arrows-up-down"></i></th>
+                                <th style="width: 50px;">#</th>
+                                <th style="width: 220px;" class="text-start">📋 MÃ LỆNH SX</th>
+                                <th class="text-start">🛠️ TÊN SẢN PHẨM & QUY CÁCH</th>
+                                <th style="width: 80px;">📦 SL</th>
+                                <th style="width: 100px;">📥 NGÀY NHẬN</th>
+                                <th style="width: 110px;">⏰ HẠN GIAO</th>
+                                <th class="text-start" style="width: 20%;">📝 GHI CHÚ KỸ THUẬT</th>
+                                <th style="width: 160px;">⚙️ TRẠNG THÁI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sortable-table-body">
+                            @if (!Model.Any())
+                            {
+                                <tr>
+                                    <td colspan="9">
+                                        <div class="empty-state">
+                                            <i class="fa-solid fa-box-open"></i>
+                                            <h5>XƯỞNG ĐANG TRỐNG VIỆC</h5>
+                                            <p>Chưa có Lệnh sản xuất nào đang chờ hoặc đang chạy máy. Hãy bổ sung lệnh từ Trạm Giám Sát.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                foreach (var group in groupedOrders)
+                                {
+                                    <tr class="group-header text-start">
+                                        <td colspan="9">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="text-uppercase"><i class="fa-regular fa-folder-open text-primary me-2"></i> NHÀ MÁY: @group.Key</span>
+                                                <span class="badge bg-white text-dark border px-3 py-1 shadow-sm fs-6">Tổng: @group.Count() lệnh</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    int groupStt = 1;
+                                    foreach (var item in group)
+                                    {
+                                        bool isLate = item.EndDate.HasValue && item.EndDate.Value.Date < DateTime.Now.Date;
+                                        
+                                        // 🔥 FIX: Tô màu nền cực nhạt (Thêm '26' tương đương 15% opacity vào mã màu Hex)
+                                        string bgStyle = (!string.IsNullOrEmpty(item.PlanColor) && item.PlanColor != "#ffffff" && item.PlanColor != "#000000") 
+                                                         ? $"background-color: {item.PlanColor}26 !important;" : "";
+
+                                        <tr class="item-row @(isLate ? "late-row" : "")" data-id="@item.Id" style="@bgStyle">
+                                            <td class="drag-handle"><i class="fa-solid fa-equals"></i></td>
+                                            <td class="fw-bold text-primary stt-cell fs-6">@groupStt</td>
+                                            <td class="text-start">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <input type="color" class="color-picker" value="@(string.IsNullOrEmpty(item.PlanColor) ? "#ffffff" : item.PlanColor)" onchange="changeRowColor(this, @item.Id)" title="Đổi màu nền dòng">
+                                                    <span class="badge-wo" title="Mã Đơn Gốc: @item.Order?.OrderCode">@item.WOCode</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-start fw-bold text-dark">@item.ProductName</td>
+                                            <td class="fw-bold fs-5 text-dark">@item.TargetQuantity</td>
+                                            <td class="text-muted small fw-bold">@(item.Order?.OrderDate.ToString("dd/MM/yyyy") ?? "-")</td>
+                                            <td class="fw-bold @(isLate ? "text-danger" : "text-dark")">
+                                                @(item.EndDate?.ToString("dd/MM/yyyy") ?? "-")    
+                                            </td>
+                                            <td class="text-start text-muted" style="font-size: 13px;">@(string.IsNullOrEmpty(item.Notes) ? "" : item.Notes)</td>
+                                            <td>
+                                                <select class="status-select @(item.Status == WorkOrderStatus.InProgress ? "status-running" : "status-pending")" 
+                                                        onchange="changeOrderStatus(this, @item.Id)" data-current="@((int)item.Status)">
+                                                    <option value="@((int)WorkOrderStatus.Pending)" selected="@(item.Status == WorkOrderStatus.Pending)">⏳ Chờ máy</option>
+                                                    <option value="@((int)WorkOrderStatus.InProgress)" selected="@(item.Status == WorkOrderStatus.InProgress)">🚀 Đang chạy</option>
+                                                    <option value="@((int)WorkOrderStatus.Completed)">✅ Xong (Nhập Kho)</option>
+                                                </select>
+                                            </td>
+                                        </tr>
+                                        groupStt++;
+                                    }
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="mode-2" role="tabpanel">
+            @if (missingSequences.Any())
+            {
+                <div class="row g-3 mb-4">
+                    @foreach (var gap in missingSequences)
+                    {
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-sm border-start border-danger border-4 h-100">
+                                <div class="card-body">
+                                    <h6 class="text-danger fw-bold mb-2"><i class="fa-solid fa-bug me-2"></i>MÃ ĐƠN NHẢY CÓC (NHÓM: @gap.GroupName)</h6>
+                                    <div class="d-flex flex-wrap gap-2 mt-2">
+                                        @foreach(var c in gap.MissingCodes){ <span class="badge bg-danger fs-6 px-3 py-2 shadow-sm">@c</span> }
+                                    </div>
+                                    <small class="text-muted mt-2 d-block">Hãy kiểm tra lại với Sale xem các mã này có bị quên nhập lên phần mềm không.</small>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="table-container">
+                <div class="table-responsive" style="max-height: 500px;">
+                    <table class="table-modern text-center">
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">📅 Ngày Đặt</th>
+                                <th style="width: 160px;">📄 Mã Đơn Gốc</th>
+                                <th class="text-start" style="width: 250px;">🏢 Khách Hàng</th>
+                                <th class="text-start">📦 SP Đặt Hàng (Cần SX)</th>
+                                <th style="width: 180px;">⚖️ Kiểm Toán Lệnh</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!auditDelayList.Any())
+                            {
+                                <tr>
+                                    <td colspan="5">
+                                        <div class="empty-state">
+                                            <i class="fa-solid fa-shield-check text-success" style="color: #22c55e;"></i>
+                                            <h5 class="text-success mt-2">HỆ THỐNG HOÀN HẢO</h5>
+                                            <p>Không phát hiện đơn hàng nào bị sót lệnh sản xuất trong 6 tháng qua. Mọi thứ đang vận hành trơn tru!</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                foreach (var audit in auditDelayList)
+                                {
+                                    <tr class="@(audit.IsMissing ? "missing-row" : "")">
+                                        <td class="text-muted fw-bold">@audit.OrderDate.ToString("dd/MM/yyyy")</td>
+                                        <td><span class="badge-wo @(audit.IsMissing ? "text-danger border-danger" : "")">@audit.OrderCode</span></td>
+                                        <td class="text-start fw-bold text-dark">@audit.CustomerName</td>
+                                        <td class="text-start">
+                                            @foreach(var d in audit.Details) { 
+                                                <div class="small fw-bold text-dark mb-1">• @d.ProductName <span class="text-primary">(SL: @d.Quantity)</span></div> 
+                                            }
+                                        </td>
+                                        <td>
+                                            @if(audit.IsMissing) {
+                                                <span class="text-danger fw-bold"><i class="fa-solid fa-ban me-1"></i> XƯỞNG SÓT LỆNH</span>
+                                            } else {
+                                                <span class="text-success fw-bold"><i class="fa-solid fa-check-double me-1"></i> ĐÃ ĐỦ LỆNH</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content rounded-3 border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white border-0 px-4 py-3">
+                <h5 class="modal-title fw-bold fs-6 text-uppercase"><i class="fa-solid fa-clock-rotate-left me-2"></i> Nhật ký thay đổi</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div id="historyContent" class="modal-body p-0 bg-light">
+                <div class="text-center py-5"><i class="fa-solid fa-spinner fa-spin fa-2x text-primary"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+        const btnSave = document.getElementById('btnSaveFloating');
+
+        // Quản lý Ẩn/Hiện nút Lưu thông minh
+        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', (e) => {
+                if (e.target.dataset.bsTarget === '#mode-1' && btnSave.dataset.dirty === 'true') {
+                    btnSave.style.display = 'block';
+                } else {
+                    btnSave.style.display = 'none';
+                }
+            });
+        });
+
+        // 1. Kéo Thả Sortable.js
+        document.addEventListener('DOMContentLoaded', function () {
+            var el = document.getElementById('sortable-table-body');
+            if (el) {
+                new Sortable(el, {
+                    handle: '.drag-handle', animation: 200, ghostClass: 'sortable-ghost', filter: '.group-header',
+                    onEnd: function () {
+                        // Đánh lại STT
+                        let allRows = document.querySelectorAll('#sortable-table-body tr'); let currentGroupStt = 1;
+                        allRows.forEach((row) => {
+                            if (row.classList.contains('group-header')) currentGroupStt = 1;
+                            else if (row.classList.contains('item-row')) { row.querySelector('.stt-cell').innerText = currentGroupStt; currentGroupStt++; }
+                        });
+                        
+                        // Bật nút Lưu
+                        btnSave.dataset.dirty = 'true';
+                        btnSave.style.display = 'block';
+                        btnSave.classList.replace('btn-primary', 'btn-danger');
+                        btnSave.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-2"></i> CẦN LƯU VỊ TRÍ';
+                    }
+                });
+            }
+        });
+
+        // 2. Logic Tô Màu Full Row
+        function changeRowColor(inputObj, orderId) {
+            let color = inputObj.value; let row = inputObj.closest('tr');
+            
+            if (color === '#ffffff' || color === '#000000') { 
+                row.style.setProperty('background-color', 'transparent', 'important'); 
+            } else { 
+                // Sử dụng Hex + '26' tương đương 15% opacity (Rất nhạt và sang)
+                row.style.setProperty('background-color', color + '26', 'important'); 
+            }
+            
+            fetch(`/ProductionPlan/UpdatePlanColor?id=${orderId}&color=${encodeURIComponent(color)}`, { method: 'POST' })
+                .then(res => res.json()).then(res => { if (!res.success) Swal.fire('Lỗi', res.message, 'error'); });
+        }
+
+        // 3. Logic Lưu vị trí
+        function saveSortOrder() {
+            let orderedIds = []; document.querySelectorAll('#sortable-table-body tr.item-row').forEach(row => orderedIds.push(parseInt(row.getAttribute('data-id'))));
+            if (orderedIds.length === 0) return;
+            
+            btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> ĐANG LƯU...'; btnSave.disabled = true;
+            fetch('/ProductionPlan/SaveOrderIndex', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orderedIds) })
+                .then(res => res.json()).then(res => {
+                    if (res.success) { 
+                        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Đã lưu kế hoạch', showConfirmButton: false, timer: 1500 }); 
+                        btnSave.style.display = 'none'; 
+                        btnSave.dataset.dirty = 'false';
+                        btnSave.classList.replace('btn-danger', 'btn-primary'); 
+                    } 
+                    else { Swal.fire('Lỗi', res.message, 'error'); btnSave.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-2"></i> CẦN LƯU VỊ TRÍ'; }
+                }).finally(() => { btnSave.disabled = false; });
+        }
+
+        // 4. Logic Update Status
+        function changeOrderStatus(selectObj, orderId) {
+            let newStatus = selectObj.value; let currentStatus = selectObj.getAttribute('data-current');
+            if (newStatus == "2") {
+                Swal.fire({ title: 'Hoàn tất sản xuất?', html: "Lệnh sẽ được nhập kho và biến mất khỏi Bảng Kế hoạch.", icon: 'question', showCancelButton: true, confirmButtonColor: '#059669', cancelButtonColor: '#64748b', confirmButtonText: 'Đồng ý', cancelButtonText: 'Hủy' })
+                .then((result) => { 
+                    if (result.isConfirmed) {
+                        fetch(`/ProductionPlan/UpdatePlanStatus?id=${orderId}&newStatus=2`, { method: 'POST' }).then(() => {
+                            let row = selectObj.closest('tr');
+                            row.style.display = 'none'; row.remove();
+                            // Dọn dẹp header rỗng
+                            document.querySelectorAll('.group-header').forEach(header => { let nextRow = header.nextElementSibling; if (!nextRow || nextRow.classList.contains('group-header')) header.remove(); });
+                        });
+                    } else selectObj.value = currentStatus; 
+                });
+            } else {
+                selectObj.className = "status-select " + (newStatus == "1" ? "status-running" : "status-pending");
+                selectObj.setAttribute('data-current', newStatus);
+                fetch(`/ProductionPlan/UpdatePlanStatus?id=${orderId}&newStatus=${newStatus}`, { method: 'POST' });
+            }
+        }
+
+        function viewHistory() {
+            var modal = new bootstrap.Modal(document.getElementById('historyModal')); modal.show();
+            fetch('/ProductionPlan/GetHistory').then(res => res.text()).then(html => { document.getElementById('historyContent').innerHTML = html; });
+        }
+
+
+    </script>
+}

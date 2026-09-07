@@ -1,0 +1,295 @@
+﻿@model ProductionManager.Data.CashEntry
+@{
+    Layout = null;
+    var isReceipt = Model.Type == ProductionManager.Data.TransactionType.Receipt;
+    var title = isReceipt ? "PHIẾU THU" : "PHIẾU CHI";
+    var color = isReceipt ? "#198754" : "#dc3545"; 
+    var watermarkDefault = isReceipt ? "ĐÃ THU TIỀN" : "ĐÃ CHI TIỀN";
+    
+    // Link xác thực cho QR Code [cite: 277]
+    var currentUrl = $"{Context.Request.Scheme}://{Context.Request.Host}/CashBook/Details/{Model.Id}";
+
+    // Sử dụng tên đầy đủ từ ViewBag nếu có, nếu không thì dùng CreatedBy [cite: 334]
+    var creatorDisplayName = ViewBag.CreatorFullName ?? Model.CreatedBy;
+}
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>In @title - @Model.VoucherCode</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        body { font-family: 'Times New Roman', serif; background: #e9ecef; padding-bottom: 50px; }
+        
+        .page-sheet {
+            width: 210mm; min-height: 148mm;
+            padding: 10mm 15mm; margin: 20px auto;
+            background: white; box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden;
+        }
+
+        /* WATERMARK [cite: 282] */
+        .watermark {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
+            font-size: 70px; font-weight: 900;
+            color: rgba(0,0,0,0.05); text-transform: uppercase;
+            pointer-events: none; white-space: nowrap;
+            border: 5px solid rgba(0,0,0,0.05);
+            padding: 10px 40px; border-radius: 10px;
+            z-index: 0;
+        }
+
+        /* HEADER [cite: 285] */
+        .header-title { font-size: 26px; font-weight: 900; margin: 0; color: @color; letter-spacing: 1px; }
+        .company-name { font-size: 13px; font-weight: bold; text-transform: uppercase; margin-bottom: 3px; }
+        .company-info { font-size: 11px; color: #444; margin-bottom: 2px; }
+        
+        .voucher-info { text-align: right; font-size: 11px; line-height: 1.4; }
+        .voucher-code { font-weight: bold; font-size: 14px; color: #dc3545; }
+
+        /* CONTENT [cite: 290] */
+        .content-row { display: flex; margin-bottom: 8px; font-size: 13px; align-items: baseline; position: relative; z-index: 1; }
+        .lbl { width: 110px; font-weight: bold; color: #333; flex-shrink: 0; }
+        .val { flex-grow: 1; border-bottom: 1px dotted #999; padding-left: 10px; color: #000; font-weight: 500; }
+        .val-text { font-weight: bold; text-transform: uppercase; }
+        .money-text { font-style: italic; font-weight: bold; color: #333; }
+
+        /* PHẦN CHỮ KÝ [cite: 296] */
+        .sig-box { margin-top: 30px; text-align: center; font-size: 12px; position: relative; z-index: 1; }
+        .sig-col { display: flex; flex-direction: column; align-items: center; }
+        .sig-title { font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+        .sig-hint { font-style: italic; font-size: 11px; color: #666; margin-bottom: 65px; } /* Khoảng cách ký tên */
+        .sig-name { font-weight: bold; text-transform: uppercase; }
+
+        /* PANEL CẤU HÌNH [cite: 301] */
+        .config-panel { width: 210mm; margin: 0 auto 20px; background: #fff; padding: 20px; border-radius: 8px; border-left: 6px solid @color; }
+        .form-label-sm { font-size: 11px; font-weight: 700; color: #666; margin-bottom: 2px; }
+
+        @@media print {
+            body { margin: 0; background: white; padding-bottom: 0; }
+            .no-print { display: none !important; }
+            .page-sheet { margin: 0; box-shadow: none; width: 100%; height: auto; border: none; }
+            .page-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container no-print pt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3" style="width: 210mm; margin: 0 auto;">
+            <div>
+                <a href="javascript:window.close()" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrow-left"></i> Quay lại</a>
+                <button onclick="resetDefault()" class="btn btn-light border btn-sm ms-2"><i class="fa-solid fa-rotate-left"></i> Mặc định</button>
+            </div>
+            <button onclick="window.print()" class="btn btn-primary fw-bold shadow px-4"><i class="fa-solid fa-print me-2"></i> IN PHIẾU NGAY</button>
+        </div>
+
+        <div class="config-panel shadow-sm">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <h6 class="fw-bold text-primary mb-3"><i class="fa-solid fa-building me-2"></i>Thông tin đơn vị</h6>
+                    <label class="form-label-sm">Tên Đơn Vị</label>
+                    <input type="text" id="inpCompany" class="form-control form-control-sm mb-2" value="CÔNG TY TNHH SẢN XUẤT ABC" oninput="updateUI()" />
+                    <label class="form-label-sm">Địa chỉ</label>
+                    <input type="text" id="inpAddress" class="form-control form-control-sm mb-2" value="Số 123, KCN VSIP, Bình Dương" oninput="updateUI()" />
+                    <label class="form-label-sm">MST / SĐT</label>
+                    <input type="text" id="inpTax" class="form-control form-control-sm" value="MST: 3700123456 - ĐT: 0909.123.456" oninput="updateUI()" />
+                </div>
+
+                <div class="col-md-4 border-start border-end">
+                    <h6 class="fw-bold text-primary mb-3"><i class="fa-solid fa-file-signature me-2"></i>Chữ ký & Dấu</h6>
+                    <div class="row">
+                        <div class="col-6">
+                            <label class="form-label-sm">Thủ trưởng</label>
+                            <input type="text" id="inpBoss" class="form-control form-control-sm mb-2" value="Giám đốc" oninput="updateUI()" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label-sm">Tên Người lập</label>
+                            <input type="text" id="inpCreatorName" class="form-control form-control-sm mb-2" value="@creatorDisplayName" oninput="updateUI()" />
+                        </div>
+                    </div>
+                    <label class="form-label-sm mt-2">Nội dung Chữ chìm</label>
+                    <input type="text" id="inpWatermarkText" class="form-control form-control-sm text-uppercase fw-bold text-success" value="@watermarkDefault" oninput="updateUI()" />
+                </div>
+
+                <div class="col-md-4">
+                    <h6 class="fw-bold text-primary mb-3"><i class="fa-solid fa-image me-2"></i>Tùy chọn hiển thị</h6>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="chkLogo" checked onchange="updateUI()">
+                        <label class="form-check-label small" for="chkLogo">Hiện Logo</label>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="chkWatermark" checked onchange="updateUI()">
+                        <label class="form-check-label small" for="chkWatermark">Hiển thị chữ chìm</label>
+                    </div>
+                    <label class="btn btn-outline-secondary btn-sm w-100" for="inpLogoFile">
+                        <i class="fa-solid fa-upload me-2"></i> Thay đổi Logo
+                    </label>
+                    <input type="file" id="inpLogoFile" class="d-none" accept="image/*" onchange="handleLogoUpload(this)" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-sheet" id="printArea">
+        <div id="outWatermark" class="watermark">@watermarkDefault</div>
+
+        <div class="row mb-4">
+            <div class="col-8">
+                <div class="d-flex gap-3 align-items-center">
+                    <div id="logoBox">
+                        <img id="outLogo" src="https://via.placeholder.com/150x100?text=LOGO" style="height: 65px; width: auto; object-fit: contain;" />
+                    </div>
+                    <div>
+                        <div id="txtCompany" class="company-name">CÔNG TY TNHH SẢN XUẤT ABC</div>
+                        <div id="txtAddress" class="company-info">Số 123, KCN VSIP, Bình Dương</div>
+                        <div id="txtTax" class="company-info fst-italic">MST: 3700123456 - ĐT: 0909.123.456</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-4 voucher-info">
+                <div class="mb-1 fw-bold">Mẫu số: 01-TT</div>
+                <div class="mb-1">Quyển số: .........</div>
+                
+                @if (!string.IsNullOrEmpty(Model.PaperVoucherNumber))
+                {
+                    <div class="mb-1">Số: <span class="voucher-code" id="displayVoucherNum">@Model.PaperVoucherNumber</span></div>
+                    <div class="text-muted small fst-italic">(Ref: @Model.VoucherCode)</div>
+                }
+                else
+                {
+                    <div class="mb-1">Số: <span class="voucher-code" id="displayVoucherNum">@Model.VoucherCode</span></div>
+                }
+                
+                <div id="qrCode" class="mt-2 d-flex justify-content-end" style="opacity: 0.8"></div>
+            </div>
+        </div>
+
+        <div class="text-center mb-4">
+            <h2 class="header-title">@title</h2>
+            <div class="fst-italic small text-muted">Ngày @Model.TransactionDate.Day tháng @Model.TransactionDate.Month năm @Model.TransactionDate.Year</div>
+        </div>
+
+        <div class="ps-3 pe-3">
+            <div class="content-row">
+                <div class="lbl">@(isReceipt ? "Người nộp" : "Người nhận"):</div>
+                <div class="val text-uppercase val-text">@Model.TargetName</div>
+            </div>
+            <div class="content-row">
+                <div class="lbl">Lý do @(isReceipt ? "nộp" : "chi"):</div>
+                <div class="val">@Model.Description</div>
+            </div>
+            <div class="content-row">
+                <div class="lbl">Số tiền:</div>
+                <div class="val fw-bold fs-5">@Model.Amount.ToString("N0") VNĐ</div>
+            </div>
+            <div class="content-row">
+                <div class="lbl">Bằng chữ:</div>
+                <div class="val money-text" id="moneyText">...</div>
+            </div>
+            <div class="content-row">
+                <div class="lbl">Kèm theo:</div>
+                <div class="val">................................................................................................... chứng từ gốc</div>
+            </div>
+        </div>
+
+        <div class="row sig-box">
+            <div class="col-3 sig-col">
+                <div id="lblBoss" class="sig-title">Giám đốc</div>
+                <div class="sig-hint">(Ký, họ tên, đóng dấu)</div>
+            </div>
+            <div class="col-3 sig-col">
+                <div class="sig-title">Kế toán trưởng</div>
+                <div class="sig-hint">(Ký, họ tên)</div>
+            </div>
+            <div class="col-3 sig-col">
+                <div class="sig-title">Người @(isReceipt ? "nộp" : "nhận") tiền</div>
+                <div class="sig-hint">(Ký, họ tên)</div>
+            </div>
+            <div class="col-3 sig-col">
+                <div class="sig-title">Người lập phiếu</div>
+                <div class="sig-hint">(Ký, họ tên)</div>
+                <div class="sig-name" id="displayCreatorName">@creatorDisplayName</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateUI() {
+            document.getElementById('txtCompany').innerText = document.getElementById('inpCompany').value;
+            document.getElementById('txtAddress').innerText = document.getElementById('inpAddress').value;
+            document.getElementById('txtTax').innerText = document.getElementById('inpTax').value;
+            document.getElementById('lblBoss').innerText = document.getElementById('inpBoss').value;
+            
+            // Cập nhật tên người lập [cite: 335]
+            document.getElementById('displayCreatorName').innerText = document.getElementById('inpCreatorName').value;
+
+            var wmText = document.getElementById('inpWatermarkText').value;
+            var wmShow = document.getElementById('chkWatermark').checked;
+            var wmDiv = document.getElementById('outWatermark');
+            wmDiv.innerText = wmText;
+            wmDiv.style.display = wmShow ? 'block' : 'none';
+
+            var logoShow = document.getElementById('chkLogo').checked;
+            document.getElementById('logoBox').style.visibility = logoShow ? 'visible' : 'hidden';
+        }
+
+        function handleLogoUpload(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) { document.getElementById('outLogo').src = e.target.result; }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function resetDefault() {
+            document.getElementById('inpCompany').value = "CÔNG TY TNHH SẢN XUẤT ABC";
+            document.getElementById('inpAddress').value = "Số 123, KCN VSIP, Bình Dương";
+            document.getElementById('inpTax').value = "MST: 3700123456 - ĐT: 0909.123.456";
+            document.getElementById('inpWatermarkText').value = '@watermarkDefault';
+            document.getElementById('inpCreatorName').value = '@creatorDisplayName';
+            document.getElementById('chkLogo').checked = true;
+            document.getElementById('chkWatermark').checked = true;
+            updateUI();
+        }
+
+        new QRCode(document.getElementById("qrCode"), {
+            text: '@currentUrl', width: 60, height: 60, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.L
+        });
+
+        // Hàm đọc số thành chữ [cite: 344]
+        const docSo = (function() {
+            const t = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
+            const r = function(r, n) {
+                var o = "", a = Math.floor(r / 10), e = r % 10;
+                return a > 1 ? (o = " " + t[a] + " mươi", 1 == e && (o += " mốt")) : 1 == a ? (o = " mười", 1 == e && (o += " một")) : n && e > 0 && (o = " lẻ"), 5 == e && a >= 1 ? o += " lăm" : 4 == e && a >= 1 ? o += " tư" : (0 != e || 1 != n && 0 != n) && (o += " " + t[e]), o
+            };
+            const n = function(n, o) {
+                var a = "", e = Math.floor(n / 100), m = n % 100;
+                return o || e > 0 ? (a = " " + t[e] + " trăm", a += r(m, !0)) : a = r(m, !1), a
+            };
+            const o = function(t, r) {
+                var a = "", e = Math.floor(t / 1e6), m = t % 1e6;
+                e > 0 && (a = o(e, r) + " triệu", r = !0);
+                var u = Math.floor(m / 1e3), l = m % 1e3;
+                return u > 0 && (a += n(u, r) + " nghìn", r = !0), l > 0 && (a += n(l, r)), a
+            };
+            return function(t) {
+                if (0 == t) return "Không đồng";
+                var r = "", a = "";
+                do { var ty = t % 1e9; t = Math.floor(t / 1e9), r = t > 0 ? o(ty, !0) + a + r : o(ty, !1) + a + r, a = " tỷ" } while (t > 0);
+                return r.trim().charAt(0).toUpperCase() + r.trim().slice(1) + " đồng chẵn";
+            }
+        })();
+
+        document.getElementById('moneyText').innerText = docSo(@Model.Amount);
+        updateUI();
+    </script>
+</body>
+</html>
